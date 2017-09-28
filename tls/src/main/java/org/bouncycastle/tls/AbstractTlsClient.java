@@ -186,13 +186,33 @@ public abstract class AbstractTlsClient
              * TODO Could just add all the EC groups since we support them all, but users may not
              * want to use unnecessarily large groups. Need configuration options.
              */
-            supportedGroups.addElement(NamedGroup.secp256r1);
-            supportedGroups.addElement(NamedGroup.secp384r1);
+            int[] supportedCurves = NamedGroup.getSupportedCurves();
+            for (int curve : supportedCurves) 
+            {
+                if(getCrypto().hasNamedGroup(curve)) 
+                {
+                    supportedGroups.addElement(curve);
+                }
+            }
 
-            this.clientECPointFormats = new short[]{ ECPointFormat.uncompressed,
-                ECPointFormat.ansiX962_compressed_prime, ECPointFormat.ansiX962_compressed_char2, };
+            short[] supportedFormats = ECPointFormat.getSupportedFormats();
 
-            TlsECCUtils.addSupportedPointFormatsExtension(clientExtensions, clientECPointFormats);
+            Vector<Short> clientECPointFormats = new Vector<Short>();
+            for (short format : supportedFormats) 
+            {
+                if(getCrypto().hasECPointFormat(format)) 
+                {
+                    clientECPointFormats.addElement(format);
+                }
+            }
+            
+            this.clientECPointFormats = new short[clientECPointFormats.size()];
+            for (int i = 0; i < clientECPointFormats.size(); i++) 
+            {
+                this.clientECPointFormats[i] = clientECPointFormats.get(i);
+            }
+            
+            TlsECCUtils.addSupportedPointFormatsExtension(clientExtensions, this.clientECPointFormats);
         }
 
         if (TlsDHUtils.containsDHECipherSuites(cipherSuites))
@@ -201,9 +221,14 @@ public abstract class AbstractTlsClient
              * TODO Could just add all the FFDHE groups since we support them all, but users may not
              * want to use unnecessarily large groups. Need configuration options.
              */
-            supportedGroups.addElement(NamedGroup.ffdhe2048);
-            supportedGroups.addElement(NamedGroup.ffdhe3072);
-            supportedGroups.addElement(NamedGroup.ffdhe4096);
+            int[] supportedFiniteFields = NamedGroup.getSupportedFiniteFields();
+            for (int finiteFields : supportedFiniteFields) 
+            {
+                if(getCrypto().hasNamedGroup(finiteFields)) 
+                {
+                    supportedGroups.addElement(finiteFields);
+                }
+            }
         }
 
         if (!supportedGroups.isEmpty())
