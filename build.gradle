@@ -96,9 +96,9 @@ subprojects {
                     username "${mavenUsername}"
                     password "${mavenPassword}"
                 }
-                url "https://artifacts.ehex.de/repository/snapshots/"
+               // url "https://artifacts.ehex.de/repository/snapshots/"
                //url "https://artifacts.ehex.de/repository/snapshots/"
-		       //url "https://artifacts.ehex.de/repository/releases/"
+		 url "https://artifacts.ehex.de/repository/releases/"
                // url "https://nexus.ehex.de/content/repositories/snapshots/" 
             }
         }
