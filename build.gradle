@@ -46,16 +46,61 @@ task printProperties << {
 
 subprojects {
     apply plugin: 'eclipse'
+    apply plugin: 'maven-publish'
 
     sourceCompatibility = 1.5
     targetCompatibility = 1.5
-    version = '1.59'
+    version = '1.59.1'
 
     test {
         systemProperty 'bc.test.data.home', bcTestDataHome
 
         filter {
             includeTestsMatching "*AllTests"
+        }
+    }
+    
+    task sourceJar(type: Jar) {
+        from sourceSets.main.allJava
+    }
+    
+    publish {
+        dependsOn assemble
+    }
+
+    publishing {
+    
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+
+                
+                artifact sourceJar {
+                    classifier "sources"
+                }
+                groupId "de.ehex.external.bouncycastle"
+                artifactId "${project.jar.baseName}"
+                version "${project.version}"
+                
+                pom.withXml {
+                    asNode().children().last() + {
+                        resolveStrategy = Closure.DELEGATE_FIRST
+                        name "${project.name}"
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                credentials{
+                    username "${mavenUsername}"
+                    password "${mavenPassword}"
+                }
+                url "https://artifacts.ehex.de/repository/snapshots/"
+               //url "https://artifacts.ehex.de/repository/snapshots/"
+		       //url "https://artifacts.ehex.de/repository/releases/"
+               // url "https://nexus.ehex.de/content/repositories/snapshots/" 
+            }
         }
     }
 }
