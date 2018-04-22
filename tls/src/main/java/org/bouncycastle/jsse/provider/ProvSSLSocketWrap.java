@@ -13,6 +13,7 @@ import java.security.cert.X509Certificate;
 
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
+import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
 import org.bouncycastle.jsse.BCSSLConnection;
@@ -524,14 +525,24 @@ class ProvSSLSocketWrap
 
     public boolean isServerTrusted(X509Certificate[] chain, String authType)
     {
-        // TODO[jsse] Consider X509ExtendedTrustManager and/or HostnameVerifier functionality
-
+        
         X509TrustManager tm = contextData.getTrustManager();
-        if (tm != null)
+
+		if (tm != null)
         {
             try
             {
-                tm.checkServerTrusted(chain, authType);
+            	if (tm instanceof X509ExtendedTrustManager) 
+            	{
+            		((X509ExtendedTrustManager)tm).checkServerTrusted(
+            				chain.clone(),
+            				authType,
+	                        this);
+            	}
+            	else {
+            		tm.checkServerTrusted(chain.clone(), authType);
+            		// TODO[jsse] Consider HostnameVerifier functionality
+            	}
                 return true;
             }
             catch (CertificateException e)
@@ -540,7 +551,6 @@ class ProvSSLSocketWrap
         }
         return false;
     }
-
     public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
     {
         this.connection = connection;
