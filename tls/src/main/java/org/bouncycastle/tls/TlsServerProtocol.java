@@ -7,10 +7,14 @@ import java.io.OutputStream;
 import java.util.Vector;
 
 import org.bouncycastle.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TlsServerProtocol
     extends TlsProtocol
 {
+    private static final Logger LOG = LoggerFactory.getLogger(TlsServerProtocol.class);
+    
     protected TlsServer tlsServer = null;
     TlsServerContextImpl tlsServerContext = null;
 
@@ -67,6 +71,7 @@ public class TlsServerProtocol
             throw new IllegalStateException("'accept' can only be called once");
         }
 
+        LOG.debug("Receives a TLS handshake in the role of server.");
         this.tlsServer = tlsServer;
 
         this.securityParameters = new SecurityParameters();
@@ -113,6 +118,7 @@ public class TlsServerProtocol
     protected void handleHandshakeMessage(short type, ByteArrayInputStream buf)
         throws IOException
     {
+    	LOG.debug("Handle HandshakeMessage [{}]", type);
         switch (type)
         {
         case HandshakeType.client_hello:
@@ -123,6 +129,7 @@ public class TlsServerProtocol
             {
                 receiveClientHelloMessage(buf);
                 this.connection_state = CS_CLIENT_HELLO;
+            	LOG.trace("New connection state CS_CLIENT_HELLO");
 
                 // NOTE: Currently no server support for session resumption
                 {
@@ -134,6 +141,7 @@ public class TlsServerProtocol
 
                 sendServerHelloMessage();
                 this.connection_state = CS_SERVER_HELLO;
+            	LOG.trace("New connection state CS_SERVER_HELLO");
 
                 recordStream.notifyHelloComplete();
 
@@ -143,6 +151,7 @@ public class TlsServerProtocol
                     sendSupplementalDataMessage(serverSupplementalData);
                 }
                 this.connection_state = CS_SERVER_SUPPLEMENTAL_DATA;
+            	LOG.trace("New connection state CS_SERVER_SUPPLEMENTAL_DATA");
 
                 this.keyExchange = tlsServer.getKeyExchange();
                 this.keyExchange.init(getContext());
@@ -163,6 +172,7 @@ public class TlsServerProtocol
                     sendCertificateMessage(serverCertificate);
                 }
                 this.connection_state = CS_SERVER_CERTIFICATE;
+            	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
 
                 // TODO[RFC 3546] Check whether empty certificates is possible, allowed, or excludes CertificateStatus
                 if (serverCertificate == null || serverCertificate.isEmpty())
@@ -179,7 +189,8 @@ public class TlsServerProtocol
                     }
                 }
 
-                this.connection_state = CS_CERTIFICATE_STATUS;
+                this.connection_state = CS_SERVER_CERTIFICATE;
+            	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
 
                 byte[] serverKeyExchange = this.keyExchange.generateServerKeyExchange();
                 if (serverKeyExchange != null)
@@ -187,6 +198,7 @@ public class TlsServerProtocol
                     sendServerKeyExchangeMessage(serverKeyExchange);
                 }
                 this.connection_state = CS_SERVER_KEY_EXCHANGE;
+            	LOG.trace("New connection state CS_SERVER_KEY_EXCHANGE");
 
                 if (this.serverCredentials != null)
                 {
@@ -207,9 +219,11 @@ public class TlsServerProtocol
                     }
                 }
                 this.connection_state = CS_CERTIFICATE_REQUEST;
+            	LOG.trace("New connection state CS_CERTIFICATE_REQUEST");
 
                 sendServerHelloDoneMessage();
                 this.connection_state = CS_SERVER_HELLO_DONE;
+            	LOG.trace("New connection state CS_SERVER_HELLO_DONE");
 
                 boolean forceBuffering = false;
                 TlsUtils.sealHandshakeHash(getContext(), this.recordStream.getHandshakeHash(), forceBuffering);
@@ -234,6 +248,7 @@ public class TlsServerProtocol
             {
                 tlsServer.processClientSupplementalData(readSupplementalDataMessage(buf));
                 this.connection_state = CS_CLIENT_SUPPLEMENTAL_DATA;
+            	LOG.trace("New connection state CS_CLIENT_SUPPLEMENTAL_DATA");
                 break;
             }
             default:
@@ -258,6 +273,7 @@ public class TlsServerProtocol
                 }
                 receiveCertificateMessage(buf);
                 this.connection_state = CS_CLIENT_CERTIFICATE;
+            	LOG.trace("New connection state CS_CLIENT_CERTIFICATE");
                 break;
             }
             default:
@@ -303,6 +319,7 @@ public class TlsServerProtocol
             {
                 receiveClientKeyExchangeMessage(buf);
                 this.connection_state = CS_CLIENT_KEY_EXCHANGE;
+            	LOG.trace("New connection state CS_CLIENT_KEY_EXCHANGE");
                 break;
             }
             default:
@@ -328,6 +345,7 @@ public class TlsServerProtocol
 
                 receiveCertificateVerifyMessage(buf);
                 this.connection_state = CS_CERTIFICATE_VERIFY;
+            	LOG.trace("New connection state CS_CERTIFICATE_VERIFY");
 
                 break;
             }
@@ -352,16 +370,19 @@ public class TlsServerProtocol
             {
                 processFinishedMessage(buf);
                 this.connection_state = CS_CLIENT_FINISHED;
+            	LOG.trace("New connection state CS_CLIENT_FINISHED");
 
                 if (this.expectSessionTicket)
                 {
                     sendNewSessionTicketMessage(tlsServer.getNewSessionTicket());
                 }
                 this.connection_state = CS_SERVER_SESSION_TICKET;
+            	LOG.trace("New connection state CS_SERVER_SESSION_TICKET");
 
                 sendChangeCipherSpecMessage();
                 sendFinishedMessage();
                 this.connection_state = CS_SERVER_FINISHED;
+            	LOG.trace("New connection state CS_SERVER_FINISHED");
 
                 completeHandshake();
                 break;
@@ -442,7 +463,8 @@ public class TlsServerProtocol
     protected void receiveCertificateMessage(ByteArrayInputStream buf)
         throws IOException
     {
-        Certificate clientCertificate = Certificate.parse(getContext(), buf);
+    	LOG.debug("Receive CertificateMessage");
+    	Certificate clientCertificate = Certificate.parse(getContext(), buf);
 
         assertEmpty(buf);
 
@@ -452,6 +474,7 @@ public class TlsServerProtocol
     protected void receiveCertificateVerifyMessage(ByteArrayInputStream buf)
         throws IOException
     {
+    	LOG.debug("Receive CertificateVerifyMessage");
         if (certificateRequest == null)
         {
             throw new IllegalStateException();
@@ -469,9 +492,11 @@ public class TlsServerProtocol
     protected void receiveClientHelloMessage(ByteArrayInputStream buf)
         throws IOException
     {
+    	LOG.debug("Receive ClientHelloMessage");
         ProtocolVersion client_version = TlsUtils.readVersion(buf);
         recordStream.setWriteVersion(client_version);
 
+        LOG.debug("ClientVersion [{}]", client_version);
         if (client_version.isDTLS())
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
@@ -500,7 +525,8 @@ public class TlsServerProtocol
             throw new TlsFatalAlert(AlertDescription.decode_error);
         }
         this.offeredCipherSuites = TlsUtils.readUint16Array(cipher_suites_length / 2, buf);
-
+        LOG.debug("Offered CipherSuites [{}]", offeredCipherSuites);
+        
         /*
          * TODO RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
          * resumption request), it MUST include the compression_method from that session.
@@ -511,6 +537,7 @@ public class TlsServerProtocol
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
         this.offeredCompressionMethods = TlsUtils.readUint8Array(compression_methods_length, buf);
+        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
 
         /*
          * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
@@ -592,6 +619,7 @@ public class TlsServerProtocol
     protected void receiveClientKeyExchangeMessage(ByteArrayInputStream buf)
         throws IOException
     {
+    	LOG.debug("Receive ClientKeyExchangeMessage");
         keyExchange.processClientKeyExchange(buf);
 
         assertEmpty(buf);
@@ -607,6 +635,7 @@ public class TlsServerProtocol
     protected void sendCertificateRequestMessage(CertificateRequest certificateRequest)
         throws IOException
     {
+    	LOG.debug("Send CertificateRequestMessage");
         HandshakeMessage message = new HandshakeMessage(HandshakeType.certificate_request);
 
         certificateRequest.encode(message);
@@ -617,6 +646,7 @@ public class TlsServerProtocol
     protected void sendCertificateStatusMessage(CertificateStatus certificateStatus)
         throws IOException
     {
+    	LOG.debug("Send CertificateStatusMessage");
         HandshakeMessage message = new HandshakeMessage(HandshakeType.certificate_status);
 
         certificateStatus.encode(message);
@@ -627,6 +657,7 @@ public class TlsServerProtocol
     protected void sendNewSessionTicketMessage(NewSessionTicket newSessionTicket)
         throws IOException
     {
+    	LOG.debug("Send NewSessionTicketMessage");
         if (newSessionTicket == null)
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
@@ -642,10 +673,13 @@ public class TlsServerProtocol
     protected void sendServerHelloMessage()
         throws IOException
     {
+    	LOG.debug("Send ServerHelloMessage");
         HandshakeMessage message = new HandshakeMessage(HandshakeType.server_hello);
 
         {
             ProtocolVersion server_version = tlsServer.getServerVersion();
+
+        	LOG.debug("ServerVersion [{}]", server_version);
             if (!server_version.isEqualOrEarlierVersionOf(getContext().getClientVersion()))
             {
                 throw new TlsFatalAlert(AlertDescription.internal_error);
@@ -676,14 +710,16 @@ public class TlsServerProtocol
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
         securityParameters.cipherSuite = selectedCipherSuite;
-
+        LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
+    	
         short selectedCompressionMethod = tlsServer.getSelectedCompressionMethod();
         if (!Arrays.contains(offeredCompressionMethods, selectedCompressionMethod))
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
         securityParameters.compressionAlgorithm = selectedCompressionMethod;
-
+        LOG.debug("Selected CompressionMethod [{}]", selectedCompressionMethod);
+        
         TlsUtils.writeUint16(selectedCipherSuite, message);
         TlsUtils.writeUint8(selectedCompressionMethod, message);
 
@@ -768,6 +804,7 @@ public class TlsServerProtocol
     protected void sendServerHelloDoneMessage()
         throws IOException
     {
+        LOG.debug("Send ServerHelloDoneMessage");
         byte[] message = new byte[4];
         TlsUtils.writeUint8(HandshakeType.server_hello_done, message, 0);
         TlsUtils.writeUint24(0, message, 1);
@@ -778,6 +815,7 @@ public class TlsServerProtocol
     protected void sendServerKeyExchangeMessage(byte[] serverKeyExchange)
         throws IOException
     {
+        LOG.debug("Send ServerKeyExchangeMessage");
         HandshakeMessage message = new HandshakeMessage(HandshakeType.server_key_exchange, serverKeyExchange.length);
 
         message.write(serverKeyExchange);
