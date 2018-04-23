@@ -10,10 +10,14 @@ import java.util.Vector;
 
 import org.bouncycastle.tls.crypto.TlsStreamSigner;
 import org.bouncycastle.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TlsClientProtocol
     extends TlsProtocol
 {
+    private static final Logger LOG = LoggerFactory.getLogger(TlsClientProtocol.class);
+    
     protected TlsClient tlsClient = null;
     TlsClientContextImpl tlsClientContext = null;
 
@@ -132,6 +136,7 @@ public class TlsClientProtocol
     {
         if (this.resumedSession)
         {
+        	LOG.debug("Resumed session");
             if (type != HandshakeType.finished || this.connection_state != CS_SERVER_HELLO)
             {
                 throw new TlsFatalAlert(AlertDescription.unexpected_message);
@@ -139,15 +144,18 @@ public class TlsClientProtocol
 
             processFinishedMessage(buf);
             this.connection_state = CS_SERVER_FINISHED;
-
+        	LOG.trace("New connection state CS_SERVER_FINISHED");
+        	
             sendChangeCipherSpecMessage();
             sendFinishedMessage();
             this.connection_state = CS_CLIENT_FINISHED;
+        	LOG.trace("New connection state CS_SERVER_FINISHED");
 
             completeHandshake();
             return;
         }
 
+    	LOG.debug("Handle HandshakeMessage [{}]", type);
         switch (type)
         {
         case HandshakeType.certificate:
@@ -186,6 +194,7 @@ public class TlsClientProtocol
             }
 
             this.connection_state = CS_SERVER_CERTIFICATE;
+        	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
             break;
         }
         case HandshakeType.certificate_status:
@@ -209,6 +218,7 @@ public class TlsClientProtocol
                 assertEmpty(buf);
 
                 this.connection_state = CS_CERTIFICATE_STATUS;
+            	LOG.trace("New connection state CS_CERTIFICATE_STATUS");
                 break;
             }
             default:
@@ -237,6 +247,7 @@ public class TlsClientProtocol
             {
                 processFinishedMessage(buf);
                 this.connection_state = CS_SERVER_FINISHED;
+            	LOG.trace("New connection state CS_SERVER_FINISHED");
 
                 completeHandshake();
                 break;
@@ -254,6 +265,7 @@ public class TlsClientProtocol
             {
                 receiveServerHelloMessage(buf);
                 this.connection_state = CS_SERVER_HELLO;
+            	LOG.trace("New connection state CS_SERVER_HELLO");
 
                 this.recordStream.notifyHelloComplete();
 
@@ -324,6 +336,7 @@ public class TlsClientProtocol
                 assertEmpty(buf);
 
                 this.connection_state = CS_SERVER_HELLO_DONE;
+            	LOG.trace("New connection state CS_SERVER_HELLO_DONE");
 
                 Vector clientSupplementalData = tlsClient.getClientSupplementalData();
                 if (clientSupplementalData != null)
@@ -331,6 +344,7 @@ public class TlsClientProtocol
                     sendSupplementalDataMessage(clientSupplementalData);
                 }
                 this.connection_state = CS_CLIENT_SUPPLEMENTAL_DATA;
+            	LOG.trace("New connection state CS_CLIENT_SUPPLEMENTAL_DATA");
 
                 TlsCredentials clientCredentials = null;
                 TlsCredentialedSigner credentialedSigner = null;
@@ -371,6 +385,7 @@ public class TlsClientProtocol
                 }
 
                 this.connection_state = CS_CLIENT_CERTIFICATE;
+            	LOG.trace("New connection state CS_CLIENT_CERTIFICATE");
 
                 boolean forceBuffering = streamSigner != null;
                 TlsUtils.sealHandshakeHash(getContext(), this.recordStream.getHandshakeHash(), forceBuffering);
@@ -381,6 +396,7 @@ public class TlsClientProtocol
                  */
                 sendClientKeyExchangeMessage();
                 this.connection_state = CS_CLIENT_KEY_EXCHANGE;
+            	LOG.trace("New connection state CS_CLIENT_KEY_EXCHANGE");
 
                 TlsHandshakeHash prepareFinishHash = recordStream.prepareToFinish();
                 this.securityParameters.sessionHash = TlsUtils.getCurrentPRFHash(prepareFinishHash);
@@ -395,6 +411,7 @@ public class TlsClientProtocol
                         credentialedSigner, streamSigner, prepareFinishHash);
                     sendCertificateVerifyMessage(certificateVerify);
                     this.connection_state = CS_CERTIFICATE_VERIFY;
+                	LOG.trace("New connection state CS_CERTIFICATE_VERIFY");
                 }
 
                 sendChangeCipherSpecMessage();
@@ -406,6 +423,7 @@ public class TlsClientProtocol
             }
 
             this.connection_state = CS_CLIENT_FINISHED;
+        	LOG.trace("New connection state CS_CLIENT_FINISHED");
             break;
         }
         case HandshakeType.server_key_exchange:
@@ -485,6 +503,7 @@ public class TlsClientProtocol
             }
 
             this.connection_state = CS_CERTIFICATE_REQUEST;
+        	LOG.trace("New connection state CS_CERTIFICATE_REQUEST");
             break;
         }
         case HandshakeType.session_ticket:
@@ -516,6 +535,7 @@ public class TlsClientProtocol
             }
 
             this.connection_state = CS_SERVER_SESSION_TICKET;
+        	LOG.trace("New connection state CS_SERVER_SESSION_TICKET");
             break;
         }
         case HandshakeType.hello_request:
@@ -546,6 +566,7 @@ public class TlsClientProtocol
     protected void handleServerCertificate()
         throws IOException
     {
+    	LOG.debug("Handle ServerCertificate");
         if (this.authentication == null)
         {
             // There was no server certificate message; check it's OK
@@ -561,6 +582,7 @@ public class TlsClientProtocol
     protected void handleSupplementalData(Vector serverSupplementalData)
         throws IOException
     {
+    	LOG.debug("Handle SupplementalData");
         this.tlsClient.processServerSupplementalData(serverSupplementalData);
         this.connection_state = CS_SERVER_SUPPLEMENTAL_DATA;
 
@@ -581,6 +603,7 @@ public class TlsClientProtocol
     protected void receiveServerHelloMessage(ByteArrayInputStream buf)
         throws IOException
     {
+    	LOG.debug("Receive ServerHelloMessage");
         ProtocolVersion server_version = TlsUtils.readVersion(buf);
 
         {
@@ -632,6 +655,7 @@ public class TlsClientProtocol
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
+        LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
         this.tlsClient.notifySelectedCipherSuite(selectedCipherSuite);
 
         /*
@@ -643,6 +667,7 @@ public class TlsClientProtocol
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
+        LOG.debug("Selected CompressionMethod [{}]", selectedCompressionMethod);
         this.tlsClient.notifySelectedCompressionMethod(selectedCompressionMethod);
 
         /*
@@ -817,6 +842,7 @@ public class TlsClientProtocol
     protected void sendCertificateVerifyMessage(DigitallySigned certificateVerify)
         throws IOException
     {
+        LOG.debug("Send CertificateVerifyMessage");
         HandshakeMessage message = new HandshakeMessage(HandshakeType.certificate_verify);
 
         certificateVerify.encode(message);
@@ -827,6 +853,7 @@ public class TlsClientProtocol
     protected void sendClientHelloMessage()
         throws IOException
     {
+        LOG.debug("Send ClientHelloMessage");
         this.recordStream.setWriteVersion(this.tlsClient.getClientHelloRecordLayerVersion());
 
         ProtocolVersion client_version = this.tlsClient.getClientVersion();
@@ -836,7 +863,8 @@ public class TlsClientProtocol
         }
 
         getContextAdmin().setClientVersion(client_version);
-
+        LOG.debug("ClientVersion [{}]", client_version);
+        
         /*
          * TODO RFC 5077 3.4. When presenting a ticket, the client MAY generate and include a
          * Session ID in the TLS ClientHello.
@@ -854,9 +882,11 @@ public class TlsClientProtocol
         boolean fallback = this.tlsClient.isFallback();
 
         this.offeredCipherSuites = this.tlsClient.getCipherSuites();
-
+        LOG.debug("Offered CipherSuites [{}]", offeredCipherSuites);
+        
         this.offeredCompressionMethods = this.tlsClient.getCompressionMethods();
-
+        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
+        
         if (session_id.length > 0 && this.sessionParameters != null)
         {
             if (!Arrays.contains(this.offeredCipherSuites, sessionParameters.getCipherSuite())
@@ -924,6 +954,7 @@ public class TlsClientProtocol
     protected void sendClientKeyExchangeMessage()
         throws IOException
     {
+        LOG.debug("Send ClientKeyExchangeMessage");
         HandshakeMessage message = new HandshakeMessage(HandshakeType.client_key_exchange);
 
         this.keyExchange.generateClientKeyExchange(message);
