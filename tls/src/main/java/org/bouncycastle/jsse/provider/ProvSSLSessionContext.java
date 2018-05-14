@@ -66,6 +66,7 @@ class ProvSSLSessionContext
             return null;
         }
 
+        removeAllExpiredSessions();
         return checkSession(sessionsByID.get(new SessionID(sessionID)));
     }
 

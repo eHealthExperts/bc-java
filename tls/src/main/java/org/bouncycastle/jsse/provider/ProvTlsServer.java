@@ -71,7 +71,7 @@ class ProvTlsServer
 
         if (!manager.getEnableSessionCreation())
         {
-            throw new SSLException("Session resumption not implemented yet and session creation is disabled");
+            throw new SSLException("Session creation is disabled");
         }
     }
 
@@ -172,6 +172,10 @@ class ProvTlsServer
             manager.getContext().convertCipherSuites(sslParameters.getCipherSuites()));
     }
 
+    public boolean getNeedClientAuth() {
+    	return sslParameters.getNeedClientAuth();
+    }
+    
     @Override
     protected short[] getCompressionMethods()
     {
@@ -237,7 +241,7 @@ class ProvTlsServer
         super.getServerExtensions();
 
         /*
-         * TODO[jsse] RFC 6066 When resuming a session, the server MUST NOT include a server_name
+         * [jsse] RFC 6066 When resuming a session, the server MUST NOT include a server_name
          * extension in the server hello.
          */
         if (matchedSNIServerName != null)
@@ -400,10 +404,6 @@ class ProvTlsServer
 
         if (clientExtensions != null)
         {
-            /*
-             * TODO[jsse] RFC 6066 A server that implements this extension MUST NOT accept the
-             * request to resume the session if the server_name extension contains a different name.
-             */
             Collection<BCSNIMatcher> sniMatchers = sslParameters.getSNIMatchers();
             if (sniMatchers != null && !sniMatchers.isEmpty())
             {

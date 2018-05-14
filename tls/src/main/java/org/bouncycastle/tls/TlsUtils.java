@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -30,6 +31,7 @@ import org.bouncycastle.tls.crypto.TlsStreamVerifier;
 import org.bouncycastle.tls.crypto.TlsVerifier;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
+import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.io.Streams;
 
 /**
@@ -856,6 +858,30 @@ public class TlsUtils
         return new TlsSessionImpl(sessionID, sessionParameters);
     }
 
+    public static byte[] generateSessionID(SecureRandom generator)
+    {
+		long temp = System.currentTimeMillis() / 1000;
+		int gmt_unix_time;
+		if (temp < Integer.MAX_VALUE) 
+		{
+			gmt_unix_time = (int) temp;
+		} 
+		else 
+		{
+			gmt_unix_time = Integer.MAX_VALUE;
+		}
+
+		byte[] sessionId = new byte[32];
+		generator.nextBytes(sessionId);
+
+		sessionId[0] = (byte) (gmt_unix_time >> 24);
+		sessionId[1] = (byte) (gmt_unix_time >> 16);
+		sessionId[2] = (byte) (gmt_unix_time >> 8);
+		sessionId[3] = (byte) gmt_unix_time;
+		
+		return sessionId;
+   }
+    
     public static boolean isSignatureAlgorithmsExtensionAllowed(ProtocolVersion clientVersion)
     {
         return ProtocolVersion.TLSv12.isEqualOrEarlierVersionOf(clientVersion.getEquivalentTLSVersion());
