@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import org.bouncycastle.tls.NamedGroup;
 import org.bouncycastle.tls.TlsDHUtils;
 import org.bouncycastle.tls.crypto.DHStandardGroups;
+import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.tls.crypto.TlsDHConfig;
 import org.bouncycastle.util.Arrays;
 
@@ -99,15 +100,16 @@ abstract class SupportedGroups
         return result;
     }
 
-    static Vector getClientSupportedGroups(boolean isFips, boolean offeringDH, boolean offeringEC)
+    static Vector getClientSupportedGroups(boolean isFips, TlsCrypto tlsCrypto, boolean offeringDH, boolean offeringEC)
     {
-        int[] namedGroups = provJdkTlsNamedGroups != null ? provJdkTlsNamedGroups : defaultClientNamedGroups;
+        int[] namedGroups = provJdkTlsNamedGroups != null ? provJdkTlsNamedGroups : NamedGroup.getSupportedCurves();
 
         Vector result = new Vector();
         for (int namedGroup : namedGroups)
         {
-            if ((offeringDH && NamedGroup.refersToASpecificFiniteField(namedGroup))
+            if (((offeringDH && NamedGroup.refersToASpecificFiniteField(namedGroup))
                 || (offeringEC && NamedGroup.refersToASpecificCurve(namedGroup)))
+        		&& tlsCrypto.hasNamedGroup(namedGroup))
             {
                 if (!isFips || FipsUtils.isFipsNamedGroup(namedGroup))
                 {
@@ -117,8 +119,8 @@ abstract class SupportedGroups
         }
         return result;
     }
-
-    static int getServerDefaultCurve(boolean isFips, int minimumCurveBits)
+    
+    static int getServerDefaultCurve(boolean isFips, TlsCrypto tlsCrypto, int minimumCurveBits)
     {
         /*
          * If supported groups wasn't explicitly configured, servers support all available curves
@@ -286,7 +288,7 @@ abstract class SupportedGroups
         }
     }
 
-    static int getServerSelectedCurve(boolean isFips, int minimumCurveBits, int[] clientSupportedGroups)
+    static int getServerSelectedCurve(boolean isFips, TlsCrypto tlsCrypto, int minimumCurveBits, int[] clientSupportedGroups)
     {
         /*
          * If supported groups wasn't explicitly configured, servers support all available curves
@@ -305,7 +307,7 @@ abstract class SupportedGroups
 
             if (serverSupportedGroups == null || Arrays.contains(serverSupportedGroups, namedGroup))
             {
-                if (NamedGroup.getCurveBits(namedGroup) >= minimumCurveBits)
+                if (NamedGroup.getCurveBits(namedGroup) >= minimumCurveBits && tlsCrypto.hasNamedGroup(namedGroup))
                 {
                     if (!isFips || FipsUtils.isFipsNamedGroup(namedGroup))
                     {
@@ -318,7 +320,7 @@ abstract class SupportedGroups
         return -1;
     }
 
-    static int getServerSelectedFiniteField(boolean isFips, int minimumFiniteFieldBits, int[] clientSupportedGroups)
+    static int getServerSelectedFiniteField(boolean isFips, TlsCrypto tlsCrypto, int minimumFiniteFieldBits, int[] clientSupportedGroups)
     {
         /*
          * If supported groups wasn't explicitly configured, servers support all available finite fields.
@@ -331,7 +333,7 @@ abstract class SupportedGroups
 
             if (serverSupportedGroups == null || Arrays.contains(serverSupportedGroups, namedGroup))
             {
-                if (NamedGroup.getFiniteFieldBits(namedGroup) >= minimumFiniteFieldBits)
+                if (NamedGroup.getFiniteFieldBits(namedGroup) >= minimumFiniteFieldBits && tlsCrypto.hasNamedGroup(namedGroup))
                 {
                     if (!isFips || FipsUtils.isFipsNamedGroup(namedGroup))
                     {

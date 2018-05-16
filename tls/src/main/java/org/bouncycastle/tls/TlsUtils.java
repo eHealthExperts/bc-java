@@ -2969,9 +2969,14 @@ public class TlsUtils
     static void processServerCertificate(Certificate serverCertificate, CertificateStatus serverCertificateStatus, TlsKeyExchange keyExchange,
         TlsAuthentication clientAuthentication, Hashtable clientExtensions, Hashtable serverExtensions) throws IOException
     {
-        checkTlsFeatures(serverCertificate, clientExtensions, serverExtensions);
+    	if (serverCertificate.isEmpty())
+    	{
+    		throw new TlsFatalAlert(AlertDescription.bad_certificate);
+    	}
+
+    	clientAuthentication.notifyServerCertificate(new TlsServerCertificateImpl(serverCertificate, serverCertificateStatus));
+    	checkTlsFeatures(serverCertificate, clientExtensions, serverExtensions);
         keyExchange.processServerCertificate(serverCertificate);
-        clientAuthentication.notifyServerCertificate(new TlsServerCertificateImpl(serverCertificate, serverCertificateStatus));
     }
 
     static CertificateRequest validateCertificateRequest(CertificateRequest certificateRequest, TlsKeyExchange keyExchange)

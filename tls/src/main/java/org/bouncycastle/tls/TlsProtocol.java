@@ -13,9 +13,13 @@ import java.util.Vector;
 import org.bouncycastle.tls.crypto.TlsSecret;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class TlsProtocol
 {
+    private static final Logger LOG = LoggerFactory.getLogger(TlsProtocol.class);
+    
     protected static final Integer EXT_RenegotiationInfo = Integers.valueOf(ExtensionType.renegotiation_info);
     protected static final Integer EXT_SessionTicket = Integers.valueOf(ExtensionType.session_ticket);
 
@@ -125,10 +129,12 @@ public abstract class TlsProtocol
 
         if (alertLevel == AlertLevel.warning)
         {
+        	LOG.warn("Handle alert [{}] [{}]", alertLevel, alertDescription);
             handleAlertWarningMessage(alertDescription);
         }
         else
         {
+        	LOG.error("Handle alert [{}] [{}]", alertLevel, alertDescription);
             handleFailure();
 
             throw new TlsFatalAlertReceived(alertDescription);
@@ -159,6 +165,7 @@ public abstract class TlsProtocol
     protected void handleClose(boolean user_canceled)
         throws IOException
     {
+    	LOG.debug("Handle close [{}]", user_canceled);
         if (!closed)
         {
             this.closed = true;
@@ -240,6 +247,7 @@ public abstract class TlsProtocol
 
     protected void cleanupHandshake()
     {
+    	LOG.debug("Cleanup handshake");
         if (this.expected_verify_data != null)
         {
             Arrays.fill(this.expected_verify_data, (byte)0);
@@ -284,6 +292,7 @@ public abstract class TlsProtocol
     protected void completeHandshake()
         throws IOException
     {
+    	LOG.debug("Complete handshake");
         try
         {
             this.connection_state = CS_END;
@@ -300,6 +309,7 @@ public abstract class TlsProtocol
              */
             if (!appDataReady)
             {
+            	LOG.debug("Ready to send and receive application data");
                 this.appDataReady = true;
 
                 if (blocking)
@@ -495,6 +505,7 @@ public abstract class TlsProtocol
     private void processChangeCipherSpec(byte[] buf, int off, int len)
         throws IOException
     {
+    	LOG.debug("Process ChangeCipherSpec");
         for (int i = 0; i < len; ++i)
         {
             short message = TlsUtils.readUint8(buf, off + i);
@@ -1101,6 +1112,7 @@ public abstract class TlsProtocol
     protected void processFinishedMessage(ByteArrayInputStream buf)
         throws IOException
     {
+    	LOG.debug("Process FinishedMessage");
         if (expected_verify_data == null)
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
@@ -1130,6 +1142,7 @@ public abstract class TlsProtocol
     protected void raiseAlertFatal(short alertDescription, String message, Throwable cause)
         throws IOException
     {
+    	LOG.error("Raise fatal alert [{}] [{}]", alertDescription, message, cause);
         getPeer().notifyAlertRaised(AlertLevel.fatal, alertDescription, message, cause);
 
         byte[] alert = new byte[]{ (byte)AlertLevel.fatal, (byte)alertDescription };
@@ -1147,6 +1160,7 @@ public abstract class TlsProtocol
     protected void raiseAlertWarning(short alertDescription, String message)
         throws IOException
     {
+    	LOG.warn("Raise fatal alert [{}] [{}]", alertDescription, message);
         getPeer().notifyAlertRaised(AlertLevel.warning, alertDescription, message, null);
 
         byte[] alert = new byte[]{ (byte)AlertLevel.warning, (byte)alertDescription };
@@ -1157,6 +1171,7 @@ public abstract class TlsProtocol
     protected void sendCertificateMessage(Certificate certificate)
         throws IOException
     {
+    	LOG.debug("Send CertificateMessage");
         if (certificate == null)
         {
             certificate = Certificate.EMPTY_CHAIN;
@@ -1174,6 +1189,7 @@ public abstract class TlsProtocol
     protected void sendChangeCipherSpecMessage()
         throws IOException
     {
+    	LOG.debug("Send ChangeCipherSpecMessage");
         byte[] message = new byte[]{ 1 };
         safeWriteRecord(ContentType.change_cipher_spec, message, 0, message.length);
         recordStream.sentWriteCipherSpec();
@@ -1182,6 +1198,7 @@ public abstract class TlsProtocol
     protected void sendFinishedMessage()
         throws IOException
     {
+    	LOG.debug("Send FinishedMessage");
         byte[] verify_data = createVerifyData(getContext().isServer());
 
         HandshakeMessage message = new HandshakeMessage(HandshakeType.finished, verify_data.length);
@@ -1199,6 +1216,7 @@ public abstract class TlsProtocol
     protected void sendSupplementalDataMessage(Vector supplementalData)
         throws IOException
     {
+    	LOG.debug("Send SupplementalDataMessage");
         HandshakeMessage message = new HandshakeMessage(HandshakeType.supplemental_data);
 
         writeSupplementalData(message, supplementalData);
@@ -1208,6 +1226,7 @@ public abstract class TlsProtocol
 
     protected byte[] createVerifyData(boolean isServer)
     {
+    	LOG.trace("Create verify data");
         return TlsUtils.calculateTLSVerifyData(getContext(), recordStream.getHandshakeHash(), isServer);
     }
 
@@ -1291,6 +1310,7 @@ public abstract class TlsProtocol
     protected static void establishMasterSecret(TlsContext context, TlsKeyExchange keyExchange)
         throws IOException
     {
+    	LOG.trace("Establish MasterSecret");
         TlsSecret preMasterSecret = keyExchange.generatePreMasterSecret();
         if (preMasterSecret == null)
         {

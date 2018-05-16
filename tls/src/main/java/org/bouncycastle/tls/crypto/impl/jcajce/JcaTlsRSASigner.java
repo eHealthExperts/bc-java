@@ -13,10 +13,13 @@ import org.bouncycastle.asn1.x509.DigestInfo;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
+import org.bouncycastle.tls.TlsClientProtocol;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsSigner;
 import org.bouncycastle.tls.crypto.TlsStreamSigner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Operator supporting the generation of RSA signatures.
@@ -24,6 +27,8 @@ import org.bouncycastle.tls.crypto.TlsStreamSigner;
 public class JcaTlsRSASigner
     implements TlsSigner
 {
+    private static final Logger LOG = LoggerFactory.getLogger(JcaTlsRSASigner.class);
+    
     private final PrivateKey privateKey;
     private final JcaTlsCrypto crypto;
 
@@ -45,10 +50,12 @@ public class JcaTlsRSASigner
     {
         try
         {
+        	LOG.debug("Generate raw signature");
             Signature signer = getRawSigner();
 
             if (algorithm != null)
             {
+            	LOG.debug("Signature algorithms [{}] [{}]", algorithm.getSignature(), algorithm.getHash());
                 if (algorithm.getSignature() != SignatureAlgorithm.rsa)
                 {
                     throw new IllegalStateException();
@@ -65,6 +72,7 @@ public class JcaTlsRSASigner
             }
             else
             {
+            	LOG.debug("Not include a DigestInfo encoding");
                 /*
                  * RFC 5246 4.7. Note that earlier versions of TLS used a different RSA signature
                  * scheme that did not include a DigestInfo encoding.
@@ -89,12 +97,14 @@ public class JcaTlsRSASigner
         {
             try
             {
+            	LOG.debug("Generate raw signature");
                 Signature rawSigner = getRawSigner();
 
                 if (JcaUtils.isSunMSCAPIProvider(rawSigner.getProvider()))
                 {
                     String algorithmName = JcaUtils.getJcaAlgorithmName(algorithm);
-
+                    LOG.debug("Signature algorithms [{}]", algorithmName);
+                    
                     final Signature signer = crypto.getHelper().createSignature(algorithmName);
                     signer.initSign(privateKey, crypto.getSecureRandom());
 
