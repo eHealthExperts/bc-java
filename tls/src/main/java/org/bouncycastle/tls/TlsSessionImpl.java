@@ -37,6 +37,12 @@ class TlsSessionImpl implements TlsSession
     public synchronized void invalidate()
     {
         this.resumable = false;
+        
+        if (this.sessionParameters != null)
+        {
+            this.sessionParameters.clear();
+        }
+
     }
 
     public synchronized boolean isResumable()
