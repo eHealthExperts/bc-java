@@ -64,11 +64,10 @@ public class EraseUtil {
         if (ecField != null) 
         {
 
-            ecField.toBigInteger(); // x = int[]; long[]
             Field declaredField = null;
             try 
             {
-                declaredField = ECFieldElement.class.getDeclaredField("x");
+                declaredField = ecField.getClass().getDeclaredField("x");
                 final boolean accessible = declaredField.isAccessible();
 
                 declaredField.setAccessible(true);
