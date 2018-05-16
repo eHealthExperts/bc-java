@@ -119,6 +119,20 @@ public class TlsServerProtocol
         throws IOException
     {
     	LOG.debug("Handle HandshakeMessage [{}]", type);
+    	 if (this.resumedSession)
+         {
+             if (type != HandshakeType.finished || this.connection_state != CS_SERVER_FINISHED)
+             {
+                 throw new TlsFatalAlert(AlertDescription.unexpected_message);
+             }
+
+             processFinishedMessage(buf);
+       
+             this.connection_state = CS_CLIENT_FINISHED;
+
+             completeHandshake();
+             return;
+         }
         switch (type)
         {
         case HandshakeType.client_hello:
@@ -127,15 +141,23 @@ public class TlsServerProtocol
             {
             case CS_START:
             {
+            	resetCurrentSession();
                 receiveClientHelloMessage(buf);
                 this.connection_state = CS_CLIENT_HELLO;
             	LOG.trace("New connection state CS_CLIENT_HELLO");
 
-                // NOTE: Currently no server support for session resumption
+                if(sessionParameters != null && tlsServer.getNeedClientAuth()) 
                 {
-                    invalidateSession();
+                	if(sessionParameters.getPeerCertificate() != null) 
+                	{
+                		resetCurrentSession();
+                	}
+                }
 
-                    this.tlsSession = TlsUtils.importSession(TlsUtils.EMPTY_BYTES, null);
+                this.resumedSession = sessionParameters != null;
+                if(!this.resumedSession) 
+                {
+                    this.tlsSession = TlsUtils.importSession(TlsUtils.generateSessionID(tlsServerContext.getCrypto().getSecureRandom()), null);
                     this.sessionParameters = null;
                 }
 
@@ -144,6 +166,18 @@ public class TlsServerProtocol
             	LOG.trace("New connection state CS_SERVER_HELLO");
 
                 recordStream.notifyHelloComplete();
+                
+                if(this.resumedSession) {
+                	this.securityParameters.masterSecret = getContext().getCrypto().adoptSecret(sessionParameters.getMasterSecret());
+                	
+                	recordStream.setPendingConnectionState(getPeer().getCompression(), getPeer().getCipher());
+                	
+                    sendChangeCipherSpecMessage();
+                    sendFinishedMessage();
+                    this.connection_state = CS_SERVER_FINISHED;
+                    
+                    return;
+                }
 
                 Vector serverSupplementalData = tlsServer.getServerSupplementalData();
                 if (serverSupplementalData != null)
@@ -514,11 +548,18 @@ public class TlsServerProtocol
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
 
-        /*
-         * TODO RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
-         * resumption request), this vector MUST include at least the cipher_suite from that
-         * session.
-         */
+        
+        TlsSession sessionToResume = tlsServer.getSessionToResume(sessionID);
+        if (sessionToResume != null && sessionToResume.isResumable())
+        {
+            SessionParameters sessionParameters = sessionToResume.exportSessionParameters();
+            if(sessionParameters != null && client_version.equals(sessionParameters.getNegotiatedVersion())) 
+            {
+                this.tlsSession = sessionToResume;
+                this.sessionParameters = sessionParameters;
+        	}
+        }
+        
         int cipher_suites_length = TlsUtils.readUint16(buf);
         if (cipher_suites_length < 2 || (cipher_suites_length & 1) != 0)
         {
@@ -528,17 +569,39 @@ public class TlsServerProtocol
         LOG.debug("Offered CipherSuites [{}]", offeredCipherSuites);
         
         /*
-         * TODO RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
-         * resumption request), it MUST include the compression_method from that session.
+         * RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
+         * resumption request), this vector MUST include at least the cipher_suite from that
+         * session.
          */
+        if (sessionID.length > 0 && this.sessionParameters != null)
+        {
+            if (!Arrays.contains(this.offeredCipherSuites, sessionParameters.getCipherSuite()))
+            {
+            	resetCurrentSession();
+            }
+        }
+        
         int compression_methods_length = TlsUtils.readUint8(buf);
         if (compression_methods_length < 1)
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
         this.offeredCompressionMethods = TlsUtils.readUint8Array(compression_methods_length, buf);
-        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
 
+        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
+      
+        /*
+         * RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
+         * resumption request), it MUST include the compression_method from that session.
+         */
+        if (sessionID.length > 0 && this.sessionParameters != null)
+        {
+            if (!Arrays.contains(this.offeredCompressionMethods, sessionParameters.getCompressionAlgorithm()))
+            {
+            	resetCurrentSession();
+            }
+        }
+        
         /*
          * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
          * extensions appearing in the client hello, and send a server hello containing no
@@ -561,8 +624,15 @@ public class TlsServerProtocol
 
         securityParameters.clientRandom = client_random;
 
-        tlsServer.notifyOfferedCipherSuites(offeredCipherSuites);
-        tlsServer.notifyOfferedCompressionMethods(offeredCompressionMethods);
+        if (sessionID.length > 0 && this.sessionParameters != null)
+        {
+        	tlsServer.notifyOfferedCipherSuites(new int[] {sessionParameters.getCipherSuite()});
+        	tlsServer.notifyOfferedCompressionMethods(new short[] {sessionParameters.getCompressionAlgorithm()});
+        }
+        else {
+        	tlsServer.notifyOfferedCipherSuites(offeredCipherSuites);
+        	tlsServer.notifyOfferedCompressionMethods(offeredCompressionMethods);
+        }
 
         /*
          * RFC 5746 3.6. Server Behavior: Initial Handshake
@@ -612,6 +682,21 @@ public class TlsServerProtocol
             // NOTE: Validates the padding extension data, if present
             TlsExtensionsUtils.getPaddingExtension(clientExtensions);
 
+            /*
+             * [jsse] RFC 6066 A server that implements this extension MUST NOT accept the
+             * request to resume the session if the server_name extension contains a different name.
+             */
+            if (sessionID.length > 0 && this.sessionParameters != null)
+            {
+            	ServerNameList oldServerNameList = TlsExtensionsUtils.getServerNameExtension(sessionParameters.readServerExtensions());
+            	ServerNameList serverNameList = TlsExtensionsUtils.getServerNameExtension(clientExtensions);
+            	if ((oldServerNameList != null && oldServerNameList.getServerNameList() != null) && //
+            			!oldServerNameList.getServerNameList().equals(serverNameList.getServerNameList()))
+            	{
+            		resetCurrentSession();
+            	}
+            }
+            
             tlsServer.processClientExtensions(clientExtensions);
         }
     }
@@ -696,32 +781,34 @@ public class TlsServerProtocol
         message.write(this.securityParameters.serverRandom);
 
         /*
-         * The server may return an empty session_id to indicate that the session will not be cached
-         * and therefore cannot be resumed.
+         * The server may return an session_id to indicate that the session will be cached
+         * and therefore can be resumed.
          */
         TlsUtils.writeOpaque8(tlsSession.getSessionID(), message);
 
-        int selectedCipherSuite = tlsServer.getSelectedCipherSuite();
-        if (!Arrays.contains(offeredCipherSuites, selectedCipherSuite)
-            || selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
-            || CipherSuite.isSCSV(selectedCipherSuite)
-            || !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, getContext().getServerVersion()))
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
-        securityParameters.cipherSuite = selectedCipherSuite;
-        LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
-    	
+    	int selectedCipherSuite = tlsServer.getSelectedCipherSuite();
+    	if (!Arrays.contains(offeredCipherSuites, selectedCipherSuite)
+    			|| selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
+    			|| CipherSuite.isSCSV(selectedCipherSuite)
+    			|| !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, getContext().getServerVersion()))
+    	{
+    		throw new TlsFatalAlert(AlertDescription.internal_error);
+    	}
+    	securityParameters.cipherSuite = selectedCipherSuite;
+      LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
+
+
         short selectedCompressionMethod = tlsServer.getSelectedCompressionMethod();
         if (!Arrays.contains(offeredCompressionMethods, selectedCompressionMethod))
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
         securityParameters.compressionAlgorithm = selectedCompressionMethod;
+
         LOG.debug("Selected CompressionMethod [{}]", selectedCompressionMethod);
-        
-        TlsUtils.writeUint16(selectedCipherSuite, message);
-        TlsUtils.writeUint8(selectedCompressionMethod, message);
+
+        TlsUtils.writeUint16(securityParameters.cipherSuite, message);
+        TlsUtils.writeUint8(securityParameters.compressionAlgorithm, message);
 
         this.serverExtensions = tlsServer.getServerExtensions();
 
@@ -759,11 +846,10 @@ public class TlsServerProtocol
         }
 
         /*
-         * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
+         * RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
          * extensions appearing in the client hello, and send a server hello containing no
          * extensions.
          */
-
         if (this.serverExtensions != null)
         {
             this.securityParameters.encryptThenMAC = TlsExtensionsUtils.hasEncryptThenMACExtension(serverExtensions);
@@ -777,15 +863,17 @@ public class TlsServerProtocol
              * TODO It's surprising that there's no provision to allow a 'fresh' CertificateStatus to be sent in
              * a session resumption handshake.
              */
-            this.allowCertificateStatus = !resumedSession
+            this.allowCertificateStatus = !this.resumedSession
                 && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsExtensionsUtils.EXT_status_request,
                     AlertDescription.internal_error);
 
-            this.expectSessionTicket = !resumedSession
+            this.expectSessionTicket = !this.resumedSession
                 && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsProtocol.EXT_SessionTicket,
                     AlertDescription.internal_error);
 
-            writeExtensions(message, serverExtensions);
+            if(!this.resumedSession) {
+            	writeExtensions(message, serverExtensions);
+            }
         }
 
         securityParameters.prfAlgorithm = getPRFAlgorithm(getContext(), securityParameters.getCipherSuite());

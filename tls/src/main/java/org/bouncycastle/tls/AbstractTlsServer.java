@@ -504,6 +504,10 @@ public abstract class AbstractTlsServer
 
         return context.getSecurityParameters().getMasterSecret().createCipher(new TlsCryptoParameters(context), encryptionAlgorithm, macAlgorithm);
     }
+    
+    public boolean getNeedClientAuth() {
+    	return false;
+    }
 
     public NewSessionTicket getNewSessionTicket()
         throws IOException

@@ -41,6 +41,8 @@ public interface TlsPeer
 
     TlsCipher getCipher() throws IOException;
 
+    boolean getNeedClientAuth();
+    
     /**
      * This method will be called when an alert is raised by the protocol.
      *
