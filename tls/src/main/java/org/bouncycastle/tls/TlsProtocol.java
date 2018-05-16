@@ -320,8 +320,7 @@ public abstract class TlsProtocol
                     .setPeerCertificate(this.peerCertificate)
                     .setPSKIdentity(this.securityParameters.getPSKIdentity())
                     .setSRPIdentity(this.securityParameters.getSRPIdentity())
-                    // TODO Consider filtering extensions that aren't relevant to resumed sessions
-                    .setServerExtensions(this.serverExtensions)
+                    .setServerExtensions(this.clientExtensions)
                     .build();
 
                 this.tlsSession = TlsUtils.importSession(this.tlsSession.getSessionID(), this.sessionParameters);
@@ -1091,6 +1090,12 @@ public abstract class TlsProtocol
             this.tlsSession.invalidate();
             this.tlsSession = null;
         }
+    }
+
+    protected void resetCurrentSession()
+    {
+		this.sessionParameters = null;
+		this.tlsSession = null;
     }
 
     protected void processFinishedMessage(ByteArrayInputStream buf)
