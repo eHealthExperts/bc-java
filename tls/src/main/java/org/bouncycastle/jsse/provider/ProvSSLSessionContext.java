@@ -88,18 +88,27 @@ class ProvSSLSessionContext
 
     synchronized ProvSSLSessionImpl reportSession(TlsSession tlsSession, String peerHost, int peerPort)
     {
-        SessionID sessionID = new SessionID(tlsSession.getSessionID());
-
-        ProvSSLSessionImpl sslSession = sessionsByID.get(sessionID);
-        if (sslSession == null || sslSession.getTlsSession() != tlsSession)
-        {
-            sslSession = new ProvSSLSessionImpl(this, tlsSession, peerHost, peerPort);
-            sessionsByID.put(sessionID, sslSession);
-        }
-
-        addSessionByPeer(sslSession);
-
-        return sslSession;
+    	
+    	if(sessionCacheSize > 0)
+    	{
+    		SessionID sessionID = new SessionID(tlsSession.getSessionID());
+    		ProvSSLSessionImpl sslSession = sessionsByID.get(sessionID);
+    		
+	        if (sslSession == null || sslSession.getTlsSession() != tlsSession)
+	        {
+	            sslSession = new ProvSSLSessionImpl(this, tlsSession, peerHost, peerPort);
+	            sessionsByID.put(sessionID, sslSession);
+	        }
+	
+	        addSessionByPeer(sslSession);
+	        return sslSession;
+    	}
+    	else 
+    	{
+    		tlsSession.invalidate();
+    		return new ProvSSLSessionImpl(this, tlsSession, peerHost, peerPort);
+    	}
+    	
     }
 
     public synchronized Enumeration<byte[]> getIds()
@@ -272,6 +281,7 @@ class ProvSSLSessionContext
     {
         if (sslSession != null && sslSession.getPeerHost() != null && sslSession.getPeerPort() >= 0)
         {
+        	sslSession.invalidate();
             String peerKey = makePeerKey(sslSession.getPeerHost(), sslSession.getPeerPort());
             return null != sessionsByPeer.remove(peerKey);
         }
