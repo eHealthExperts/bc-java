@@ -875,9 +875,7 @@ public class TlsServerProtocol
                 && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsProtocol.EXT_SessionTicket,
                     AlertDescription.internal_error);
 
-            if(!this.resumedSession) {
-            	writeExtensions(message, serverExtensions);
-            }
+           	writeExtensions(message, serverExtensions);
         }
 
         securityParameters.prfAlgorithm = getPRFAlgorithm(getContext(), securityParameters.getCipherSuite());
