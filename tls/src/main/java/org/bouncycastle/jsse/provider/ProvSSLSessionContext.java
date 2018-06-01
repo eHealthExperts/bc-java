@@ -31,6 +31,7 @@ class ProvSSLSessionContext
             if (shouldRemove)
             {
                 removeSessionByPeer(eldest.getValue());
+                eldest.getValue().invalidate();
             }
             return shouldRemove;
         }

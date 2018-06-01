@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.crypto.spec.SecretKeySpec;
+
 import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECPoint;
 
@@ -56,6 +58,30 @@ public class EraseUtil {
             catch (Exception e) 
             {
                 LOG.log(Level.WARNING, "Could not erase BigInteger", e);
+            }
+        }
+    }
+    
+    public static void clearSecretKeySpec(final SecretKeySpec secretKeySpec) 
+    {
+        if (secretKeySpec != null) 
+        {
+            Field declaredField = null;
+            try {
+
+                declaredField = SecretKeySpec.class.getDeclaredField("key");
+                final boolean accessible = declaredField.isAccessible();
+
+                declaredField.setAccessible(true);
+
+                final byte[] array = (byte[]) declaredField.get(secretKeySpec);
+                clearByteArray(array);
+                declaredField.setAccessible(accessible);
+
+            } 
+            catch (Exception e) 
+            {
+                LOG.log(Level.WARNING, "Could not erase SecretKeySpec", e);
             }
         }
     }

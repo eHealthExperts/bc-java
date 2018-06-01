@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Strings;
 import org.bouncycastle.util.encoders.Hex;
@@ -248,5 +249,11 @@ public abstract class ASN1OctetString
     public String toString()
     {
       return "#"+ Strings.fromByteArray(Hex.encode(string));
+    }
+    
+    @Override
+    protected void finalize() throws Throwable {
+    	super.finalize();
+    	EraseUtil.clearByteArray(string);
     }
 }
