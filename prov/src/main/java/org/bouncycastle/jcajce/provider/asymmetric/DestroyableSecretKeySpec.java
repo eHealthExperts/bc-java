@@ -9,6 +9,10 @@ import javax.security.auth.DestroyFailedException;
 import org.bouncycastle.crypto.util.EraseUtil;
 
 
+/**
+ * SecretKeySpec with a destroy method to wipe out the key-array 
+ *
+ */
 public class DestroyableSecretKeySpec implements KeySpec, SecretKey 
 {
 

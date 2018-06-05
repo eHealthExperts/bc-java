@@ -1,6 +1,7 @@
 package org.bouncycastle.crypto.params;
 
 import org.bouncycastle.crypto.CipherParameters;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 public class KeyParameter
     implements CipherParameters
@@ -26,5 +27,12 @@ public class KeyParameter
     public byte[] getKey()
     {
         return key;
+    }
+    
+    @Override
+    protected void finalize() throws Throwable
+    {	
+    	super.finalize();
+    	EraseUtil.clearByteArray(key);
     }
 }

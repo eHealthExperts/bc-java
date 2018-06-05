@@ -24,6 +24,7 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.bouncycastle.crypto.params.RC2Parameters;
 import org.bouncycastle.crypto.params.SkeinParameters;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.jcajce.PKCS12Key;
 import org.bouncycastle.jcajce.spec.AEADParameterSpec;
 import org.bouncycastle.jcajce.spec.SkeinParameterSpec;
@@ -165,7 +166,9 @@ public class BaseMac
             {
                 throw new InvalidAlgorithmParameterException("inappropriate parameter type: " + params.getClass().getName());
             }
-            param = new KeyParameter(key.getEncoded());
+            byte[] encoded = key.getEncoded();
+            param = new KeyParameter(encoded);
+            EraseUtil.clearByteArray(encoded);
         }
 
         KeyParameter keyParam;
@@ -198,7 +201,9 @@ public class BaseMac
         }
         else if (params == null)
         {
-            param = new KeyParameter(key.getEncoded());
+        	byte[] encoded = key.getEncoded();
+            param = new KeyParameter(encoded);
+            EraseUtil.clearByteArray(encoded);
         }
         else if (gcmSpecClass != null && gcmSpecClass.isAssignableFrom(params.getClass()))
         {

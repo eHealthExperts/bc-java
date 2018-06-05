@@ -63,6 +63,7 @@ import org.bouncycastle.crypto.params.ParametersWithRandom;
 import org.bouncycastle.crypto.params.ParametersWithSBox;
 import org.bouncycastle.crypto.params.RC2Parameters;
 import org.bouncycastle.crypto.params.RC5Parameters;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.jcajce.PBKDF1Key;
 import org.bouncycastle.jcajce.PBKDF1KeyWithParameters;
 import org.bouncycastle.jcajce.PKCS12Key;
@@ -70,6 +71,7 @@ import org.bouncycastle.jcajce.PKCS12KeyWithParameters;
 import org.bouncycastle.jcajce.spec.AEADParameterSpec;
 import org.bouncycastle.jcajce.spec.GOST28147ParameterSpec;
 import org.bouncycastle.jcajce.spec.RepeatedSecretKeySpec;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Strings;
 
 public class BaseBlockCipher
@@ -219,7 +221,10 @@ public class BaseBlockCipher
     protected int engineGetKeySize(
         Key     key)
     {
-        return key.getEncoded().length * 8;
+        byte[] encoded = key.getEncoded();
+		int length = encoded.length * 8;
+		EraseUtil.clearByteArray(encoded);
+		return length;
     }
 
     protected int engineGetOutputSize(
@@ -656,7 +661,9 @@ public class BaseBlockCipher
             {
                 throw new InvalidKeyException("Algorithm requires a PBE key");
             }
-            param = new KeyParameter(key.getEncoded());
+            byte[] encoded = key.getEncoded();
+            param = new KeyParameter(encoded);
+            EraseUtil.clearByteArray(encoded);
         }
         else
         {

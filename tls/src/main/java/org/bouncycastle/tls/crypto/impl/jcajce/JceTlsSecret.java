@@ -5,6 +5,7 @@ import java.security.GeneralSecurityException;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.tls.PRFAlgorithm;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsSecret;
@@ -58,7 +59,8 @@ public class JceTlsSecret
     {
         String macName = "Hmac" + digestName;
         Mac mac = crypto.getHelper().createMac(macName);
-        mac.init(new SecretKeySpec(secret, secretOff, secretLen, macName));
+        SecretKeySpec secretKey = new SecretKeySpec(secret, secretOff, secretLen, macName);
+		mac.init(secretKey);
 
         byte[] a = seed;
 
@@ -79,6 +81,9 @@ public class JceTlsSecret
             System.arraycopy(b2, 0, output, pos, Math.min(macSize, output.length - pos));
             pos += macSize;
         }
+        
+        EraseUtil.clearSecretKeySpec(secretKey);
+        
     }
 
     protected byte[] prf_1_0(byte[] secret, byte[] labelSeed, int length)

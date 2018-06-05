@@ -5,6 +5,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.io.Streams;
 
@@ -288,4 +289,10 @@ public abstract class ASN1BitString
 
     abstract void encode(ASN1OutputStream out)
         throws IOException;
+    
+    @Override
+    protected void finalize() throws Throwable {
+    	super.finalize();
+    	EraseUtil.clearByteArray(data);
+    }
 }
