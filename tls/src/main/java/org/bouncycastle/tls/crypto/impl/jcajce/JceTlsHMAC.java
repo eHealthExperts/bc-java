@@ -7,6 +7,7 @@ import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.tls.crypto.TlsHMAC;
 
 /**
@@ -69,7 +70,9 @@ public class JceTlsHMAC
     {
         try
         {
-            hmac.init(new SecretKeySpec(key, keyOff, keyLen, algorithm));
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key, keyOff, keyLen, algorithm);
+			hmac.init(secretKeySpec);
+			EraseUtil.clearSecretKeySpec(secretKeySpec);
         }
         catch (InvalidKeyException e)
         {

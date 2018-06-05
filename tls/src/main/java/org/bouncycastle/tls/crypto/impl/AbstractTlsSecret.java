@@ -47,7 +47,6 @@ public abstract class AbstractTlsSecret
     {
         if (data != null)
         {
-            // TODO Is there a way to ensure the data is really overwritten?
         	EraseUtil.clearByteArray(data);
             this.data = null;
         }
@@ -63,9 +62,9 @@ public abstract class AbstractTlsSecret
     public synchronized byte[] extract()
     {
         checkAlive();
-
+        
         byte[] result = data;
-        this.data = null;
+        data = null;
         return result;
     }
 
