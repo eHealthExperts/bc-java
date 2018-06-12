@@ -1,10 +1,11 @@
 package org.bouncycastle.crypto;
 
+import javax.security.auth.Destroyable;
 
 /**
  * Block cipher engines are expected to conform to this interface.
  */
-public interface BlockCipher
+public interface BlockCipher extends Destroyable
 {
     /**
      * Initialise the cipher.
@@ -31,7 +32,7 @@ public interface BlockCipher
      * @return the block size for this cipher in bytes.
      */
     public int getBlockSize();
-
+    
     /**
      * Process one block of input from the array in and write it to
      * the out array.

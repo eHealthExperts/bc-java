@@ -257,4 +257,17 @@ public class TlsAEADCipher
 
         return additional_data;
     }
+
+    public void destroy() throws javax.security.auth.DestroyFailedException
+    {
+    	if(decryptCipher != null)
+    	{
+    		decryptCipher.destroy();
+    	}
+    	
+    	if(encryptCipher != null)
+    	{
+    		encryptCipher.destroy();
+    	}
+    }
 }

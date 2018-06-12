@@ -1,5 +1,8 @@
 package org.bouncycastle.crypto.modes;
 
+import javax.security.auth.DestroyFailedException;
+import javax.security.auth.Destroyable;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
@@ -15,7 +18,7 @@ import org.bouncycastle.util.Pack;
  */
 public class SICBlockCipher
     extends StreamBlockCipher
-    implements SkippingStreamCipher
+    implements SkippingStreamCipher, Destroyable
 {
     private final BlockCipher     cipher;
     private final int             blockSize;
@@ -286,5 +289,11 @@ public class SICBlockCipher
         }
 
         return Pack.bigEndianToLong(res, res.length - 8) * blockSize + byteCount;
+    }
+    
+    @Override
+    public void destroy() throws DestroyFailedException 
+    {
+    	cipher.destroy();
     }
 }

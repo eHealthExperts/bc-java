@@ -1,5 +1,7 @@
 package org.bouncycastle.crypto.modes;
 
+import javax.security.auth.Destroyable;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
@@ -19,7 +21,7 @@ import org.bouncycastle.crypto.InvalidCipherTextException;
  * appropriately until the end of data is reached and the entire ciphertext is authenticated.
  * @see org.bouncycastle.crypto.params.AEADParameters
  */
-public interface AEADBlockCipher
+public interface AEADBlockCipher extends Destroyable
 {
     /**
      * initialise the underlying cipher. Parameter can either be an AEADParameters or a ParametersWithIV object.

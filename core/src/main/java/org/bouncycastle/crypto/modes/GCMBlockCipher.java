@@ -1,5 +1,7 @@
 package org.bouncycastle.crypto.modes;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
@@ -653,5 +655,13 @@ public class GCMBlockCipher
             }
             throw new IllegalStateException("GCM cipher needs to be initialised");
         }
+    }
+    
+    public void destroy() throws DestroyFailedException 
+    {
+    	if(cipher != null) 
+    	{
+    		cipher.destroy();
+    	}
     }
 }

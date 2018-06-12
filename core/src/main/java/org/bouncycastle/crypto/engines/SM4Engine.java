@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Pack;
 
 /**
@@ -201,6 +204,7 @@ public class SM4Engine
             }
 
             rk = expandKey(forEncryption, key);
+            EraseUtil.clearByteArray(key);
         }
         else
         {
@@ -263,5 +267,9 @@ public class SM4Engine
     public void reset()
     {
 
+    }
+
+    public void destroy() throws DestroyFailedException {
+    	EraseUtil.clearIntArray(rk);
     }
 }

@@ -2,6 +2,8 @@ package org.bouncycastle.tls.crypto.impl;
 
 import java.io.IOException;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.crypto.TlsCipher;
@@ -90,5 +92,8 @@ public class TlsNullCipher
         }
 
         return Arrays.copyOfRange(ciphertext, offset, offset + macInputLen);
+    }
+    
+    public void destroy() throws DestroyFailedException {
     }
 }

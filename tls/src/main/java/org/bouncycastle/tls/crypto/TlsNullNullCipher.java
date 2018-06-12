@@ -2,6 +2,8 @@ package org.bouncycastle.tls.crypto;
 
 import java.io.IOException;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.util.Arrays;
 
 /**
@@ -30,5 +32,8 @@ public class TlsNullNullCipher
         throws IOException
     {
         return Arrays.copyOfRange(ciphertext, offset, offset + len);
+    }
+    
+    public void destroy() throws DestroyFailedException {
     }
 }

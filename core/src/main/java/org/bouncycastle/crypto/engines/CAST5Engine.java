@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 /**
  * A class that provides CAST key encryption operations,
@@ -828,4 +831,9 @@ public class CAST5Engine
             ((b[i+2] & 0xff) << 8) |
             ((b[i+3] & 0xff));
     }
+
+	public void destroy() throws DestroyFailedException 
+	{
+		EraseUtil.clearByteArray(_workingKey);
+	}
 }
