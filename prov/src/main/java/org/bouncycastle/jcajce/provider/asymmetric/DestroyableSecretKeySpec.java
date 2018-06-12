@@ -208,4 +208,10 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
     public void destroy() throws DestroyFailedException {
         EraseUtil.clearByteArray(this.key);
     }
+    
+    @Override
+    protected void finalize() throws Throwable {
+    	super.finalize();
+    	EraseUtil.clearByteArray(this.key);
+    }
 }
