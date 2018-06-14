@@ -1,5 +1,7 @@
 package org.bouncycastle.crypto.modes;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
@@ -383,5 +385,14 @@ public class EAXBlockCipher
         }
 
         return nonEqual == 0;
+    }
+    
+    public void destroy() throws DestroyFailedException 
+    {
+    	if(cipher != null) 
+    	{
+    		cipher.destroy();
+    
+    	}
     }
 }

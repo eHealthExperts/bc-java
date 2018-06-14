@@ -2,10 +2,12 @@ package org.bouncycastle.tls.crypto.impl;
 
 import java.io.IOException;
 
+import javax.security.auth.Destroyable;
+
 /**
  * Base interface for services supporting AEAD encryption/decryption.
  */
-public interface TlsAEADCipherImpl
+public interface TlsAEADCipherImpl extends Destroyable
 {
     /**
      * Set the key to be used by the AEAD cipher implementation supporting this service.

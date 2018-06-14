@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.params;
 
+import javax.security.auth.DestroyFailedException;
+import javax.security.auth.Destroyable;
+
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.util.EraseUtil;
 
 public class KeyParameter
-    implements CipherParameters
+    implements CipherParameters, Destroyable
 {
     private byte[]  key;
 
@@ -27,6 +30,10 @@ public class KeyParameter
     public byte[] getKey()
     {
         return key;
+    }
+    
+    public void destroy() throws DestroyFailedException {
+    	EraseUtil.clearByteArray(key);
     }
     
     @Override

@@ -9,7 +9,10 @@ import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.DestroyFailedException;
+import javax.security.auth.Destroyable;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.util.JcaJceHelper;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.TlsFatalAlert;
@@ -140,7 +143,7 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
 
     public void setKey(byte[] key, int keyOff, int keyLen) throws IOException
     {
-        this.cipherKey = new SecretKeySpec(key, keyOff, keyLen, "ChaCha7539");
+        this.cipherKey = new DestroyableSecretKeySpec(key, keyOff, keyLen, "ChaCha7539");
     }
 
     protected void initMAC(byte[] firstBlock) throws InvalidKeyException
@@ -162,5 +165,17 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
         {
             mac.update(ZEROES, 0, 16 - partial);
         }
+    }
+    
+    public void destroy() throws DestroyFailedException 
+    {
+    	 if (this.cipherKey != null) 
+         {
+             this.cipherKey.destroy();
+         }
+    	 
+    	if(cipher instanceof Destroyable) {
+    		((Destroyable) cipher).destroy();
+    	}
     }
 }

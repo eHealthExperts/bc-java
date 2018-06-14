@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Pack;
 
@@ -626,4 +629,14 @@ private static final int[] Tinv0 =
         this.C2 = (s[r2&255]&255) ^ ((Si[(r1>>8)&255]&255)<<8) ^ ((Si[(r0>>16)&255]&255)<<16) ^ (s[(r3>>24)&255]<<24) ^ KW[0][2];
         this.C3 = (Si[r3&255]&255) ^ ((s[(r2>>8)&255]&255)<<8) ^ ((s[(r1>>16)&255]&255)<<16) ^ (s[(r0>>24)&255]<<24) ^ KW[0][3];
     }
+
+	public void destroy() throws DestroyFailedException 
+	{
+		if(WorkingKey != null) 
+		{
+			for (int[] t : WorkingKey) {
+				EraseUtil.clearIntArray(t);
+			}
+		}
+	}
 }

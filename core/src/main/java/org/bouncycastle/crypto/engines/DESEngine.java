@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Pack;
 
 /**
@@ -480,4 +483,10 @@ public class DESEngine
         Pack.intToBigEndian(right, out, outOff);
         Pack.intToBigEndian(left, out, outOff + 4);
     }
+
+
+	public void destroy() throws DestroyFailedException 
+	{
+		EraseUtil.clearIntArray(workingKey);
+	}
 }

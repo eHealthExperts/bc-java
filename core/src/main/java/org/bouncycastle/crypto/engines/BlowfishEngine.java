@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 /**
  * A class that provides Blowfish key encryption operations,
@@ -574,4 +577,9 @@ implements BlockCipher
         b[offset + 1] = (byte)(in >> 16);
         b[offset]     = (byte)(in >> 24);
     }
+
+	public void destroy() throws DestroyFailedException 
+	{
+		EraseUtil.clearByteArray(workingKey);
+	}
 }

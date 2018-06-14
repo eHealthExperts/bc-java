@@ -2,6 +2,8 @@ package org.bouncycastle.crypto.modes;
 
 import java.util.Vector;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
@@ -598,5 +600,18 @@ public class OCBBlockCipher
         {
             block[i] ^= val[i];
         }
+    }
+    
+    public void destroy() throws DestroyFailedException 
+    {
+    	if(hashCipher != null) 
+    	{
+    		hashCipher.destroy();
+    	}
+    	
+    	if(mainCipher != null) 
+    	{
+    		mainCipher.destroy();
+    	}
     }
 }

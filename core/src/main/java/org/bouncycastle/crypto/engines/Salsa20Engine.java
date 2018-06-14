@@ -1,5 +1,8 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+import javax.security.auth.Destroyable;
+
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.MaxBytesExceededException;
@@ -7,6 +10,7 @@ import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.SkippingStreamCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Pack;
 import org.bouncycastle.util.Strings;
 
@@ -14,7 +18,7 @@ import org.bouncycastle.util.Strings;
  * Implementation of Daniel J. Bernstein's Salsa20 stream cipher, Snuffle 2005
  */
 public class Salsa20Engine
-    implements SkippingStreamCipher
+    implements SkippingStreamCipher, Destroyable
 {
     public final static int DEFAULT_ROUNDS = 20;
 
@@ -538,5 +542,9 @@ public class Salsa20Engine
         }
 
         return false;
+    }
+    
+    public void destroy() throws DestroyFailedException {
+    	EraseUtil.clearByteArray(keyStream);
     }
 }

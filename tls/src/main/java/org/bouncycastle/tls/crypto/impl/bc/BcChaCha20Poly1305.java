@@ -2,6 +2,8 @@ package org.bouncycastle.tls.crypto.impl.bc;
 
 import java.io.IOException;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.engines.ChaCha7539Engine;
 import org.bouncycastle.crypto.macs.Poly1305;
 import org.bouncycastle.crypto.params.KeyParameter;
@@ -127,5 +129,9 @@ public class BcChaCha20Poly1305 implements TlsAEADCipherImpl
         {
             mac.update(ZEROES, 0, 16 - partial);
         }
+    }
+    
+    public void destroy() throws DestroyFailedException {
+    	cipher.destroy();
     }
 }

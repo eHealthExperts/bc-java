@@ -63,7 +63,6 @@ public class ECDHBasicAgreement
         }
         final BigInteger result = P.getAffineXCoord().toBigInteger();
 
-        EraseUtil.clearECFieldElement(P.getAffineXCoord());
         EraseUtil.clearECFieldElement(P.getAffineYCoord());
 
         return result;

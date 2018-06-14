@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 /**
  * Camellia - based on RFC 3713, smaller implementation, about half the size of CamelliaEngine.
@@ -589,4 +592,9 @@ public class CamelliaLightEngine
     public void reset()
     {
     }
+
+	public void destroy() throws DestroyFailedException 
+	{
+		EraseUtil.clearIntArray(subkey);
+	}
 }

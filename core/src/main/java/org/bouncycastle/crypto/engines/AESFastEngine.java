@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Pack;
 
 /**
@@ -1007,4 +1010,14 @@ public class AESFastEngine
         i0 = Si[i0 & 255] & 255; i1 = Si[i1 & 255] & 255; i2 = Si[i2 & 255] & 255; i3 = Si[i3 & 255] & 255;
         this.C3 = i0 ^ i1 << 8 ^ i2 << 16 ^ i3 << 24 ^ KW[0][3];
     }
+
+	public void destroy() throws DestroyFailedException 
+	{
+		if(WorkingKey != null) 
+		{
+			for (int[] t : WorkingKey) {
+				EraseUtil.clearIntArray(t);
+			}
+		}
+	}
 }

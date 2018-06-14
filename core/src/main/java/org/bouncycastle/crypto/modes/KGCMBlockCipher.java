@@ -2,6 +2,8 @@ package org.bouncycastle.crypto.modes;
 
 import java.io.ByteArrayOutputStream;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.BufferedBlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
@@ -368,5 +370,18 @@ public class KGCMBlockCipher
         {
             return this.buf;
         }
+    }
+    
+    public void destroy() throws DestroyFailedException 
+    {
+    	if(engine != null) 
+    	{
+    		engine.destroy();
+    	}
+    	
+    	if(ctrEngine != null) 
+    	{
+    		ctrEngine.destroy();
+    	}
     }
 }

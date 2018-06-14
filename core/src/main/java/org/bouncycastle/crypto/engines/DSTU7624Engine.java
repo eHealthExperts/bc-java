@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Pack;
 
@@ -1180,4 +1183,17 @@ public class DSTU7624Engine
         (byte)0xd0, (byte)0x36, (byte)0x48, (byte)0x70, (byte)0x96, (byte)0x77, (byte)0x24, (byte)0x53, (byte)0xdf,
         (byte)0xf3, (byte)0x83, (byte)0x28, (byte)0x32, (byte)0x45, (byte)0x1e, (byte)0xa4, (byte)0xd3, (byte)0xa2,
         (byte)0x46, (byte)0x6e, (byte)0x9c, (byte)0xdd, (byte)0x63, (byte)0xd4, (byte)0x9d };
+
+
+	public void destroy() throws DestroyFailedException 
+	{
+		if(roundKeys != null) 
+		{
+			for (long[] t : roundKeys) {
+				EraseUtil.clearLongArray(t);
+			}
+		}
+		EraseUtil.clearLongArray(workingKey);
+	}
+	
 }

@@ -1,5 +1,7 @@
 package org.bouncycastle.crypto;
 
+import javax.security.auth.DestroyFailedException;
+
 /**
  * A parent class for block cipher modes that do not require block aligned data to be processed, but can function in
  * a streaming mode.
@@ -54,4 +56,8 @@ public abstract class StreamBlockCipher
     }
 
     protected abstract byte calculateByte(byte b);
+
+    public void destroy() throws DestroyFailedException {
+    	cipher.destroy();
+    }
 }

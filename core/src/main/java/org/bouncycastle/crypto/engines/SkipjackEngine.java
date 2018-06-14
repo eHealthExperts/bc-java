@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 /**
  * a class that provides a basic SKIPJACK engine.
@@ -257,4 +260,12 @@ public class SkipjackEngine
 
         return BLOCK_SIZE;
     }
+
+    public void destroy() throws DestroyFailedException 
+	{
+		EraseUtil.clearIntArray(key0);	
+		EraseUtil.clearIntArray(key1);	
+		EraseUtil.clearIntArray(key2);	
+		EraseUtil.clearIntArray(key3);	
+	}
 }
