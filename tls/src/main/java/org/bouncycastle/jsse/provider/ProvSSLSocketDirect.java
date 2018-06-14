@@ -8,6 +8,8 @@ import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
+import javax.net.ssl.HandshakeCompletedEvent;
+import javax.net.ssl.HandshakeCompletedListener;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509ExtendedTrustManager;
@@ -397,6 +399,18 @@ class ProvSSLSocketDirect
     public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
     {
         this.connection = connection;
+        
+        if (!listeners.isEmpty())
+        {
+        	HandshakeCompletedEvent event = new HandshakeCompletedEvent(this, getSession());
+        	synchronized (listeners)
+        	{
+        		for (HandshakeCompletedListener listener : listeners)
+        		{
+        			listener.handshakeCompleted(event);
+        		}
+        	}
+        }
     }
 
     synchronized void handshakeIfNecessary() throws IOException

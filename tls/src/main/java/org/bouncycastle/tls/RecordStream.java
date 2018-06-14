@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.tls.crypto.TlsCipher;
 import org.bouncycastle.tls.crypto.TlsNullNullCipher;
 
@@ -461,11 +463,43 @@ class RecordStream
 //                io.addSuppressed(e);
             }
         }
-
-        if (io != null)
+        
+        if(pendingCipher != null)
         {
-            throw io;
+	        try
+	        {
+	        	pendingCipher.destroy();
+	        }
+        	catch (DestroyFailedException e)
+        	{
+        		// ignore
+        	}
         }
+        
+        if(writeCipher != null)
+        {
+	        try
+	        {
+	        	writeCipher.destroy();
+	        }
+        	catch (DestroyFailedException e)
+        	{
+        		// ignore
+        	}
+        }
+        
+        if(readCipher != null)
+        {
+	        try
+	        {
+	        	readCipher.destroy();
+	        }
+        	catch (DestroyFailedException e)
+        	{
+        		// ignore
+        	}
+        }
+
     }
 
     void flush()

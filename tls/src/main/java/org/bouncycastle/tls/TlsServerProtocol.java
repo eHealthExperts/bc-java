@@ -169,8 +169,6 @@ public class TlsServerProtocol
                 recordStream.notifyHelloComplete();
                 
                 if(this.resumedSession) {
-                	this.securityParameters.masterSecret = getContext().getCrypto().adoptSecret(sessionParameters.getMasterSecret());
-                	
                 	recordStream.setPendingConnectionState(getPeer().getCompression(), getPeer().getCipher());
                 	
                     sendChangeCipherSpecMessage();
@@ -558,6 +556,12 @@ public class TlsServerProtocol
             {
                 this.tlsSession = sessionToResume;
                 this.sessionParameters = sessionParameters;
+                this.securityParameters.masterSecret = getContext().getCrypto().adoptSecret(sessionParameters.getMasterSecret());
+                
+                if(!tlsSession.isResumable()) {
+                	resetCurrentSession();
+                	this.securityParameters.clear();
+                }
         	}
         }
         
@@ -872,9 +876,7 @@ public class TlsServerProtocol
                 && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsProtocol.EXT_SessionTicket,
                     AlertDescription.internal_error);
 
-            if(!this.resumedSession) {
-            	writeExtensions(message, serverExtensions);
-            }
+           	writeExtensions(message, serverExtensions);
         }
 
         securityParameters.prfAlgorithm = getPRFAlgorithm(getContext(), securityParameters.getCipherSuite());

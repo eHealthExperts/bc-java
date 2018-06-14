@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 
+import javax.security.auth.DestroyFailedException;
+import javax.security.auth.Destroyable;
+
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CryptoException;
@@ -711,6 +714,17 @@ public class BcTlsCrypto
         {
             return cipher.getBlockSize();
         }
+        
+        
+        public void destroy() throws DestroyFailedException 
+        {
+        	if (this.key != null) 
+            {
+        		 this.key.destroy();
+            }
+        	 
+         	cipher.destroy();
+        }
     }
 
     public class AeadOperator
@@ -756,6 +770,14 @@ public class BcTlsCrypto
                 throw new RuntimeCryptoException(e.toString());
             }
         }
+        
+		public void destroy() throws DestroyFailedException {
+			if(key != null) 
+			{
+				key.destroy();
+			}
+			cipher.destroy();
+		}
     }
 
     private class HMacOperator implements TlsHMAC

@@ -1,5 +1,6 @@
 package org.bouncycastle.tls;
 
+import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.tls.crypto.TlsSecret;
 
 public class SecurityParameters
@@ -137,5 +138,12 @@ public class SecurityParameters
     public boolean isTruncatedHMac()
     {
         return truncatedHMac;
+    }
+    
+    @Override
+    protected void finalize() throws Throwable 
+    {
+       super.finalize();
+       masterSecret.destroy();
     }
 }

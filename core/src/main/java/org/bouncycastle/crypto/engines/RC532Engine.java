@@ -1,9 +1,12 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.RC5Parameters;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 /**
  * The specification for RC5 came from the <code>RC5 Encryption Algorithm</code>
@@ -284,4 +287,8 @@ public class RC532Engine
         dst[dstOff + 2] = (byte)(word >> 16);
         dst[dstOff + 3] = (byte)(word >> 24);
     }
+	
+    public void destroy() throws DestroyFailedException {
+		EraseUtil.clearIntArray(_S);
+	}
 }

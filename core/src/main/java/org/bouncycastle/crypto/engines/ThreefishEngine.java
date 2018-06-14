@@ -1,11 +1,14 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.TweakableBlockCipherParameters;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 /**
  * Implementation of the Threefish tweakable large block cipher in 256, 512 and 1024 bit block
@@ -194,6 +197,7 @@ public class ThreefishEngine
             {
                 keyWords[i] = bytesToWord(keyBytes, i * 8);
             }
+            EraseUtil.clearByteArray(keyBytes);
         }
         if (tweakBytes != null)
         {
@@ -219,6 +223,7 @@ public class ThreefishEngine
         if (key != null)
         {
             setKey(key);
+            EraseUtil.clearLongArray(key);
         }
         if (tweak != null)
         {
@@ -1491,4 +1496,7 @@ public class ThreefishEngine
 
     }
 
+    public void destroy() throws DestroyFailedException {
+    	EraseUtil.clearLongArray(kw);
+    }
 }

@@ -1,5 +1,7 @@
 package org.bouncycastle.crypto.modes;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
@@ -449,5 +451,9 @@ public class PGPCFBBlockCipher
         
         return blockSize;
         
+    }
+    
+    public void destroy() throws DestroyFailedException {
+    	cipher.destroy();
     }
 }

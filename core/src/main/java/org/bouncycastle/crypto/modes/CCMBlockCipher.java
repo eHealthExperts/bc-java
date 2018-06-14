@@ -2,6 +2,8 @@ package org.bouncycastle.crypto.modes;
 
 import java.io.ByteArrayOutputStream;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
@@ -455,5 +457,12 @@ public class CCMBlockCipher
         {
             return this.buf;
         }
+    }
+    
+    public void destroy() throws DestroyFailedException {
+    	if(cipher != null) 
+    	{
+    		cipher.destroy();
+    	}
     }
 }

@@ -2,10 +2,12 @@ package org.bouncycastle.tls.crypto;
 
 import java.io.IOException;
 
+import javax.security.auth.Destroyable;
+
 /**
  * Base interface for a TLS cipher suite.
  */
-public interface TlsCipher
+public interface TlsCipher extends Destroyable
 {
     /**
      * Return the maximum size for the ciphertext given plaintextlimit bytes of plaintext.

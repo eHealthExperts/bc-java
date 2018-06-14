@@ -1,10 +1,13 @@
 package org.bouncycastle.crypto.engines;
 
+import javax.security.auth.DestroyFailedException;
+
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.util.EraseUtil;
 
 /**
  * an implementation of Rijndael, based on the documentation and reference implementation
@@ -722,4 +725,14 @@ public class RijndaelEngine
         //
         KeyAddition(rk[0]);
     }
+
+	public void destroy() throws DestroyFailedException 
+	{
+		if(workingKey != null) 
+		{
+			for (long[] t : workingKey) {
+				EraseUtil.clearLongArray(t);
+			}
+		}
+	}
 }
