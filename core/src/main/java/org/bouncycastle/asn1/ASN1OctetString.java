@@ -235,12 +235,12 @@ public abstract class ASN1OctetString
 
     ASN1Primitive toDERObject()
     {
-        return new DEROctetString(string);
+        return new DEROctetString(Arrays.clone(string));
     }
 
     ASN1Primitive toDLObject()
     {
-        return new DEROctetString(string);
+        return new DEROctetString(Arrays.clone(string));
     }
 
     abstract void encode(ASN1OutputStream out)
