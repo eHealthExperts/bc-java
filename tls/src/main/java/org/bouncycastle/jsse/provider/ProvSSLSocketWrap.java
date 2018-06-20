@@ -365,7 +365,7 @@ class ProvSSLSocketWrap
     {
         sslParameters.setNeedClientAuth(need);
     }
-
+    
     @Override
     public void setPerformancePreferences(int connectionTime, int latency, int bandwidth)
     {
@@ -405,6 +405,9 @@ class ProvSSLSocketWrap
     @Override
     public void setSoTimeout(int timeout) throws SocketException
     {
+    	if(protocol != null) {
+    		protocol.setSoTimeout(timeout);
+    	}
         wrapSocket.setSoTimeout(timeout);
     }
 
@@ -466,6 +469,7 @@ class ProvSSLSocketWrap
             {
                 TlsClientProtocol clientProtocol = new ProvTlsClientProtocol(input, output, socketCloser);
                 this.protocol = clientProtocol;
+                this.protocol.setSoTimeout(getSoTimeout());
 
                 ProvTlsClient client = new ProvTlsClient(this, sslParameters.copy());
                 this.protocolPeer = client;
@@ -476,7 +480,8 @@ class ProvSSLSocketWrap
             {
                 TlsServerProtocol serverProtocol = new ProvTlsServerProtocol(input, output, socketCloser);
                 this.protocol = serverProtocol;
-    
+                this.protocol.setSoTimeout(getSoTimeout());
+                
                 ProvTlsServer server = new ProvTlsServer(this, sslParameters.copy());
                 this.protocolPeer = server;
     

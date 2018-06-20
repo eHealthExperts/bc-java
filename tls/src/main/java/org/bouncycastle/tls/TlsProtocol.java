@@ -6,6 +6,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.SocketTimeoutException;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -72,6 +73,9 @@ public abstract class TlsProtocol
     private volatile boolean appDataReady = false;
     private volatile boolean appDataSplitEnabled = true;
     private volatile int appDataSplitMode = ADS_MODE_1_Nsub1;
+    
+    private int soTimeout = -1;
+    
     // TODO[tls-ops] Investigate whether we can handle (expected/actual) verify data using TlsSecret
     private byte[] expected_verify_data = null;
 
@@ -189,6 +193,11 @@ public abstract class TlsProtocol
     protected void handleException(short alertDescription, String message, Throwable cause)
         throws IOException
     {
+    	if(soTimeout == 0 && cause instanceof SocketTimeoutException) {
+    		LOG.debug("Ignore SocketTimeoutException because soTimeout is set to 0", cause);
+    		return;
+    	}
+    	
         if (!closed)
         {
             raiseAlertFatal(alertDescription, message, cause);
@@ -775,6 +784,10 @@ public abstract class TlsProtocol
         this.appDataSplitMode = appDataSplitMode;
 	}
 
+	public void setSoTimeout(int timeout) {
+		this.soTimeout = timeout;
+	}
+    
     protected void writeHandshakeMessage(byte[] buf, int off, int len) throws IOException
     {
         if (len < 4)

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -252,6 +253,14 @@ class ProvSSLSocketDirect
     }
 
     @Override
+    public synchronized void setSoTimeout(int timeout) throws SocketException {
+    	if(protocol != null) {
+    		protocol.setSoTimeout(timeout);
+    	}
+    	super.setSoTimeout(timeout);
+    }
+    
+    @Override
     public synchronized void setSSLParameters(SSLParameters sslParameters)
     {
         SSLParametersUtil.setSSLParameters(this.sslParameters, sslParameters);
@@ -304,6 +313,8 @@ class ProvSSLSocketDirect
                 TlsClientProtocol clientProtocol = new ProvTlsClientProtocol(input, output, socketCloser);
                 this.protocol = clientProtocol;
     
+                this.protocol.setSoTimeout(getSoTimeout());
+                
                 ProvTlsClient client = new ProvTlsClient(this, sslParameters.copy());
                 this.protocolPeer = client;
     
@@ -314,6 +325,8 @@ class ProvSSLSocketDirect
                 TlsServerProtocol serverProtocol = new ProvTlsServerProtocol(input, output, socketCloser);
                 this.protocol = serverProtocol;
     
+                this.protocol.setSoTimeout(getSoTimeout());
+                
                 ProvTlsServer server = new ProvTlsServer(this, sslParameters.copy());
                 this.protocolPeer = server;
     
