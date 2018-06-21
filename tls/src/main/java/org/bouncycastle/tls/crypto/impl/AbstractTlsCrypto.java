@@ -1,13 +1,10 @@
 package org.bouncycastle.tls.crypto.impl;
 
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 
 import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.tls.EncryptionAlgorithm;
 import org.bouncycastle.tls.MACAlgorithm;
-import org.bouncycastle.tls.NamedGroup;
-import org.bouncycastle.tls.TlsDHUtils;
 import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.TlsCipher;
 import org.bouncycastle.tls.crypto.TlsCrypto;
@@ -40,33 +37,19 @@ public abstract class AbstractTlsCrypto implements TlsCrypto {
         throw new IllegalArgumentException("unrecognized TlsSecret - cannot copy data: " + secret.getClass().getName());
     }
 
-    public TlsDHConfig createDHConfig(final int selectedCipherSuite, final int[] clientSupportedGroups) throws GeneralSecurityException {
-        final int minimumFiniteFieldBits = TlsDHUtils.getMinimumFiniteFieldBits(selectedCipherSuite);
-
-        TlsDHConfig dhConfig = null;
-        if (clientSupportedGroups == null) {
-            dhConfig = this.selectDefaultDHConfig(minimumFiniteFieldBits);
-        } else {
-            // Try to find a supported named group of the required size from the client's list.
-            for (final int namedGroup : clientSupportedGroups) {
-                if (NamedGroup.getFiniteFieldBits(namedGroup) >= minimumFiniteFieldBits) {
-                    dhConfig = new TlsDHConfig(namedGroup);
-                }
-            }
-        }
-
-        if (dhConfig == null) {
-            throw new GeneralSecurityException("Count not create a TlsDHConfig!");
-        }
-        return dhConfig;
-    }
-
-    protected TlsDHConfig selectDefaultDHConfig(final int minimumFiniteFieldBits) {
-        final int namedGroup = minimumFiniteFieldBits <= 2048 ? NamedGroup.ffdhe2048
-                : minimumFiniteFieldBits <= 3072 ? NamedGroup.ffdhe3072
-                        : minimumFiniteFieldBits <= 4096 ? NamedGroup.ffdhe4096 : minimumFiniteFieldBits <= 6144 ? NamedGroup.ffdhe6144 : minimumFiniteFieldBits <= 8192 ? NamedGroup.ffdhe8192 : -1;
-
-        return TlsDHUtils.createNamedDHConfig(namedGroup);
+    /**
+     * Create an dhConfig object for the selected CipherSuite and the clientSupportedGroups.
+     *
+     * @param selectedCipherSuite
+     *            the selected CipherSuite to use.
+     * @param clientSupportedGroups
+     *            the clientSupportedGroups may be null.
+     *
+     * @return a TlsDHConfig supporting the parameters or null.
+     *
+     */
+    public TlsDHConfig createDHConfig(final int selectedCipherSuite, final int[] clientSupportedGroups) {
+        return null;
     }
 
     /**
