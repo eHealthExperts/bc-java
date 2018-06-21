@@ -1,6 +1,7 @@
 package org.bouncycastle.tls;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -165,49 +166,18 @@ public abstract class AbstractTlsServer
             :  -1;
     }
 
-    protected TlsDHConfig selectDefaultDHConfig(int minimumFiniteFieldBits)
-    {
-        int namedGroup = minimumFiniteFieldBits <= 2048 ? NamedGroup.ffdhe2048
-                      :  minimumFiniteFieldBits <= 3072 ? NamedGroup.ffdhe3072
-                      :  minimumFiniteFieldBits <= 4096 ? NamedGroup.ffdhe4096
-                      :  minimumFiniteFieldBits <= 6144 ? NamedGroup.ffdhe6144
-                      :  minimumFiniteFieldBits <= 8192 ? NamedGroup.ffdhe8192
-                      :  -1;
-
-        return TlsDHUtils.createNamedDHConfig(namedGroup);
-    }
-
     protected TlsDHConfig selectDHConfig() throws IOException
     {
-        int minimumFiniteFieldBits = TlsDHUtils.getMinimumFiniteFieldBits(selectedCipherSuite);
-
-        TlsDHConfig dhConfig = selectDHConfig(minimumFiniteFieldBits);
-        if (dhConfig == null)
+        try 
         {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
+            TlsDHConfig createDHConfig = context.getCrypto().createDHConfig(selectedCipherSuite, clientSupportedGroups);
+            return createDHConfig;
         }
-        return dhConfig;
+        catch(GeneralSecurityException e) {
+            throw new TlsFatalAlert(AlertDescription.internal_error, e);
+        }
     }
 
-    protected TlsDHConfig selectDHConfig(int minimumFiniteFieldBits)
-    {
-        if (clientSupportedGroups == null)
-        {
-            return selectDefaultDHConfig(minimumFiniteFieldBits);
-        }
-
-        // Try to find a supported named group of the required size from the client's list.
-        for (int i = 0; i < clientSupportedGroups.length; ++i)
-        {
-            int namedGroup = clientSupportedGroups[i];
-            if (NamedGroup.getFiniteFieldBits(namedGroup) >= minimumFiniteFieldBits)
-            {
-                return new TlsDHConfig(namedGroup);
-            }
-        }
-
-        return null;
-    }
 
     protected TlsECConfig selectECConfig() throws IOException
     {
