@@ -2,7 +2,6 @@ package org.bouncycastle.tls.crypto;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 
 import org.bouncycastle.tls.HashAlgorithm;
@@ -166,12 +165,10 @@ public interface TlsCrypto {
      * @param clientSupportedGroups
      *            the clientSupportedGroups may be null.
      *
-     * @return a TlsDHConfig supporting the parameters.
+     * @return a TlsDHConfig supporting the parameters or null.
      *
-     * @throws GeneralSecurityException
-     *             if there no dhConfig can be created.
      */
-    TlsDHConfig createDHConfig(int selectedCipherSuite, int[] clientSupportedGroups) throws GeneralSecurityException;
+    TlsDHConfig createDHConfig(int selectedCipherSuite, int[] clientSupportedGroups);
 
     /**
      * Create an domain object supporting the domain parameters described in ecConfig.

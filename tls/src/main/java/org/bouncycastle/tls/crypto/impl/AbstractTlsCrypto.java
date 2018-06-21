@@ -70,6 +70,21 @@ public abstract class AbstractTlsCrypto implements TlsCrypto {
     }
 
     /**
+     * Create an dhConfig object for the selected CipherSuite and the clientSupportedGroups.
+     *
+     * @param selectedCipherSuite
+     *            the selected CipherSuite to use.
+     * @param clientSupportedGroups
+     *            the clientSupportedGroups may be null.
+     *
+     * @return a TlsDHConfig supporting the parameters or null.
+     *
+     */
+    public TlsDHConfig createDHConfig(final int selectedCipherSuite, final int[] clientSupportedGroups) {
+        return null;
+    }
+
+    /**
      * Create a cipher for the specified encryption and MAC algorithms.
      * <p>
      * See enumeration classes {@link EncryptionAlgorithm}, {@link MACAlgorithm} for appropriate argument values.
