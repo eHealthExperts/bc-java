@@ -45,6 +45,10 @@ class TlsSessionImpl implements TlsSession
 
     public synchronized boolean isResumable()
     {
+    	if(resumable && sessionParameters.getMasterSecret().isDestroy()) {
+    		resumable = false;
+    	}
+    	
         return resumable;
     }
 }

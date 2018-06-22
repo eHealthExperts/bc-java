@@ -39,6 +39,11 @@ public interface TlsSecret
      * {@link TlsSecret} will result in an {@link IllegalStateException} being thrown.
      */
     void destroy();
+    
+    /**
+     * Return if the internal state of the secret is destroyed. 
+     */
+    boolean isDestroy();
 
     /**
      * Return the an encrypted copy of the data this secret is based on.
