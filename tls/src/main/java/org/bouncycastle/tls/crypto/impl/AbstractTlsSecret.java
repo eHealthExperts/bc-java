@@ -15,7 +15,8 @@ import org.bouncycastle.util.Arrays;
 public abstract class AbstractTlsSecret
     implements TlsSecret
 {
-    protected byte[] data;
+    protected boolean isDestroyed = false;
+	protected byte[] data;
     
     /**
      * Base constructor.
@@ -27,9 +28,15 @@ public abstract class AbstractTlsSecret
         this.data = data;
     }
 
+    
+    public boolean isDestroy() 
+    {
+    	return isDestroyed || data == null;
+    }
+    
     protected void checkAlive()
     {
-        if (data == null)
+        if (isDestroy())
         {
             throw new IllegalStateException("Secret has already been extracted or destroyed");
         }
@@ -45,6 +52,7 @@ public abstract class AbstractTlsSecret
 
     public synchronized void destroy()
     {
+    	isDestroyed = true;
         if (data != null)
         {
         	EraseUtil.clearByteArray(data);
@@ -64,7 +72,14 @@ public abstract class AbstractTlsSecret
         checkAlive();
         
         byte[] result = data;
-        data = null;
+        
+        isDestroyed = true;
+        if (data != null)
+        {
+        	EraseUtil.clearByteArray(data);
+            this.data = null;
+        }
+        
         return result;
     }
 
