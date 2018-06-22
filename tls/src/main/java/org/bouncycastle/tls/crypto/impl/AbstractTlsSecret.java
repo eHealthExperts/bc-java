@@ -74,11 +74,7 @@ public abstract class AbstractTlsSecret
         byte[] result = data;
         
         isDestroyed = true;
-        if (data != null)
-        {
-        	EraseUtil.clearByteArray(data);
-            this.data = null;
-        }
+        this.data = null;
         
         return result;
     }
