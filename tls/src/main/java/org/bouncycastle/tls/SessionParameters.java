@@ -21,6 +21,7 @@ public final class SessionParameters
         private byte[] pskIdentity = null;
         private byte[] srpIdentity = null;
         private byte[] encodedServerExtensions = null;
+        private byte[] encodedClientExtensions = null;
 
         public Builder()
         {
@@ -32,7 +33,7 @@ public final class SessionParameters
             validate(this.compressionAlgorithm >= 0, "compressionAlgorithm");
             validate(this.masterSecret != null, "masterSecret");
             return new SessionParameters(cipherSuite, compressionAlgorithm, localCertificate, masterSecret,
-                negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions);
+                negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions);
         }
 
         public Builder setCipherSuite(int cipherSuite)
@@ -106,6 +107,21 @@ public final class SessionParameters
             }
             return this;
         }
+        
+        public Builder setClientExtensions(Hashtable clientExtensions) throws IOException
+        {
+            if (clientExtensions == null)
+            {
+            	encodedClientExtensions = null;
+            }
+            else
+            {
+                ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                TlsProtocol.writeExtensions(buf, clientExtensions);
+                encodedClientExtensions = buf.toByteArray();
+            }
+            return this;
+        }
 
         private void validate(boolean condition, String parameter)
         {
@@ -125,10 +141,11 @@ public final class SessionParameters
     private byte[] pskIdentity = null;
     private byte[] srpIdentity = null;
     private byte[] encodedServerExtensions;
+    private byte[] encodedClientExtensions;
 
     private SessionParameters(int cipherSuite, short compressionAlgorithm, Certificate localCertificate,
         TlsSecret masterSecret, ProtocolVersion negotiatedVersion, Certificate peerCertificate, byte[] pskIdentity,
-        byte[] srpIdentity, byte[] encodedServerExtensions)
+        byte[] srpIdentity, byte[] encodedServerExtensions, byte[] encodedClientExtensions)
     {
         this.cipherSuite = cipherSuite;
         this.compressionAlgorithm = compressionAlgorithm;
@@ -139,6 +156,7 @@ public final class SessionParameters
         this.pskIdentity = Arrays.clone(pskIdentity);
         this.srpIdentity = Arrays.clone(srpIdentity);
         this.encodedServerExtensions = encodedServerExtensions;
+        this.encodedClientExtensions = encodedClientExtensions;
     }
 
     public void clear()
@@ -152,7 +170,7 @@ public final class SessionParameters
     public SessionParameters copy()
     {
         return new SessionParameters(cipherSuite, compressionAlgorithm, localCertificate, masterSecret,
-            negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions);
+            negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions);
     }
 
     public int getCipherSuite()
@@ -204,6 +222,17 @@ public final class SessionParameters
     }
 
     public Hashtable readServerExtensions() throws IOException
+    {
+        if (encodedServerExtensions == null)
+        {
+            return null;
+        }
+
+        ByteArrayInputStream buf = new ByteArrayInputStream(encodedServerExtensions);
+        return TlsProtocol.readExtensions(buf);
+    }
+    
+    public Hashtable readClientExtensions() throws IOException
     {
         if (encodedServerExtensions == null)
         {

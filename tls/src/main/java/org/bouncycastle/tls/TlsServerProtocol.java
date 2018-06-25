@@ -148,7 +148,7 @@ public class TlsServerProtocol
 
                 if(sessionParameters != null && tlsServer.getNeedClientAuth()) 
                 {
-                	if(sessionParameters.getPeerCertificate() != null) 
+                	if(sessionParameters.getPeerCertificate() == null) 
                 	{
                 		resetCurrentSession();
                 	}
@@ -692,7 +692,7 @@ public class TlsServerProtocol
              */
             if (sessionID.length > 0 && this.sessionParameters != null)
             {
-            	ServerNameList oldServerNameList = TlsExtensionsUtils.getServerNameExtension(sessionParameters.readServerExtensions());
+            	ServerNameList oldServerNameList = TlsExtensionsUtils.getServerNameExtension(sessionParameters.readClientExtensions());
             	ServerNameList serverNameList = TlsExtensionsUtils.getServerNameExtension(clientExtensions);
             	if ((oldServerNameList != null && oldServerNameList.getServerNameList() != null) && //
             			!oldServerNameList.getServerNameList().equals(serverNameList.getServerNameList()))
