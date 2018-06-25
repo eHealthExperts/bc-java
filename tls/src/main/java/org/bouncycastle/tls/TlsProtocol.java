@@ -339,7 +339,8 @@ public abstract class TlsProtocol
                     .setPeerCertificate(this.peerCertificate)
                     .setPSKIdentity(this.securityParameters.getPSKIdentity())
                     .setSRPIdentity(this.securityParameters.getSRPIdentity())
-                    .setServerExtensions(this.clientExtensions)
+                    .setServerExtensions(this.serverExtensions)
+                    .setClientExtensions(this.clientExtensions)
                     .build();
 
                 this.tlsSession = TlsUtils.importSession(this.tlsSession.getSessionID(), this.sessionParameters);
