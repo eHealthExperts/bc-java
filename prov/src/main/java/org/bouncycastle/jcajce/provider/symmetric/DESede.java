@@ -24,6 +24,7 @@ import org.bouncycastle.crypto.macs.CFBBlockCipherMac;
 import org.bouncycastle.crypto.macs.CMac;
 import org.bouncycastle.crypto.modes.CBCBlockCipher;
 import org.bouncycastle.crypto.paddings.ISO7816d4Padding;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.provider.config.ConfigurableProvider;
 import org.bouncycastle.jcajce.provider.symmetric.util.BaseAlgorithmParameterGenerator;
 import org.bouncycastle.jcajce.provider.symmetric.util.BaseBlockCipher;
@@ -172,11 +173,11 @@ public final class DESede
 
                 System.arraycopy(k, 0, k, 16, 8);
 
-                return new SecretKeySpec(k, algName);
+                return new DestroyableSecretKeySpec(k, algName);
             }
             else
             {
-                return new SecretKeySpec(engine.generateKey(), algName);
+                return new DestroyableSecretKeySpec(engine.generateKey(), algName);
             }
         }
     }
@@ -303,7 +304,7 @@ public final class DESede
 
             if (SecretKeySpec.class.isAssignableFrom(keySpec))
             {
-                return new SecretKeySpec(key.getEncoded(), algName);
+                return new DestroyableSecretKeySpec(key.getEncoded(), algName);
             }
             else if (DESedeKeySpec.class.isAssignableFrom(keySpec))
             {
@@ -341,7 +342,7 @@ public final class DESede
             if (keySpec instanceof DESedeKeySpec)
             {
                 DESedeKeySpec desKeySpec = (DESedeKeySpec)keySpec;
-                return new SecretKeySpec(desKeySpec.getKey(), "DESede");
+                return new DestroyableSecretKeySpec(desKeySpec.getKey(), "DESede");
             }
 
             return super.engineGenerateSecret(keySpec);

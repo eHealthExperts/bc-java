@@ -13,7 +13,6 @@ import org.bouncycastle.asn1.x509.DigestInfo;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
-import org.bouncycastle.tls.TlsClientProtocol;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsSigner;

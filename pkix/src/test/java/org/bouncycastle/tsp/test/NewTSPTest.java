@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SimpleTimeZone;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.DEROctetString;
@@ -73,6 +72,8 @@ import org.bouncycastle.tsp.TimeStampTokenGenerator;
 import org.bouncycastle.tsp.TimeStampTokenInfo;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Store;
+
+import junit.framework.TestCase;
 
 public class NewTSPTest
     extends TestCase

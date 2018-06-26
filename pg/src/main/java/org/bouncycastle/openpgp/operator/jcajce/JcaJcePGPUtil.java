@@ -4,11 +4,11 @@ import java.io.IOException;
 import java.math.BigInteger;
 
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x9.ECNamedCurveTable;
 import org.bouncycastle.asn1.x9.X9ECParameters;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.openpgp.PGPException;
@@ -31,7 +31,7 @@ class JcaJcePGPUtil
             throw new PGPException("unknown symmetric algorithm: " + algorithm);
         }
 
-        return new SecretKeySpec(keyBytes, algName);
+        return new DestroyableSecretKeySpec(keyBytes, algName);
     }
 
     static ECPoint decodePoint(

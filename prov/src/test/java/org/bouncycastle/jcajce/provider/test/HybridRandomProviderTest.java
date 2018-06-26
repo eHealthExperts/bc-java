@@ -3,8 +3,9 @@ package org.bouncycastle.jcajce.provider.test;
 import java.security.SecureRandom;
 import java.security.Security;
 
-import junit.framework.TestCase;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
+import junit.framework.TestCase;
 
 public class HybridRandomProviderTest
     extends TestCase

@@ -5,7 +5,6 @@ import java.security.AccessController;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
 import java.security.spec.AlgorithmParameterSpec;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.crypto.Cipher;

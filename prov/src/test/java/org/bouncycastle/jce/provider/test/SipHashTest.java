@@ -8,8 +8,8 @@ import java.security.Security;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
@@ -64,7 +64,7 @@ public class SipHashTest
 
         Mac mac = Mac.getInstance("SipHash", "BC");
 
-        mac.init(new SecretKeySpec(key, "SipHash"));
+        mac.init(new DestroyableSecretKeySpec(key, "SipHash"));
 
         mac.update(input, 0, input.length);
 
@@ -75,7 +75,7 @@ public class SipHashTest
             fail("Result does not match expected value for doFinal()");
         }
 
-        mac.init(new SecretKeySpec(key, "SipHash-2-4"));
+        mac.init(new DestroyableSecretKeySpec(key, "SipHash-2-4"));
 
         mac.update(input, 0, input.length);
 
@@ -87,7 +87,7 @@ public class SipHashTest
 
         mac = Mac.getInstance("SipHash-2-4", "BC");
 
-        mac.init(new SecretKeySpec(key, "SipHash-2-4"));
+        mac.init(new DestroyableSecretKeySpec(key, "SipHash-2-4"));
 
         mac.update(input, 0, input.length);
 
@@ -102,7 +102,7 @@ public class SipHashTest
 
         mac = Mac.getInstance("SipHash-4-8", "BC");
 
-        mac.init(new SecretKeySpec(key, "SipHash"));
+        mac.init(new DestroyableSecretKeySpec(key, "SipHash"));
 
         mac.update(input, 0, input.length);
 

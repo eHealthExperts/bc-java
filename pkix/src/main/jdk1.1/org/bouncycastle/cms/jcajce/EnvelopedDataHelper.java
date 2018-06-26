@@ -160,7 +160,7 @@ public class EnvelopedDataHelper
 
         if (key.getRepresentation() instanceof byte[])
         {
-            return new SecretKeySpec((byte[])key.getRepresentation(), "ENC");
+            return new DestroyableSecretKeySpec((byte[])key.getRepresentation(), "ENC");
         }
 
         throw new IllegalArgumentException("unknown generic key type");
@@ -175,7 +175,7 @@ public class EnvelopedDataHelper
 
         if (key.getRepresentation() instanceof byte[])
         {
-            return new SecretKeySpec((byte[])key.getRepresentation(), getBaseCipherName(algorithm));
+            return new DestroyableSecretKeySpec((byte[])key.getRepresentation(), getBaseCipherName(algorithm));
         }
 
         throw new IllegalArgumentException("unknown generic key type");

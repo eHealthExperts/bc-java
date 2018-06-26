@@ -1,6 +1,5 @@
 package org.bouncycastle.jce.provider;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.Principal;
@@ -10,10 +9,6 @@ import java.security.cert.CertPathBuilderResult;
 import java.security.cert.CertPathBuilderSpi;
 import java.security.cert.CertPathParameters;
 import java.security.cert.CertPathValidator;
-import java.security.cert.CertStore;
-import java.security.cert.CertStoreException;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.PKIXBuilderParameters;
@@ -33,7 +28,6 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.jcajce.PKIXCertStoreSelector;
 import org.bouncycastle.jcajce.PKIXExtendedBuilderParameters;
 import org.bouncycastle.jce.exception.ExtCertPathBuilderException;
-import org.bouncycastle.util.Encodable;
 import org.bouncycastle.util.Selector;
 import org.bouncycastle.util.Store;
 import org.bouncycastle.util.StoreException;
@@ -42,7 +36,6 @@ import org.bouncycastle.x509.ExtendedPKIXParameters;
 import org.bouncycastle.x509.X509AttributeCertStoreSelector;
 import org.bouncycastle.x509.X509AttributeCertificate;
 import org.bouncycastle.x509.X509CertStoreSelector;
-import org.bouncycastle.x509.X509Store;
 
 public class PKIXAttrCertPathBuilderSpi
     extends CertPathBuilderSpi

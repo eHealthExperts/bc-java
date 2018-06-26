@@ -2,9 +2,6 @@ package org.bouncycastle.cms.test;
 
 import java.util.Arrays;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
 import org.bouncycastle.cms.CMSCompressedData;
 import org.bouncycastle.cms.CMSCompressedDataGenerator;
 import org.bouncycastle.cms.CMSException;
@@ -13,6 +10,10 @@ import org.bouncycastle.cms.jcajce.ZlibCompressor;
 import org.bouncycastle.cms.jcajce.ZlibExpanderProvider;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.io.StreamOverflowException;
+
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 public class NewCompressedDataTest
     extends TestCase

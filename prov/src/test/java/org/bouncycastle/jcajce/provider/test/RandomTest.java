@@ -2,9 +2,10 @@ package org.bouncycastle.jcajce.provider.test;
 
 import java.security.SecureRandom;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import junit.framework.Assert;
 import junit.framework.TestCase;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 public class RandomTest
     extends TestCase

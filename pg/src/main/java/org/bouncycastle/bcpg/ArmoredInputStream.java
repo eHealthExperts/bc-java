@@ -3,8 +3,6 @@ package org.bouncycastle.bcpg;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Vector;
 
 import org.bouncycastle.util.StringList;
 import org.bouncycastle.util.Strings;

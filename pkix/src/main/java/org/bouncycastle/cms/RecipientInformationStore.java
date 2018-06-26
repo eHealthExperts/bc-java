@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.util.*;
 import org.bouncycastle.util.Iterable;
 
 public class RecipientInformationStore

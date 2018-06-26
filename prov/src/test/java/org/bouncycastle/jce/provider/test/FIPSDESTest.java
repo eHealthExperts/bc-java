@@ -13,8 +13,8 @@ import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTestResult;
@@ -91,7 +91,7 @@ public class FIPSDESTest
         {
             String  baseAlgorithm;
 
-            key = new SecretKeySpec(Hex.decode("0123456789abcdef"), "DES");
+            key = new DestroyableSecretKeySpec(Hex.decode("0123456789abcdef"), "DES");
 
             in = Cipher.getInstance(algorithm, "BC");
             out = Cipher.getInstance(algorithm, "BC");

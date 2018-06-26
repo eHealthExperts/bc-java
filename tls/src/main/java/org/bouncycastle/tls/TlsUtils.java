@@ -31,7 +31,6 @@ import org.bouncycastle.tls.crypto.TlsStreamVerifier;
 import org.bouncycastle.tls.crypto.TlsVerifier;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
-import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.io.Streams;
 
 /**

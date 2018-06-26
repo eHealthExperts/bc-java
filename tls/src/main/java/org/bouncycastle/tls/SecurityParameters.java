@@ -1,6 +1,5 @@
 package org.bouncycastle.tls;
 
-import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.tls.crypto.TlsSecret;
 
 public class SecurityParameters

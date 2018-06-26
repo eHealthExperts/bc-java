@@ -1,14 +1,14 @@
 package org.bouncycastle.x509;
 
-import org.bouncycastle.x509.util.StreamParser;
-import org.bouncycastle.x509.util.StreamParsingException;
-
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Provider;
 import java.util.Collection;
+
+import org.bouncycastle.x509.util.StreamParser;
+import org.bouncycastle.x509.util.StreamParsingException;
 
 /**
  *

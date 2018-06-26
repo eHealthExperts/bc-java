@@ -1,9 +1,9 @@
 package org.bouncycastle.cms.test;
 
+import java.security.Security;
+
 import junit.extensions.TestSetup;
 import junit.framework.Test;
-
-import java.security.Security;
 
 class CMSTestSetup extends TestSetup
 {

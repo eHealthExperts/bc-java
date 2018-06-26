@@ -15,11 +15,11 @@ import javax.crypto.CipherInputStream;
 import javax.crypto.KeyAgreement;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.bcpg.PublicKeyAlgorithmTags;
 import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.util.JcaJceHelper;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPublicKey;
@@ -120,7 +120,7 @@ class OperatorHelper
     {
         try
         {
-            SecretKey secretKey = new SecretKeySpec(key, PGPUtil.getSymmetricCipherName(encAlgorithm));
+            SecretKey secretKey = new DestroyableSecretKeySpec(key, PGPUtil.getSymmetricCipherName(encAlgorithm));
 
             final Cipher c = createStreamCipher(encAlgorithm, withIntegrityPacket);
 

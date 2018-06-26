@@ -34,6 +34,7 @@ import javax.crypto.spec.RC2ParameterSpec;
 import javax.crypto.spec.RC5ParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
@@ -1302,7 +1303,7 @@ public class BlockCipherTest
             byte[] rawDESKey = { (byte)128, (byte)131, (byte)133, (byte)134,
                     (byte)137, (byte)138, (byte)140, (byte)143 };
 
-            SecretKeySpec cipherKey = new SecretKeySpec(rawDESKey, "DES");
+            DestroyableSecretKeySpec cipherKey = new DestroyableSecretKeySpec(rawDESKey, "DES");
 
             Cipher cipher = Cipher.getInstance("DES/CBC/NoPadding", "BC");
             
@@ -1331,7 +1332,7 @@ public class BlockCipherTest
         {
             byte[] rawDESKey = { -128, -125, -123, -122, -119, -118 };
 
-            SecretKeySpec cipherKey = new SecretKeySpec(rawDESKey, "DES");
+            DestroyableSecretKeySpec cipherKey = new DestroyableSecretKeySpec(rawDESKey, "DES");
             Cipher cipher = Cipher.getInstance("DES/ECB/NoPadding", "BC");
             try
             {
@@ -1356,7 +1357,7 @@ public class BlockCipherTest
         {
             byte[] rawDESKey = { -128, -125, -123, -122, -119, -118, -117, -115, -114 };
 
-            SecretKeySpec cipherKey = new SecretKeySpec(rawDESKey, "DES");
+            DestroyableSecretKeySpec cipherKey = new DestroyableSecretKeySpec(rawDESKey, "DES");
             Cipher cipher = Cipher.getInstance("DES/ECB/NoPadding", "BC");
             try
             {
@@ -1383,7 +1384,7 @@ public class BlockCipherTest
             byte[] rawDESKey = { (byte)128, (byte)131, (byte)133, (byte)134,
                     (byte)137, (byte)138, (byte)140, (byte)143 };
 
-            SecretKeySpec cipherKey = new SecretKeySpec(rawDESKey, "DES");
+            DestroyableSecretKeySpec cipherKey = new DestroyableSecretKeySpec(rawDESKey, "DES");
             Cipher ecipher = Cipher.getInstance("DES/ECB/PKCS5Padding", "BC");
             ecipher.init(Cipher.ENCRYPT_MODE, cipherKey);
 
@@ -1415,7 +1416,7 @@ public class BlockCipherTest
             byte[] rawDESKey = { (byte)128, (byte)131, (byte)133, (byte)134,
                     (byte)137, (byte)138, (byte)140, (byte)143 };
 
-            SecretKeySpec cipherKey = new SecretKeySpec(rawDESKey, "DES");
+            DestroyableSecretKeySpec cipherKey = new DestroyableSecretKeySpec(rawDESKey, "DES");
             Cipher ecipher = Cipher.getInstance("DES/ECB/PKCS5Padding", "BC");
             ecipher.init(Cipher.ENCRYPT_MODE, cipherKey);
 
@@ -1603,7 +1604,7 @@ public class BlockCipherTest
         {
             Cipher c = Cipher.getInstance("AES/CTS/NoPadding", "BC");
             
-            c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(new byte[16], "AES"));
+            c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(new byte[16], "AES"));
             
             c.doFinal(new byte[4]);
             

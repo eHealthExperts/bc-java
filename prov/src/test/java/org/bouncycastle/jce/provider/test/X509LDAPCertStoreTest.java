@@ -1,15 +1,5 @@
 package org.bouncycastle.jce.provider.test;
 
-import org.bouncycastle.jce.PrincipalUtil;
-import org.bouncycastle.jce.X509LDAPCertStoreParameters;
-import org.bouncycastle.jce.X509Principal;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.util.encoders.Base64;
-import org.bouncycastle.util.test.SimpleTest;
-import org.bouncycastle.x509.X509CRLStoreSelector;
-import org.bouncycastle.x509.X509CertStoreSelector;
-import org.bouncycastle.x509.X509Store;
-
 import java.io.ByteArrayInputStream;
 import java.security.Security;
 import java.security.cert.CRLException;
@@ -23,6 +13,16 @@ import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+
+import org.bouncycastle.jce.PrincipalUtil;
+import org.bouncycastle.jce.X509LDAPCertStoreParameters;
+import org.bouncycastle.jce.X509Principal;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.encoders.Base64;
+import org.bouncycastle.util.test.SimpleTest;
+import org.bouncycastle.x509.X509CRLStoreSelector;
+import org.bouncycastle.x509.X509CertStoreSelector;
+import org.bouncycastle.x509.X509Store;
 
 public class X509LDAPCertStoreTest extends SimpleTest
 {

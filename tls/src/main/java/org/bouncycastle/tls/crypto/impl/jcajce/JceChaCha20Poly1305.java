@@ -8,7 +8,6 @@ import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 
@@ -148,7 +147,7 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
 
     protected void initMAC(byte[] firstBlock) throws InvalidKeyException
     {
-        mac.init(new SecretKeySpec(firstBlock, 0, 32, "Poly1305"));
+        mac.init(new DestroyableSecretKeySpec(firstBlock, 0, 32, "Poly1305"));
 
         for (int i = 0; i < 64; ++i)
         {

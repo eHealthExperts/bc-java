@@ -7,10 +7,10 @@ import java.security.spec.AlgorithmParameterSpec;
 
 import javax.crypto.KeyGeneratorSpi;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.crypto.CipherKeyGenerator;
 import org.bouncycastle.crypto.KeyGenerationParameters;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 
 public class BaseKeyGenerator
     extends KeyGeneratorSpi
@@ -77,6 +77,6 @@ public class BaseKeyGenerator
             uninitialised = false;
         }
 
-        return new SecretKeySpec(engine.generateKey(), algName);
+        return new DestroyableSecretKeySpec(engine.generateKey(), algName);
     }
 }

@@ -1,11 +1,15 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.security.GeneralSecurityException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.DestroyFailedException;
 
 import org.bouncycastle.crypto.util.EraseUtil;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.tls.PRFAlgorithm;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsSecret;
@@ -20,6 +24,9 @@ import org.bouncycastle.util.Strings;
 public class JceTlsSecret
     extends AbstractTlsSecret
 {
+	
+	private static Logger LOG = Logger.getLogger(JceTlsSecret.class.getName());
+	
     protected final JcaTlsCrypto crypto;
 
     public JceTlsSecret(JcaTlsCrypto crypto, byte[] data)
@@ -59,7 +66,7 @@ public class JceTlsSecret
     {
         String macName = "Hmac" + digestName;
         Mac mac = crypto.getHelper().createMac(macName);
-        SecretKeySpec secretKey = new SecretKeySpec(secret, secretOff, secretLen, macName);
+        DestroyableSecretKeySpec secretKey = new DestroyableSecretKeySpec(secret, secretOff, secretLen, macName);
 		mac.init(secretKey);
 
         byte[] a = seed;
@@ -82,7 +89,11 @@ public class JceTlsSecret
             pos += macSize;
         }
         
-        EraseUtil.clearSecretKeySpec(secretKey);
+        try {
+			secretKey.destroy();
+		} catch (DestroyFailedException e) {
+			 LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
+		}
         
     }
 

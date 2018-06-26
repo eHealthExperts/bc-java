@@ -61,7 +61,7 @@ public class JCESecretKeyFactory
         
         if (SecretKeySpec.class.isAssignableFrom(keySpec))
         {
-            return new SecretKeySpec(key.getEncoded(), algName);
+            return new DestroyableSecretKeySpec(key.getEncoded(), algName);
         }
 
         try
@@ -95,7 +95,7 @@ public class JCESecretKeyFactory
             throw new InvalidKeyException("Key not of type " + algName + ".");
         }
 
-        return new SecretKeySpec(key.getEncoded(), algName);
+        return new DestroyableSecretKeySpec(key.getEncoded(), algName);
     }
 
     /*
@@ -203,7 +203,7 @@ public class JCESecretKeyFactory
             if (keySpec instanceof DESKeySpec)
             {
                 DESKeySpec desKeySpec = (DESKeySpec)keySpec;
-                return new SecretKeySpec(desKeySpec.getKey(), "DES");
+                return new DestroyableSecretKeySpec(desKeySpec.getKey(), "DES");
             }
 
             return super.engineGenerateSecret(keySpec);
@@ -234,7 +234,7 @@ public class JCESecretKeyFactory
             
             if (SecretKeySpec.class.isAssignableFrom(keySpec))
             {
-                return new SecretKeySpec(key.getEncoded(), algName);
+                return new DestroyableSecretKeySpec(key.getEncoded(), algName);
             }
             else if (DESedeKeySpec.class.isAssignableFrom(keySpec))
             {
@@ -272,7 +272,7 @@ public class JCESecretKeyFactory
             if (keySpec instanceof DESedeKeySpec)
             {
                 DESedeKeySpec desKeySpec = (DESedeKeySpec)keySpec;
-                return new SecretKeySpec(desKeySpec.getKey(), "DESede");
+                return new DestroyableSecretKeySpec(desKeySpec.getKey(), "DESede");
             }
 
             return super.engineGenerateSecret(keySpec);

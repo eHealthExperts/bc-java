@@ -19,6 +19,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.crypto.util.EraseUtil;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.util.JcaJceHelper;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.ECPointFormat;
@@ -549,9 +550,8 @@ public class JcaTlsCrypto
                     try
                     {
                         c.init(Cipher.WRAP_MODE, pubKeyRSA, getSecureRandom());
-                        SecretKeySpec secretKeySpec = new SecretKeySpec(input, inOff, length, "TLS");
+                        DestroyableSecretKeySpec secretKeySpec = new DestroyableSecretKeySpec(input, inOff, length, "TLS");
 						byte[] result = c.wrap(secretKeySpec);
-						EraseUtil.clearSecretKeySpec(secretKeySpec);
 						return result;
                     }
                     catch (Exception e)

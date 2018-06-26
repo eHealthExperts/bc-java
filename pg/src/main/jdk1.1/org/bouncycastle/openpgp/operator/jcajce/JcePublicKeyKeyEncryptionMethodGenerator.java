@@ -122,7 +122,7 @@ public class JcePublicKeyKeyEncryptionMethodGenerator
 
                 byte[] paddedSessionData = PGPPad.padSessionData(sessionInfo);
 
-                byte[] C = c.wrap(new SecretKeySpec(paddedSessionData, PGPUtil.getSymmetricCipherName(sessionInfo[0])));
+                byte[] C = c.wrap(new DestroyableSecretKeySpec(paddedSessionData, PGPUtil.getSymmetricCipherName(sessionInfo[0])));
 
                 SubjectPublicKeyInfo epPubKey = SubjectPublicKeyInfo.getInstance(ephKP.getPublic().getEncoded());
 

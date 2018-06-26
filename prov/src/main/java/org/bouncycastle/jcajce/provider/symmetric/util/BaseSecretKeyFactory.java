@@ -10,6 +10,7 @@ import javax.crypto.SecretKeyFactorySpi;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 
 public class BaseSecretKeyFactory
     extends SecretKeyFactorySpi
@@ -32,7 +33,7 @@ public class BaseSecretKeyFactory
     {
         if (keySpec instanceof SecretKeySpec)
         {
-            return new SecretKeySpec(((SecretKeySpec)keySpec).getEncoded(), algName);
+            return new DestroyableSecretKeySpec(((SecretKeySpec)keySpec).getEncoded(), algName);
         }
 
         throw new InvalidKeySpecException("Invalid KeySpec");
@@ -54,7 +55,7 @@ public class BaseSecretKeyFactory
         
         if (SecretKeySpec.class.isAssignableFrom(keySpec))
         {
-            return new SecretKeySpec(key.getEncoded(), algName);
+            return new DestroyableSecretKeySpec(key.getEncoded(), algName);
         }
 
         try
@@ -88,6 +89,6 @@ public class BaseSecretKeyFactory
             throw new InvalidKeyException("Key not of type " + algName + ".");
         }
 
-        return new SecretKeySpec(key.getEncoded(), algName);
+        return new DestroyableSecretKeySpec(key.getEncoded(), algName);
     }
 }
