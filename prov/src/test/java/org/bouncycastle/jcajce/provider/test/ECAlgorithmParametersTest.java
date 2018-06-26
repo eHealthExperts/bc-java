@@ -5,8 +5,9 @@ import java.security.Security;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 
-import junit.framework.TestCase;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
+import junit.framework.TestCase;
 
 public class ECAlgorithmParametersTest
     extends TestCase

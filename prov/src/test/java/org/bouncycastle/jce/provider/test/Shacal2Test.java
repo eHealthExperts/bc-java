@@ -16,8 +16,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
@@ -66,7 +66,7 @@ public class Shacal2Test
         new SecureRandom().nextBytes(salt);
 
         final KeySpec keySpec = new PBEKeySpec(TEST_PASSWORD, salt, 262144, KEY_SIZE_BITS);
-        final SecretKey secretKey = new SecretKeySpec(SecretKeyFactory.getInstance("PBKDF2", "BC").
+        final SecretKey secretKey = new DestroyableSecretKeySpec(SecretKeyFactory.getInstance("PBKDF2", "BC").
             generateSecret(keySpec).getEncoded(), "Shacal2");
 
         final Cipher cipher = Cipher.getInstance("Shacal2/CBC/ISO10126Padding", "BC");
@@ -99,7 +99,7 @@ public class Shacal2Test
         ByteArrayInputStream bIn;
         ByteArrayOutputStream bOut;
 
-        key = new SecretKeySpec(keyBytes, "Shacal2");
+        key = new DestroyableSecretKeySpec(keyBytes, "Shacal2");
 
         in = Cipher.getInstance("Shacal2/ECB/NoPadding", "BC");
         out = Cipher.getInstance("Shacal2/ECB/NoPadding", "BC");

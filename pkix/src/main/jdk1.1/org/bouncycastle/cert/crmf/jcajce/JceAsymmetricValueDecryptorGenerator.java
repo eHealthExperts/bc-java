@@ -78,7 +78,7 @@ public class JceAsymmetricValueDecryptorGenerator
             if (sKey == null)
             {
                 keyCipher.init(Cipher.DECRYPT_MODE, recipientKey);
-                sKey = new SecretKeySpec(keyCipher.doFinal(encryptedContentEncryptionKey), contentEncryptionAlgorithm.getAlgorithm().getId());
+                sKey = new DestroyableSecretKeySpec(keyCipher.doFinal(encryptedContentEncryptionKey), contentEncryptionAlgorithm.getAlgorithm().getId());
             }
 
             return sKey;

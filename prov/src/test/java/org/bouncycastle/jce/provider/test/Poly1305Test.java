@@ -10,9 +10,9 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.crypto.generators.Poly1305KeyGenerator;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
@@ -121,7 +121,7 @@ public class Poly1305Test
         }
 
         Mac mac = Mac.getInstance(name);
-        mac.init(new SecretKeySpec(MASTER_KEY, name));
+        mac.init(new DestroyableSecretKeySpec(MASTER_KEY, name));
         mac.update(new byte[128]);
         byte[] bytes = mac.doFinal();
 
@@ -152,7 +152,7 @@ public class Poly1305Test
                 try
                 {
                     Mac mac = Mac.getInstance(name);
-                    mac.init(new SecretKeySpec(MASTER_KEY, name), new IvParameterSpec(new byte[16]));
+                    mac.init(new DestroyableSecretKeySpec(MASTER_KEY, name), new IvParameterSpec(new byte[16]));
                     mac.update(new byte[128]);
                     byte[] bytes = mac.doFinal();
 

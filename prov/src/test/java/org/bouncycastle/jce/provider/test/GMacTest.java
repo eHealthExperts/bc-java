@@ -9,8 +9,8 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
@@ -102,7 +102,7 @@ public class GMacTest
         {
             Mac mac = Mac.getInstance(name);
 
-            mac.init(new SecretKeySpec(new byte[mac.getMacLength()], mac.getAlgorithm()), new IvParameterSpec(
+            mac.init(new DestroyableSecretKeySpec(new byte[mac.getMacLength()], mac.getAlgorithm()), new IvParameterSpec(
                 new byte[16]));
             mac.update(new byte[128]);
             byte[] bytes = mac.doFinal();

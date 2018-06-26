@@ -7,13 +7,13 @@ import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.cryptopro.GOST28147Parameters;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.spec.GOST28147ParameterSpec;
 import org.bouncycastle.jcajce.util.DefaultJcaJceHelper;
 import org.bouncycastle.jcajce.util.JcaJceHelper;
@@ -74,7 +74,7 @@ public class JceInputDecryptorProviderBuilder
                 try
                 {
                     cipher = helper.createCipher(algorithm.getId());
-                    SecretKey key = new SecretKeySpec(encKeyBytes, algorithm.getId());
+                    SecretKey key = new DestroyableSecretKeySpec(encKeyBytes, algorithm.getId());
                     
                     ASN1Encodable encParams = algorithmIdentifier.getParameters();
 

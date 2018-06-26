@@ -10,9 +10,6 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
 import org.bouncycastle.asn1.eac.CertificateHolderAuthorization;
 import org.bouncycastle.asn1.eac.CertificateHolderReference;
 import org.bouncycastle.asn1.eac.CertificationAuthorityReference;
@@ -31,6 +28,10 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jce.spec.ECParameterSpec;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.io.Streams;
+
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 public class AllTests
     extends TestCase

@@ -3,7 +3,6 @@ package org.bouncycastle.pkcs.test;
 import java.math.BigInteger;
 import java.security.Security;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.DERNull;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.EncryptedPrivateKeyInfo;
@@ -22,6 +21,8 @@ import org.bouncycastle.pkcs.jcajce.JcePKCSPBEInputDecryptorProviderBuilder;
 import org.bouncycastle.pkcs.jcajce.JcePKCSPBEOutputEncryptorBuilder;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Base64;
+
+import junit.framework.TestCase;
 
 public class PKCS8Test
     extends TestCase

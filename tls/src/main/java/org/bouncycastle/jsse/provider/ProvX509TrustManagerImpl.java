@@ -19,7 +19,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.X509TrustManager;
 
 class ProvX509TrustManagerImpl
     implements ProvX509TrustManager

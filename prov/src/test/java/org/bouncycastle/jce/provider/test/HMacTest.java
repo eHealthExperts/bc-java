@@ -18,6 +18,7 @@ import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.rosstandart.RosstandartObjectIdentifiers;
 import org.bouncycastle.asn1.ua.UAObjectIdentifiers;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
@@ -73,7 +74,7 @@ public class HMacTest
         byte[] output)
         throws Exception
     {
-        SecretKey key = new SecretKeySpec(keyBytes, hmacName);
+        SecretKey key = new DestroyableSecretKeySpec(keyBytes, hmacName);
         byte[] out;
         Mac mac;
 
@@ -113,7 +114,7 @@ public class HMacTest
         byte[] output)
         throws Exception
     {
-        SecretKey key = new SecretKeySpec(keyBytes, hmacName);
+        SecretKey key = new DestroyableSecretKeySpec(keyBytes, hmacName);
         byte[] out;
         Mac mac;
 
@@ -154,7 +155,7 @@ public class HMacTest
         mac = Mac.getInstance("HmacSHA1", "BC");
 
         byte[] b = {(byte)1, (byte)2, (byte)3, (byte)4, (byte)5};
-        SecretKeySpec sks = new SecretKeySpec(b, "HmacSHA1");
+        DestroyableSecretKeySpec sks = new DestroyableSecretKeySpec(b, "HmacSHA1");
         RC5ParameterSpec algPS = new RC5ParameterSpec(100, 100, 100);
 
         try

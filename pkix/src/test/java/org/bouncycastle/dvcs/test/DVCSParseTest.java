@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1GeneralizedTime;
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -36,6 +35,8 @@ import org.bouncycastle.cms.CMSSignedData;
 import org.bouncycastle.dvcs.DVCSException;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
+
+import junit.framework.TestCase;
 
 public class DVCSParseTest
     extends TestCase

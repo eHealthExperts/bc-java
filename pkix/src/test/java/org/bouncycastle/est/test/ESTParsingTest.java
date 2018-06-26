@@ -3,7 +3,6 @@ package org.bouncycastle.est.test;
 import java.math.BigInteger;
 import java.util.Collection;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1String;
 import org.bouncycastle.asn1.pkcs.Attribute;
@@ -17,6 +16,8 @@ import org.bouncycastle.est.CSRAttributesResponse;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.util.Store;
 import org.bouncycastle.util.encoders.Base64;
+
+import junit.framework.TestCase;
 
 public class ESTParsingTest
     extends TestCase

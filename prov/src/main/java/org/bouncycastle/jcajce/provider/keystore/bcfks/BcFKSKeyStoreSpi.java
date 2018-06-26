@@ -37,7 +37,6 @@ import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.PasswordCallback;
@@ -81,6 +80,7 @@ import org.bouncycastle.crypto.util.PBKDF2Config;
 import org.bouncycastle.crypto.util.PBKDFConfig;
 import org.bouncycastle.crypto.util.ScryptConfig;
 import org.bouncycastle.jcajce.BCFKSStoreParameter;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Strings;
@@ -205,7 +205,7 @@ class BcFKSKeyStoreSpi
                         kFact = SecretKeyFactory.getInstance(keyData.getKeyAlgorithm().getId());
                     }
 
-                    return kFact.generateSecret(new SecretKeySpec(keyData.getKeyBytes(), keyData.getKeyAlgorithm().getId()));
+                    return kFact.generateSecret(new DestroyableSecretKeySpec(keyData.getKeyBytes(), keyData.getKeyAlgorithm().getId()));
                 }
                 catch (Exception e)
                 {
@@ -358,7 +358,7 @@ class BcFKSKeyStoreSpi
                     c = Cipher.getInstance("AES/CCM/NoPadding", provider);
                 }
 
-                c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
+                c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
 
                 byte[] encryptedKey = c.doFinal(encodedKey);
 
@@ -401,7 +401,7 @@ class BcFKSKeyStoreSpi
                     c = Cipher.getInstance("AES/CCM/NoPadding", provider);
                 }
 
-                c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
+                c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
 
 
                 String keyAlg = Strings.toUpperCase(key.getAlgorithm());
@@ -758,7 +758,7 @@ class BcFKSKeyStoreSpi
 
         try
         {
-            mac.init(new SecretKeySpec(generateKey(pbkdAlgorithm, "INTEGRITY_CHECK", ((password != null) ? password : new char[0])), algorithmId));
+            mac.init(new DestroyableSecretKeySpec(generateKey(pbkdAlgorithm, "INTEGRITY_CHECK", ((password != null) ? password : new char[0])), algorithmId));
         }
         catch (InvalidKeyException e)
         {
@@ -852,7 +852,7 @@ class BcFKSKeyStoreSpi
                 c = Cipher.getInstance("AES/CCM/NoPadding", provider);
             }
 
-            c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
+            c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
 
             byte[] encOut = c.doFinal(storeData.getEncoded());
 
@@ -1025,7 +1025,7 @@ class BcFKSKeyStoreSpi
 
             byte[] keyBytes = generateKey(pbes2Parameters.getKeyDerivationFunc(), purpose, ((password != null) ? password : new char[0]));
 
-            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyBytes, "AES"), algParams);
+            c.init(Cipher.DECRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"), algParams);
 
             byte[] rv = c.doFinal(encryptedData);
             return rv;

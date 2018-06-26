@@ -4,7 +4,6 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.crypto.Mac;
 import org.bouncycastle.crypto.digests.SHA256Digest;
@@ -13,6 +12,7 @@ import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.util.DigestFactory;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.provider.config.ConfigurableProvider;
 import org.bouncycastle.jcajce.provider.symmetric.util.BaseSecretKeyFactory;
 import org.bouncycastle.jcajce.provider.util.AlgorithmProvider;
@@ -45,7 +45,7 @@ public class TLSKDF
         {
             if (keySpec instanceof TLSKeyMaterialSpec)
             {
-                return new SecretKeySpec(PRF_legacy((TLSKeyMaterialSpec)keySpec), algName);
+                return new DestroyableSecretKeySpec(PRF_legacy((TLSKeyMaterialSpec)keySpec), algName);
             }
 
             throw new InvalidKeySpecException("Invalid KeySpec");
@@ -66,7 +66,7 @@ public class TLSKDF
         {
             if (keySpec instanceof TLSKeyMaterialSpec)
             {
-                return new SecretKeySpec(PRF_legacy((TLSKeyMaterialSpec)keySpec), algName);
+                return new DestroyableSecretKeySpec(PRF_legacy((TLSKeyMaterialSpec)keySpec), algName);
             }
 
             throw new InvalidKeySpecException("Invalid KeySpec");
@@ -119,7 +119,7 @@ public class TLSKDF
         {
             if (keySpec instanceof TLSKeyMaterialSpec)
             {
-                return new SecretKeySpec(PRF((TLSKeyMaterialSpec)keySpec, prf), algName);
+                return new DestroyableSecretKeySpec(PRF((TLSKeyMaterialSpec)keySpec, prf), algName);
             }
 
             throw new InvalidKeySpecException("Invalid KeySpec");

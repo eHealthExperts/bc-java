@@ -3,8 +3,8 @@ package org.bouncycastle.tls.crypto.impl.jcajce;
 import java.security.InvalidKeyException;
 
 import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.tls.crypto.TlsMAC;
 
 /**
@@ -27,7 +27,7 @@ public class JceTlsMAC
     {
         try
         {
-            mac.init(new SecretKeySpec(key, keyOff, keyLen, algorithm));
+            mac.init(new DestroyableSecretKeySpec(key, keyOff, keyLen, algorithm));
         }
         catch (InvalidKeyException e)
         {

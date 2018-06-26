@@ -3,11 +3,15 @@ package org.bouncycastle.tls.crypto.impl.jcajce;
 import java.security.InvalidKeyException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.DestroyFailedException;
 
 import org.bouncycastle.crypto.util.EraseUtil;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.tls.crypto.TlsHMAC;
 
 /**
@@ -16,6 +20,9 @@ import org.bouncycastle.tls.crypto.TlsHMAC;
 public class JceTlsHMAC
     implements TlsHMAC
 {
+	
+	 private static Logger LOG = Logger.getLogger(JceTlsHMAC.class.getName());
+	
     private static final Map<String, Integer> internalBlockSizes = new HashMap<String, Integer>();
 
     static
@@ -70,9 +77,14 @@ public class JceTlsHMAC
     {
         try
         {
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key, keyOff, keyLen, algorithm);
+        	DestroyableSecretKeySpec secretKeySpec = new DestroyableSecretKeySpec(key, keyOff, keyLen, algorithm);
 			hmac.init(secretKeySpec);
-			EraseUtil.clearSecretKeySpec(secretKeySpec);
+		    try {
+		    	secretKeySpec.destroy();
+            } catch (DestroyFailedException e) {
+                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
+            }
+			
         }
         catch (InvalidKeyException e)
         {

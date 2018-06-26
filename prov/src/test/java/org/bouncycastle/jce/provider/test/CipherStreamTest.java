@@ -17,6 +17,7 @@ import javax.crypto.ShortBufferException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
@@ -217,7 +218,7 @@ public class CipherStreamTest
     private void testAlgorithm(String name, byte[] keyBytes, byte[] iv, byte[] plainText, byte[] cipherText)
         throws Exception
     {
-        SecretKey key = new SecretKeySpec(keyBytes, name);
+        SecretKey key = new DestroyableSecretKeySpec(keyBytes, name);
         Cipher    in = Cipher.getInstance(name, "BC");
         Cipher    out = Cipher.getInstance(name, "BC");
 
@@ -277,7 +278,7 @@ public class CipherStreamTest
                 keyBytes = key128;
             }
 
-            SecretKeySpec cipherKey = new SecretKeySpec(keyBytes, name);
+            DestroyableSecretKeySpec cipherKey = new DestroyableSecretKeySpec(keyBytes, name);
             Cipher ecipher = Cipher.getInstance(name, "BC");
             ecipher.init(Cipher.ENCRYPT_MODE, cipherKey);
 

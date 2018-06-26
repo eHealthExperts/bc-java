@@ -192,7 +192,7 @@ class BcFKSKeyStoreSpi
                         kFact = SecretKeyFactory.getInstance(keyData.getKeyAlgorithm().getId());
                     }
 
-                    return kFact.generateSecret(new SecretKeySpec(keyData.getKeyBytes(), keyData.getKeyAlgorithm().getId()));
+                    return kFact.generateSecret(new DestroyableSecretKeySpec(keyData.getKeyBytes(), keyData.getKeyAlgorithm().getId()));
                 }
                 catch (Exception e)
                 {
@@ -345,7 +345,7 @@ class BcFKSKeyStoreSpi
                     c = Cipher.getInstance("AES/CCM/NoPadding", provider);
                 }
 
-                c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
+                c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
 
                 byte[] encryptedKey = c.doFinal(encodedKey);
 
@@ -388,7 +388,7 @@ class BcFKSKeyStoreSpi
                     c = Cipher.getInstance("AES/CCM/NoPadding", provider);
                 }
 
-                c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
+                c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
 
 
                 String keyAlg = Strings.toUpperCase(key.getAlgorithm());
@@ -722,7 +722,7 @@ class BcFKSKeyStoreSpi
 
         try
         {
-            mac.init(new SecretKeySpec(generateKey(pbkdAlgorithm, "INTEGRITY_CHECK", ((password != null) ? password : new char[0])), algorithmId));
+            mac.init(new DestroyableSecretKeySpec(generateKey(pbkdAlgorithm, "INTEGRITY_CHECK", ((password != null) ? password : new char[0])), algorithmId));
         }
         catch (InvalidKeyException e)
         {
@@ -755,7 +755,7 @@ class BcFKSKeyStoreSpi
                 c = Cipher.getInstance("AES/CCM/NoPadding", provider);
             }
 
-            c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"));
+            c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
 
             byte[] encOut = c.doFinal(storeData.getEncoded());
 
@@ -913,7 +913,7 @@ class BcFKSKeyStoreSpi
 
             byte[] keyBytes = generateKey(pbes2Parameters.getKeyDerivationFunc(), purpose, ((password != null) ? password : new char[0]));
 
-            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyBytes, "AES"), algParams);
+            c.init(Cipher.DECRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"), algParams);
 
             byte[] rv = c.doFinal(encryptedData);
             return rv;

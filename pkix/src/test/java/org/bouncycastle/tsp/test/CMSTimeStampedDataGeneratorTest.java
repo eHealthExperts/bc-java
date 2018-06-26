@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -35,6 +34,8 @@ import org.bouncycastle.tsp.cms.CMSTimeStampedDataParser;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Store;
 import org.bouncycastle.util.io.Streams;
+
+import junit.framework.TestCase;
 
 public class CMSTimeStampedDataGeneratorTest
     extends TestCase

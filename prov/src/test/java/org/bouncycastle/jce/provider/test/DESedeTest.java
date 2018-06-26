@@ -16,8 +16,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.DESedeKeySpec;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
@@ -137,11 +137,11 @@ public class DESedeTest
         {
             Cipher wrapper = Cipher.getInstance(alg + "Wrap", "BC");
 
-            wrapper.init(Cipher.WRAP_MODE, new SecretKeySpec(kek, alg), new IvParameterSpec(iv));
+            wrapper.init(Cipher.WRAP_MODE, new DestroyableSecretKeySpec(kek, alg), new IvParameterSpec(iv));
 
             try
             {
-                byte[]  cText = wrapper.wrap(new SecretKeySpec(in, alg));
+                byte[]  cText = wrapper.wrap(new DestroyableSecretKeySpec(in, alg));
                 if (!equalArray(cText, out))
                 {
                     fail("failed wrap test " + id  + " expected " + new String(Hex.encode(out)) + " got " + new String(Hex.encode(cText)));
@@ -152,7 +152,7 @@ public class DESedeTest
                 fail("failed wrap test exception " + e.toString());
             }
 
-            wrapper.init(Cipher.UNWRAP_MODE, new SecretKeySpec(kek, alg));
+            wrapper.init(Cipher.UNWRAP_MODE, new DestroyableSecretKeySpec(kek, alg));
 
             try
             {

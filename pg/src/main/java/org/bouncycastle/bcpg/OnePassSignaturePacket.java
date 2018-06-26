@@ -1,6 +1,7 @@
 package org.bouncycastle.bcpg;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 /**
  * generic signature object

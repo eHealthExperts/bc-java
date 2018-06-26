@@ -1,14 +1,14 @@
 package org.bouncycastle.jce.provider.test;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.util.test.SimpleTest;
-import org.bouncycastle.x509.X509CertificatePair;
-
 import java.io.ByteArrayInputStream;
 import java.security.Security;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.test.SimpleTest;
+import org.bouncycastle.x509.X509CertificatePair;
 
 public class X509CertificatePairTest
     extends SimpleTest

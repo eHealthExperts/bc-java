@@ -6,12 +6,12 @@ import java.security.Provider;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.cms.PasswordRecipient;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 
 /**
  * the RecipientInfo class for a recipient who has been sent a message
@@ -60,7 +60,7 @@ public abstract class JcePasswordRecipient
         {
             IvParameterSpec ivSpec = new IvParameterSpec(ASN1OctetString.getInstance(keyEncryptionAlgorithm.getParameters()).getOctets());
 
-            keyEncryptionCipher.init(Cipher.UNWRAP_MODE, new SecretKeySpec(derivedKey, keyEncryptionCipher.getAlgorithm()), ivSpec);
+            keyEncryptionCipher.init(Cipher.UNWRAP_MODE, new DestroyableSecretKeySpec(derivedKey, keyEncryptionCipher.getAlgorithm()), ivSpec);
 
             return keyEncryptionCipher.unwrap(encryptedContentEncryptionKey, contentEncryptionAlgorithm.getAlgorithm().getId(), Cipher.SECRET_KEY);
         }

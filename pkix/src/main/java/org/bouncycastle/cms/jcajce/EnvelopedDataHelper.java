@@ -27,7 +27,6 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.RC2ParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1Null;
@@ -44,6 +43,7 @@ import org.bouncycastle.cms.CMSAlgorithm;
 import org.bouncycastle.cms.CMSEnvelopedDataGenerator;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.cms.PasswordRecipient;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.operator.DefaultSecretKeySizeProvider;
 import org.bouncycastle.operator.GenericKey;
 import org.bouncycastle.operator.SecretKeySizeProvider;
@@ -170,7 +170,7 @@ public class EnvelopedDataHelper
 
         if (key.getRepresentation() instanceof byte[])
         {
-            return new SecretKeySpec((byte[])key.getRepresentation(), "ENC");
+            return new DestroyableSecretKeySpec((byte[])key.getRepresentation(), "ENC");
         }
 
         throw new IllegalArgumentException("unknown generic key type");
@@ -185,7 +185,7 @@ public class EnvelopedDataHelper
 
         if (key.getRepresentation() instanceof byte[])
         {
-            return new SecretKeySpec((byte[])key.getRepresentation(), getBaseCipherName(algorithm));
+            return new DestroyableSecretKeySpec((byte[])key.getRepresentation(), getBaseCipherName(algorithm));
         }
 
         throw new IllegalArgumentException("unknown generic key type");

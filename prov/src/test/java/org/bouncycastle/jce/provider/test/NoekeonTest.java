@@ -1,18 +1,19 @@
 package org.bouncycastle.jce.provider.test;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.util.encoders.Hex;
-
-import javax.crypto.Cipher;
-import javax.crypto.CipherInputStream;
-import javax.crypto.CipherOutputStream;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.security.Key;
 import java.security.Security;
+
+import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
+
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.encoders.Hex;
 
 /**
  * basic test class for SEED
@@ -47,7 +48,7 @@ public class NoekeonTest
         ByteArrayInputStream bIn;
         ByteArrayOutputStream bOut;
 
-        key = new SecretKeySpec(keyBytes, "Noekeon");
+        key = new DestroyableSecretKeySpec(keyBytes, "Noekeon");
 
         in = Cipher.getInstance("Noekeon/ECB/NoPadding", "BC");
         out = Cipher.getInstance("Noekeon/ECB/NoPadding", "BC");

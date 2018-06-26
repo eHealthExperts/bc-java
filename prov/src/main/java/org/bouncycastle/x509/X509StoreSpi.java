@@ -1,8 +1,8 @@
 package org.bouncycastle.x509;
 
-import org.bouncycastle.util.Selector;
-
 import java.util.Collection;
+
+import org.bouncycastle.util.Selector;
 
 public abstract class X509StoreSpi
 {

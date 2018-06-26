@@ -57,7 +57,7 @@ public class JcePKMACValuesCalculator
     {
         try
         {
-            mac.init(new SecretKeySpec(pwd, mac.getAlgorithm()));
+            mac.init(new DestroyableSecretKeySpec(pwd, mac.getAlgorithm()));
 
             return mac.doFinal(data);
         }
