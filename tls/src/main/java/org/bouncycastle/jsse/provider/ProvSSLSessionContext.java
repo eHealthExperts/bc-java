@@ -1,5 +1,7 @@
 package org.bouncycastle.jsse.provider;
 
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -8,6 +10,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSessionContext;
@@ -16,281 +19,297 @@ import org.bouncycastle.tls.SessionID;
 import org.bouncycastle.tls.TlsSession;
 import org.bouncycastle.tls.crypto.TlsCrypto;
 
-class ProvSSLSessionContext
-    implements SSLSessionContext
-{
-    private static final int provSessionCacheSize = PropertyUtils
-        .getIntegerSystemProperty("javax.net.ssl.sessionCacheSize", 0, 0, Integer.MAX_VALUE);
+class ProvSSLSessionContext implements SSLSessionContext {
+	private static Logger LOG = Logger.getLogger(ProvSSLSessionContext.class.getName());
 
-    // NOTE: This is configured as a simple LRU cache using the "access order" constructor
-    protected final Map<SessionID, ProvSSLSessionImpl> sessionsByID = new LinkedHashMap<SessionID, ProvSSLSessionImpl>(16, 0.75f, true)
-    {
-        protected boolean removeEldestEntry(Map.Entry<SessionID, ProvSSLSessionImpl> eldest)
-        {
-            boolean shouldRemove = sessionCacheSize > 0 && size() > sessionCacheSize;
-            if (shouldRemove)
-            {
-                removeSessionByPeer(eldest.getValue());
-                eldest.getValue().invalidate();
-            }
-            return shouldRemove;
-        }
-    };
-    protected final Map<String, ProvSSLSessionImpl> sessionsByPeer = new HashMap<String, ProvSSLSessionImpl>();
+	private static final int provSessionCacheSize = PropertyUtils
+			.getIntegerSystemProperty("javax.net.ssl.sessionCacheSize", 0, 0, Integer.MAX_VALUE);
 
-    protected final ProvSSLContextSpi sslContext;
-    protected final TlsCrypto crypto;
+	// NOTE: This is configured as a simple LRU cache using the "access order"
+	// constructor
+	@SuppressWarnings("serial")
+	protected final Map<SessionID, SessionEntry> sessionsByID = new LinkedHashMap<SessionID, SessionEntry>(16, 0.75f,
+			true) {
+		protected boolean removeEldestEntry(Map.Entry<SessionID, SessionEntry> eldest) {
+			boolean shouldRemove = sessionCacheSize > 0 && size() > sessionCacheSize;
+			if (shouldRemove) {
+				removeSessionByPeer(eldest.getValue());
+				eldest.getValue().get().invalidate();
+			}
+			return shouldRemove;
+		}
+	};
+	protected final Map<String, SessionEntry> sessionsByPeer = new HashMap<String, SessionEntry>();
+	protected final ReferenceQueue<ProvSSLSessionImpl> sessionsQueue = new ReferenceQueue<ProvSSLSessionImpl>();
 
-    protected int sessionCacheSize = provSessionCacheSize;
-    protected int sessionTimeoutSeconds = 86400; // 24hrs (in seconds)
+	protected final ProvSSLContextSpi sslContext;
+	protected final TlsCrypto crypto;
 
-    ProvSSLSessionContext(ProvSSLContextSpi sslContext, TlsCrypto crypto)
-    {
-        this.sslContext = sslContext;
-        this.crypto = crypto;
-    }
+	protected int sessionCacheSize = provSessionCacheSize;
+	protected int sessionTimeoutSeconds = 86400; // 24hrs (in seconds)
 
-    ProvSSLContextSpi getSSLContext()
-    {
-        return sslContext;
-    }
+	ProvSSLSessionContext(ProvSSLContextSpi sslContext, TlsCrypto crypto) {
+		this.sslContext = sslContext;
+		this.crypto = crypto;
+	}
 
-    TlsCrypto getCrypto()
-    {
-        return crypto;
-    }
+	ProvSSLContextSpi getSSLContext() {
+		return sslContext;
+	}
 
-    synchronized ProvSSLSessionImpl getSessionImpl(byte[] sessionID)
-    {
-        if (sessionID == null || sessionID.length < 1)
-        {
-            return null;
-        }
+	TlsCrypto getCrypto() {
+		return crypto;
+	}
 
-        removeAllExpiredSessions();
-        return checkSession(sessionsByID.get(new SessionID(sessionID)));
-    }
+	synchronized ProvSSLSessionImpl getSessionImpl(byte[] sessionID) {
+		removeAllExpiredSessions();
+		return accessSession(mapGet(sessionsByID, makeSessionID(sessionID)));
+	}
 
-    synchronized ProvSSLSessionImpl getSessionImpl(String hostName, int port)
-    {
-        if (hostName == null || port < 0)
-        {
-            return null;
-        }
+	synchronized ProvSSLSessionImpl getSessionImpl(String hostName, int port) {
+		removeAllExpiredSessions();
 
-        ProvSSLSessionImpl sslSession = checkSession(sessionsByPeer.get(makePeerKey(hostName, port)));
-        if (sslSession != null)
-        {
-            // NOTE: For the current simple cache implementation, need to 'access' the sessionByIDs entry
-            sessionsByID.get(new SessionID(sslSession.getId()));
-        }
-        return sslSession;
-    }
+		SessionEntry sessionEntry = mapGet(sessionsByPeer, makePeerKey(hostName, port));
+		ProvSSLSessionImpl session = accessSession(sessionEntry);
+		if (session != null) {
+			// NOTE: For the current simple cache implementation, need to 'access' the
+			// sessionByIDs entry
+			sessionsByID.get(sessionEntry.getSessionID());
+		}
+		return session;
+	}
 
-    synchronized ProvSSLSessionImpl reportSession(TlsSession tlsSession, String peerHost, int peerPort)
-    {
-    	
-    	if(sessionCacheSize > 0)
-    	{
-    		SessionID sessionID = new SessionID(tlsSession.getSessionID());
-    		ProvSSLSessionImpl sslSession = sessionsByID.get(sessionID);
-    		
-	        if (sslSession == null || sslSession.getTlsSession() != tlsSession)
-	        {
-	            sslSession = new ProvSSLSessionImpl(this, tlsSession, peerHost, peerPort);
-	            sessionsByID.put(sessionID, sslSession);
-	        }
-	
-	        addSessionByPeer(sslSession);
-	        return sslSession;
-    	}
-    	else 
-    	{
-    		tlsSession.invalidate();
-    		return new ProvSSLSessionImpl(this, tlsSession, peerHost, peerPort);
-    	}
-    	
-    }
+	synchronized ProvSSLSessionImpl reportSession(TlsSession tlsSession, String peerHost, int peerPort) {
 
-    public synchronized Enumeration<byte[]> getIds()
-    {
-        removeAllExpiredSessions();
+		if (sessionCacheSize > 0) {
+			SessionID sessionID = new SessionID(tlsSession.getSessionID());
+			SessionEntry sessionEntry = sessionsByID.get(sessionID);
+			ProvSSLSessionImpl session = sessionEntry == null ? null : sessionEntry.get();
 
-        ArrayList<byte[]> ids = new ArrayList<byte[]>(sessionsByID.size());
+			if (session == null || session.getTlsSession() != tlsSession) {
+				session = new ProvSSLSessionImpl(this, tlsSession, peerHost, peerPort);
+				sessionEntry = new SessionEntry(sessionID, session, sessionsQueue);
+				sessionsByID.put(sessionID, sessionEntry);
+			}
 
-        Iterator<SessionID> iter = sessionsByID.keySet().iterator();
-        while (iter.hasNext())
-        {
-            SessionID sessionID = iter.next();
-            ids.add(sessionID.getBytes());
-        }
+			mapAdd(sessionsByPeer, sessionEntry.getPeerKey(), sessionEntry);
 
-        return Collections.enumeration(ids);
-    }
+			return session;
+		} else {
+			tlsSession.invalidate();
+			return new ProvSSLSessionImpl(this, tlsSession, peerHost, peerPort);
+		}
 
-    public SSLSession getSession(byte[] sessionID)
-    {
-        if (sessionID == null)
-        {
-            throw new NullPointerException("'sessionID' cannot be null");
-        }
+	}
 
-        return getSessionImpl(sessionID);
-    }
+	public synchronized Enumeration<byte[]> getIds() {
+		removeAllExpiredSessions();
 
-    public synchronized int getSessionCacheSize()
-    {
-        return sessionCacheSize;
-    }
+		ArrayList<byte[]> ids = new ArrayList<byte[]>(sessionsByID.size());
+		for (SessionID sessionID : sessionsByID.keySet()) {
+			ids.add(sessionID.getBytes());
+		}
+		return Collections.enumeration(ids);
+	}
 
-    public synchronized int getSessionTimeout()
-    {
-        return sessionTimeoutSeconds;
-    }
+	public SSLSession getSession(byte[] sessionID) {
+		if (sessionID == null) {
+			throw new NullPointerException("'sessionID' cannot be null");
+		}
 
-    public synchronized void setSessionCacheSize(int size) throws IllegalArgumentException
-    {
-        if (sessionCacheSize == size)
-        {
-            return;
-        }
+		return getSessionImpl(sessionID);
+	}
 
-        if (size < 0)
-        {
-            throw new IllegalArgumentException("'size' cannot be < 0");
-        }
+	public synchronized int getSessionCacheSize() {
+		return sessionCacheSize;
+	}
 
-        this.sessionCacheSize = size;
+	public synchronized int getSessionTimeout() {
+		return sessionTimeoutSeconds;
+	}
 
-        // Immediately remove LRU sessions in excess of the new limit
-        if (sessionCacheSize > 0)
-        {
-            int currentSize = sessionsByID.size();
-            if (currentSize > sessionCacheSize)
-            {
-                Iterator<ProvSSLSessionImpl> iter = sessionsByID.values().iterator();
-                while (iter.hasNext() && currentSize > sessionCacheSize)
-                {
-                    ProvSSLSessionImpl sslSession = iter.next();
-                    iter.remove();
-                    removeSessionByPeer(sslSession);
-                    --currentSize;
-                }
-            }
-        }
-    }
+	public synchronized void setSessionCacheSize(int size) throws IllegalArgumentException {
+		if (sessionCacheSize == size) {
+			return;
+		}
 
-    public synchronized void setSessionTimeout(int seconds) throws IllegalArgumentException
-    {
-        if (sessionTimeoutSeconds == seconds)
-        {
-            return;
-        }
+		if (size < 0) {
+			throw new IllegalArgumentException("'size' cannot be < 0");
+		}
 
-        if (seconds < 0)
-        {
-            throw new IllegalArgumentException("'seconds' cannot be < 0");
-        }
+		this.sessionCacheSize = size;
 
-        this.sessionTimeoutSeconds = seconds;
+		removeAllExpiredSessions();
 
-        removeAllExpiredSessions();
-    }
+		// Immediately remove LRU sessions in excess of the new limit
+		if (sessionCacheSize > 0) {
+			int currentSize = sessionsByID.size();
+			if (currentSize > sessionCacheSize) {
+				Iterator<SessionEntry> iter = sessionsByID.values().iterator();
+				while (iter.hasNext() && currentSize > sessionCacheSize) {
+					SessionEntry sessionEntry = iter.next();
+					iter.remove();
+					removeSessionByPeer(sessionEntry);
+					--currentSize;
+				}
+			}
+		}
+	}
 
-    private void addSessionByPeer(ProvSSLSessionImpl sslSession)
-    {
-        if (sslSession != null && sslSession.getPeerHost() != null && sslSession.getPeerPort() >= 0)
-        {
-            String peerKey = makePeerKey(sslSession.getPeerHost(), sslSession.getPeerPort());
-            sessionsByPeer.put(peerKey, sslSession);
-        }
-    }
+	public synchronized void setSessionTimeout(int seconds) throws IllegalArgumentException {
+		if (sessionTimeoutSeconds == seconds) {
+			return;
+		}
 
-    private ProvSSLSessionImpl checkSession(ProvSSLSessionImpl sslSession)
-    {
-        if (sslSession != null)
-        {
-            long currentTimeMillis = System.currentTimeMillis();
-            invalidateIfExpiredBefore(sslSession, currentTimeMillis);
+		if (seconds < 0) {
+			throw new IllegalArgumentException("'seconds' cannot be < 0");
+		}
 
-            if (sslSession.isValid())
-            {
-                sslSession.accessedAt(currentTimeMillis);
-                return sslSession;
-            }
+		this.sessionTimeoutSeconds = seconds;
 
-            removeSessionByID(sslSession);
-            removeSessionByPeer(sslSession);
-        }
-        return null;
-    }
+		removeAllExpiredSessions();
+	}
 
-    private void invalidateIfCreatedBefore(ProvSSLSessionImpl sslSession, long creationTimeLimit)
-    {
-        if (sslSession.getCreationTime() < creationTimeLimit)
-        {
-            sslSession.invalidate();
-        }
-    }
+	private ProvSSLSessionImpl accessSession(SessionEntry sessionEntry) {
+		if (sessionEntry != null) {
+			ProvSSLSessionImpl session = sessionEntry.get();
+			if (session != null) {
+				long currentTimeMillis = System.currentTimeMillis();
+				if (!invalidateIfCreatedBefore(sessionEntry, getCreationTimeLimit(currentTimeMillis))) {
+					session.accessedAt(currentTimeMillis);
+					return session;
+				}
+			}
 
-    private void invalidateIfExpiredBefore(ProvSSLSessionImpl sslSession, long expiryTimeMillis)
-    {
-        if (sessionTimeoutSeconds > 0)
-        {
-            long creationTimeLimit = expiryTimeMillis - 1000L * sessionTimeoutSeconds;
-            invalidateIfCreatedBefore(sslSession, creationTimeLimit);
-        }
-    }
+			removeSession(sessionEntry);
+		}
+		return null;
+	}
 
-    private void removeAllExpiredSessions()
-    {
-        if (sessionTimeoutSeconds == 0)
-        {
-            return; 
-        }
+	private long getCreationTimeLimit(long expiryTimeMillis) {
+		return sessionTimeoutSeconds < 1 ? Long.MIN_VALUE : (expiryTimeMillis - 1000L * sessionTimeoutSeconds);
+	}
 
-        long creationTimeLimit = System.currentTimeMillis() - 1000L * sessionTimeoutSeconds;
+	private boolean invalidateIfCreatedBefore(SessionEntry sessionEntry, long creationTimeLimit) {
+		ProvSSLSessionImpl session = sessionEntry.get();
+		if (session == null) {
+			return true;
+		}
+		if (session.getCreationTime() < creationTimeLimit) {
+			session.invalidate();
+		}
+		return !session.isValid();
+	}
 
-        Iterator<ProvSSLSessionImpl> iter = sessionsByID.values().iterator();
-        while (iter.hasNext())
-        {
-            ProvSSLSessionImpl sslSession = iter.next();
-            invalidateIfCreatedBefore(sslSession, creationTimeLimit);
+	private void processQueue() {
+		int count = 0;
 
-            if (!sslSession.isValid())
-            {
-                iter.remove();
-                removeSessionByPeer(sslSession);
-            }
-        }
-    }
+		SessionEntry sessionEntry;
+		while ((sessionEntry = (SessionEntry) sessionsQueue.poll()) != null) {
+			removeSession(sessionEntry);
+			++count;
+		}
 
-    private boolean removeSessionByID(ProvSSLSessionImpl sslSession)
-    {
-        if (sslSession != null)
-        {
-            byte[] sessionID = sslSession.getId();
-            if (sessionID != null & sessionID.length > 0)
-            {
-                return null != sessionsByID.remove(new SessionID(sessionID));
-            }
-        }
-        return false;
-    }
+		if (count > 0) {
+			LOG.fine("Processed " + count + " session entries (soft references) from the reference queue");
+		}
+	}
 
-    private boolean removeSessionByPeer(ProvSSLSessionImpl sslSession)
-    {
-        if (sslSession != null && sslSession.getPeerHost() != null && sslSession.getPeerPort() >= 0)
-        {
-        	sslSession.invalidate();
-            String peerKey = makePeerKey(sslSession.getPeerHost(), sslSession.getPeerPort());
-            return null != sessionsByPeer.remove(peerKey);
-        }
-        return false;
-    }
+	private void removeAllExpiredSessions() {
+		processQueue();
 
-    private static String makePeerKey(String hostName, int port)
-    {
-        return (hostName + ':' + Integer.toString(port)).toLowerCase(Locale.ENGLISH);
-    }
+		long creationTimeLimit = getCreationTimeLimit(System.currentTimeMillis());
+
+		Iterator<SessionEntry> iter = sessionsByID.values().iterator();
+		while (iter.hasNext()) {
+			SessionEntry sessionEntry = iter.next();
+			if (invalidateIfCreatedBefore(sessionEntry, creationTimeLimit)) {
+				iter.remove();
+				removeSessionByPeer(sessionEntry);
+			}
+		}
+	}
+
+	private void removeSession(SessionEntry sessionEntry) {
+		boolean remove = mapRemove(sessionsByID, sessionEntry.getSessionID(), sessionEntry);
+
+		remove |= removeSessionByPeer(sessionEntry);
+		if (remove) {
+			sessionEntry.get().invalidate();
+		}
+	}
+
+	private boolean removeSessionByPeer(SessionEntry sessionEntry) {
+		return mapRemove(sessionsByPeer, sessionEntry.getPeerKey(), sessionEntry);
+	}
+
+	private static String makePeerKey(ProvSSLSessionImpl session) {
+		return session == null ? null : makePeerKey(session.getPeerHost(), session.getPeerPort());
+	}
+
+	private static String makePeerKey(String hostName, int port) {
+		return (hostName == null || port < 0) ? null
+				: (hostName + ':' + Integer.toString(port)).toLowerCase(Locale.ENGLISH);
+	}
+
+	private static SessionID makeSessionID(byte[] sessionID) {
+		return (sessionID == null || sessionID.length < 1) ? null : new SessionID(sessionID);
+	}
+
+	private static <K, V> void mapAdd(Map<K, V> map, K key, V value) {
+		if (map == null || value == null) {
+			throw new NullPointerException();
+		}
+		if (key != null) {
+			map.put(key, value);
+		}
+	}
+
+	private static <K, V> V mapGet(Map<K, V> map, K key) {
+		if (map == null) {
+			throw new NullPointerException();
+		}
+		return key == null ? null : map.get(key);
+	}
+
+	private static <K, V> boolean mapRemove(Map<K, V> map, K key, V value) {
+		if (map == null || value == null) {
+			throw new NullPointerException();
+		}
+		if (key != null) {
+			// TODO[jsse] From 1.8 there is a 2-argument remove method to accomplish this
+			V removed = map.remove(key);
+			if (removed == value) {
+				return true;
+			}
+			if (removed != null) {
+				map.put(key, removed);
+			}
+		}
+		return false;
+	}
+
+	private static final class SessionEntry extends SoftReference<ProvSSLSessionImpl> {
+		private final SessionID sessionID;
+		private final String peerKey;
+
+		SessionEntry(SessionID sessionID, ProvSSLSessionImpl session, ReferenceQueue<ProvSSLSessionImpl> queue) {
+			super(session, queue);
+
+			if (sessionID == null || session == null || queue == null) {
+				throw new NullPointerException();
+			}
+
+			this.sessionID = sessionID;
+			this.peerKey = makePeerKey(session);
+		}
+
+		public String getPeerKey() {
+			return peerKey;
+		}
+
+		public SessionID getSessionID() {
+			return sessionID;
+		}
+	}
 }

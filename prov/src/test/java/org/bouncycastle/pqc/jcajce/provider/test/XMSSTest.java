@@ -267,6 +267,8 @@ public class XMSSTest
 
         xmssSig.initSign(kp.getPrivate());
 
+        assertTrue(xmssSig.isSigningCapable());
+
         xmssSig.update(msg, 0, msg.length);
 
         byte[] s = xmssSig.sign();
@@ -274,6 +276,7 @@ public class XMSSTest
         PrivateKey nKey = xmssSig.getUpdatedPrivateKey();
 
         assertFalse(kp.getPrivate().equals(nKey));
+        assertFalse(xmssSig.isSigningCapable());
 
         xmssSig.update(msg, 0, msg.length);
 

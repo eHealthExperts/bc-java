@@ -8,6 +8,7 @@ import java.security.spec.AlgorithmParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 
 import org.bouncycastle.crypto.CipherKeyGenerator;
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.crypto.engines.RC532Engine;
 import org.bouncycastle.crypto.engines.RC564Engine;
 import org.bouncycastle.crypto.macs.CBCBlockCipherMac;
@@ -98,7 +99,7 @@ public final class RC5
 
             if (random == null)
             {
-                random = new SecureRandom();
+                random = CryptoServicesRegistrar.getSecureRandom();
             }
 
             random.nextBytes(iv);

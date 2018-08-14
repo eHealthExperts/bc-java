@@ -2,6 +2,9 @@ package org.bouncycastle.tls;
 
 import org.bouncycastle.tls.crypto.TlsSecret;
 
+/**
+ * Carrier class for general security parameters.
+ */
 public class SecurityParameters
 {
     int entity = -1;
@@ -16,6 +19,7 @@ public class SecurityParameters
     byte[] sessionHash = null;
     byte[] pskIdentity = null;
     byte[] srpIdentity = null;
+    byte[] tlsServerEndPoint = null;
     byte[] tlsUnique = null;
     boolean encryptThenMAC = false;
     boolean extendedMasterSecret = false;
@@ -112,6 +116,11 @@ public class SecurityParameters
     public byte[] getSRPIdentity()
     {
         return srpIdentity;
+    }
+
+    public byte[] getTLSServerEndPoint()
+    {
+        return tlsServerEndPoint;
     }
 
     public byte[] getTLSUnique()

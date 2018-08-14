@@ -8,6 +8,8 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.net.ssl.HandshakeCompletedEvent;
 import javax.net.ssl.HandshakeCompletedListener;
@@ -17,6 +19,7 @@ import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
 import org.bouncycastle.jsse.BCSSLConnection;
+import org.bouncycastle.jsse.BCSSLParameters;
 import org.bouncycastle.tls.TlsClientProtocol;
 import org.bouncycastle.tls.TlsProtocol;
 import org.bouncycastle.tls.TlsServerProtocol;
@@ -25,6 +28,8 @@ class ProvSSLSocketDirect
     extends ProvSSLSocketBase
     implements ProvTlsManager
 {
+    private static Logger LOG = Logger.getLogger(ProvSSLSocketDirect.class.getName());
+
     protected final AppDataInput appDataIn = new AppDataInput();
     protected final AppDataOutput appDataOut = new AppDataOutput();
 
@@ -35,7 +40,6 @@ class ProvSSLSocketDirect
     protected boolean enableSessionCreation = true;
     protected boolean useClientMode = true;
 
-    protected boolean initialHandshakeBegun = false;
     protected TlsProtocol protocol = null;
     protected ProvTlsPeer protocolPeer = null;
     protected BCSSLConnection connection = null;
@@ -128,11 +132,11 @@ class ProvSSLSocketDirect
     {
         try
         {
-            handshakeIfNecessary();
+            handshakeIfNecessary(false);
         }
-        catch (Exception e)
+        catch (IOException e)
         {
-            // TODO[jsse] Logging?
+            LOG.log(Level.FINE, "Failed to establish connection", e);
         }
 
         return connection;
@@ -180,6 +184,11 @@ class ProvSSLSocketDirect
         return appDataOut;
     }
 
+    public synchronized BCSSLParameters getParameters()
+    {
+        return SSLParametersUtil.getParameters(sslParameters);
+    }
+
     @Override
     public synchronized SSLSession getSession()
     {
@@ -221,22 +230,12 @@ class ProvSSLSocketDirect
     @Override
     public synchronized void setEnabledCipherSuites(String[] suites)
     {
-        if (!context.isSupportedCipherSuites(suites))
-        {
-            throw new IllegalArgumentException("'suites' cannot be null, or contain unsupported cipher suites");
-        }
-
         sslParameters.setCipherSuites(suites);
     }
 
     @Override
     public synchronized void setEnabledProtocols(String[] protocols)
     {
-        if (!context.isSupportedProtocols(protocols))
-        {
-            throw new IllegalArgumentException("'protocols' cannot be null, or contain unsupported protocols");
-        }
-
         sslParameters.setProtocols(protocols);
     }
 
@@ -250,6 +249,11 @@ class ProvSSLSocketDirect
     public synchronized void setNeedClientAuth(boolean need)
     {
         sslParameters.setNeedClientAuth(need);
+    }
+
+    public synchronized void setParameters(BCSSLParameters parameters)
+    {
+        SSLParametersUtil.setParameters(this.sslParameters, parameters);
     }
 
     @Override
@@ -274,7 +278,7 @@ class ProvSSLSocketDirect
             return;
         }
 
-        if (initialHandshakeBegun)
+        if (protocol != null)
         {
             throw new IllegalArgumentException("Mode cannot be changed after the initial handshake has begun");
         }
@@ -293,49 +297,52 @@ class ProvSSLSocketDirect
     @Override
     public synchronized void startHandshake() throws IOException
     {
-        if (initialHandshakeBegun)
-        {
-            throw new UnsupportedOperationException("Renegotiation not supported");
-        }
+        startHandshake(true);
+    }
 
-        this.initialHandshakeBegun = true;
-
-        try
+    protected void startHandshake(boolean resumable) throws IOException
+    {
+        if (protocol == null)
         {
             // TODO[jsse] Check for session to re-use and apply to handshake
             // TODO[jsse] Allocate this.handshakeSession and update it during handshake
-    
+
             InputStream input = super.getInputStream();
             OutputStream output = super.getOutputStream();
 
             if (this.useClientMode)
             {
                 TlsClientProtocol clientProtocol = new ProvTlsClientProtocol(input, output, socketCloser);
+                clientProtocol.setResumableHandshake(resumable);
                 this.protocol = clientProtocol;
-    
                 this.protocol.setSoTimeout(getSoTimeout());
                 
                 ProvTlsClient client = new ProvTlsClient(this, sslParameters.copy());
                 this.protocolPeer = client;
-    
+
                 clientProtocol.connect(client);
             }
             else
             {
                 TlsServerProtocol serverProtocol = new ProvTlsServerProtocol(input, output, socketCloser);
+                serverProtocol.setResumableHandshake(resumable);
                 this.protocol = serverProtocol;
-    
                 this.protocol.setSoTimeout(getSoTimeout());
                 
                 ProvTlsServer server = new ProvTlsServer(this, sslParameters.copy());
                 this.protocolPeer = server;
-    
+
                 serverProtocol.accept(server);
             }
         }
-        finally
+        else if (protocol.isHandshaking())
         {
-            this.handshakeSession = null;
+            protocol.setResumableHandshake(resumable);
+            protocol.resumeHandshake();
+        }
+        else
+        {
+            throw new UnsupportedOperationException("Renegotiation not supported");
         }
     }
 
@@ -426,11 +433,11 @@ class ProvSSLSocketDirect
         }
     }
 
-    synchronized void handshakeIfNecessary() throws IOException
+    synchronized void handshakeIfNecessary(boolean resumable) throws IOException
     {
-        if (!initialHandshakeBegun)
+        if (protocol == null || protocol.isHandshaking())
         {
-            startHandshake();
+            startHandshake(resumable);
         }
     }
 
@@ -456,7 +463,7 @@ class ProvSSLSocketDirect
         @Override
         public int read() throws IOException
         {
-            handshakeIfNecessary();
+            handshakeIfNecessary(true);
 
             byte[] buf = new byte[1];
             int ret = protocol.readApplicationData(buf, 0, 1);
@@ -471,7 +478,7 @@ class ProvSSLSocketDirect
                 return 0;
             }
 
-            handshakeIfNecessary();
+            handshakeIfNecessary(true);
             return protocol.readApplicationData(b, off, len);
         }
     }
@@ -499,7 +506,7 @@ class ProvSSLSocketDirect
         @Override
         public void write(int b) throws IOException
         {
-            handshakeIfNecessary();
+            handshakeIfNecessary(true);
 
             byte[] buf = new byte[]{ (byte)b };
             protocol.writeApplicationData(buf, 0, 1);
@@ -510,7 +517,7 @@ class ProvSSLSocketDirect
         {
             if (len > 0)
             {
-                handshakeIfNecessary();
+                handshakeIfNecessary(true);
                 protocol.writeApplicationData(b, off, len);
             }
         }

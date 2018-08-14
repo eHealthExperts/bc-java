@@ -425,7 +425,11 @@ class ProvTlsClient
     public void notifyServerVersion(ProtocolVersion serverVersion) throws IOException
     {
         String selected = manager.getContext().getProtocolString(serverVersion);
-        if (selected != null)
+        if (selected == null)
+        {
+            LOG.fine("Server selected an unsupported protocol version: " + serverVersion);
+        }
+        else
         {
             for (String protocol : sslParameters.getProtocols())
             {
@@ -435,6 +439,8 @@ class ProvTlsClient
                     return;
                 }
             }
+
+            LOG.fine("Server selected a protocol version not enabled in the client: " + selected);
         }
         throw new TlsFatalAlert(AlertDescription.protocol_version);
     }

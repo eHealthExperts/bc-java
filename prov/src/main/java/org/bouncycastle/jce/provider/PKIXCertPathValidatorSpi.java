@@ -480,7 +480,7 @@ public class PKIXCertPathValidatorSpi
         }
         catch (CertificateEncodingException e)
         {
-            throw new AnnotatedException("unable to process TBSCertificate");
+            throw new AnnotatedException("unable to process TBSCertificate", e);
         }
         catch (IllegalArgumentException e)
         {

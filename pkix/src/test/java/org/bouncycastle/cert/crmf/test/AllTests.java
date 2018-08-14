@@ -1,6 +1,7 @@
 package org.bouncycastle.cert.crmf.test;
 
 import java.io.IOException;
+
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
@@ -19,6 +20,9 @@ import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource;
 import javax.security.auth.x500.X500Principal;
 
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.DERNull;
@@ -30,6 +34,7 @@ import org.bouncycastle.asn1.crmf.POPOSigningKey;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.ntt.NTTObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.pkcs.RSAESOAEPparams;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -257,6 +262,30 @@ public class AllTests
         TestCase.assertEquals(kp.getPublic(), certReqMsg.getPublicKey());
     }
 
+    public void testEncryptedValueWithKey()
+        throws Exception
+    {
+        KeyPairGenerator kGen = KeyPairGenerator.getInstance("RSA", BC);
+
+        kGen.initialize(512);
+
+        KeyPair kp = kGen.generateKeyPair();
+        
+        JcaEncryptedValueBuilder build = new JcaEncryptedValueBuilder(new JceAsymmetricKeyWrapper(kp.getPublic()).setProvider(BC), new JceCRMFEncryptorBuilder(CMSAlgorithm.AES128_CBC).setProvider(BC).build());
+
+        EncryptedValue value = build.build(kp.getPrivate());
+
+        ValueDecryptorGenerator decGen = new JceAsymmetricValueDecryptorGenerator(kp.getPrivate()).setProvider(BC);
+
+        EncryptedValueParser  parser = new EncryptedValueParser(value);
+
+        PrivateKeyInfo privInfo = parser.readPrivateKeyInfo(decGen);
+
+        TestCase.assertEquals(privInfo.getPrivateKeyAlgorithm(), parser.getIntendedAlg());
+
+        TestCase.assertTrue(Arrays.areEqual(privInfo.getEncoded(), kp.getPrivate().getEncoded()));
+    }
+
     public void testProofOfPossessionWithSender()
         throws Exception
     {
@@ -346,7 +375,7 @@ public class AllTests
 
         OutputEncryptor outputEncryptor = encryptorBuilder.build();
 
-        Assert.assertEquals(keySize / 8, ((byte[])(outputEncryptor.getKey().getRepresentation())).length);
+        assertEquals(keySize / 8, ((byte[])(outputEncryptor.getKey().getRepresentation())).length);
     }
 
     public void testEncryptedValue()
@@ -416,9 +445,9 @@ public class AllTests
 
         EncryptedValue value = build.build(cert);
 
-        Assert.assertEquals(PKCSObjectIdentifiers.id_RSAES_OAEP, value.getKeyAlg().getAlgorithm());
-        Assert.assertEquals(NISTObjectIdentifiers.id_sha256, RSAESOAEPparams.getInstance(value.getKeyAlg().getParameters()).getHashAlgorithm().getAlgorithm());
-        Assert.assertEquals(new DEROctetString(new byte[2]), RSAESOAEPparams.getInstance(value.getKeyAlg().getParameters()).getPSourceAlgorithm().getParameters());
+        assertEquals(PKCSObjectIdentifiers.id_RSAES_OAEP, value.getKeyAlg().getAlgorithm());
+        assertEquals(NISTObjectIdentifiers.id_sha256, RSAESOAEPparams.getInstance(value.getKeyAlg().getParameters()).getHashAlgorithm().getAlgorithm());
+        assertEquals(new DEROctetString(new byte[2]), RSAESOAEPparams.getInstance(value.getKeyAlg().getParameters()).getPSourceAlgorithm().getParameters());
 
         ValueDecryptorGenerator decGen = new JceAsymmetricValueDecryptorGenerator(kp.getPrivate()).setProvider(BC);
 

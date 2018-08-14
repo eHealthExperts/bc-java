@@ -9,6 +9,7 @@ import javax.crypto.KeyGeneratorSpi;
 import javax.crypto.SecretKey;
 
 import org.bouncycastle.crypto.CipherKeyGenerator;
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.crypto.KeyGenerationParameters;
 import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 
@@ -58,7 +59,7 @@ public class BaseKeyGenerator
         {
             if (random == null)
             {
-                random = new SecureRandom();
+                random = CryptoServicesRegistrar.getSecureRandom();
             }
             engine.init(new KeyGenerationParameters(random, keySize));
             uninitialised = false;
@@ -73,7 +74,7 @@ public class BaseKeyGenerator
     {
         if (uninitialised)
         {
-            engine.init(new KeyGenerationParameters(new SecureRandom(), defaultKeySize));
+            engine.init(new KeyGenerationParameters(CryptoServicesRegistrar.getSecureRandom(), defaultKeySize));
             uninitialised = false;
         }
 

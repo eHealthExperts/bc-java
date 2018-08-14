@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.SocketTimeoutException;
 import java.util.Enumeration;
@@ -72,6 +73,7 @@ public abstract class TlsProtocol
     private volatile boolean failedWithError = false;
     private volatile boolean appDataReady = false;
     private volatile boolean appDataSplitEnabled = true;
+    private volatile boolean resumableHandshake = false;
     private volatile int appDataSplitMode = ADS_MODE_1_Nsub1;
     
     private int soTimeout = -1;
@@ -113,6 +115,20 @@ public abstract class TlsProtocol
     {
         this.blocking = true;
         this.recordStream = new RecordStream(this, input, output);
+    }
+
+    public void resumeHandshake() throws IOException
+    {
+        if (!blocking)
+        {
+            throw new IllegalStateException("Cannot use resumeHandshake() in non-blocking mode!");
+        }
+        if (!isHandshaking())
+        {
+            throw new IllegalStateException("No handshake in progress");
+        }
+
+        blockForHandshake();
     }
 
     protected void closeConnection() throws IOException
@@ -190,17 +206,22 @@ public abstract class TlsProtocol
         }
     }
 
-    protected void handleException(short alertDescription, String message, Throwable cause)
+    protected void handleException(short alertDescription, String message, Throwable e)
         throws IOException
     {
-    	if(soTimeout == 0 && cause instanceof SocketTimeoutException) {
-    		LOG.debug("Ignore SocketTimeoutException because soTimeout is set to 0", cause);
+    	if(soTimeout == 0 && e instanceof SocketTimeoutException) {
+    		LOG.debug("Ignore SocketTimeoutException because soTimeout is set to 0", e);
     		return;
     	}
     	
+        if ((appDataReady || isResumableHandshake()) && (e instanceof InterruptedIOException))
+        {
+            return;
+        }
+
         if (!closed)
         {
-            raiseAlertFatal(alertDescription, message, cause);
+            raiseAlertFatal(alertDescription, message, e);
 
             handleFailure();
         }
@@ -254,6 +275,20 @@ public abstract class TlsProtocol
         }
     }
 
+    protected void blockForHandshake() throws IOException
+    {
+        while (this.connection_state != CS_END)
+        {
+            if (isClosed())
+            {
+                // NOTE: Any close during the handshake should have raised an exception.
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+
+            safeReadRecord();
+        }
+    }
+
     protected void cleanupHandshake()
     {
     	LOG.debug("Cleanup handshake");
@@ -279,23 +314,6 @@ public abstract class TlsProtocol
         this.secure_renegotiation = false;
         this.allowCertificateStatus = false;
         this.expectSessionTicket = false;
-    }
-    
-    protected void blockForHandshake() throws IOException
-    {
-        if (blocking)
-        {
-            while (this.connection_state != CS_END)
-            {
-                if (this.closed)
-                {
-                    // NOTE: Any close during the handshake should have raised an exception.
-                    throw new TlsFatalAlert(AlertDescription.internal_error);
-                }
-
-                safeReadRecord();
-            }
-        }
     }
 
     protected void completeHandshake()
@@ -578,6 +596,10 @@ public abstract class TlsProtocol
                 throw new IllegalStateException("Cannot read application data until initial handshake completed.");
             }
 
+            /*
+             * NOTE: Only called more than once when empty records are received, so no special
+             * InterruptedIOException handling is necessary.
+             */
             safeReadRecord();
         }
 
@@ -651,12 +673,12 @@ public abstract class TlsProtocol
         throw new TlsNoCloseNotifyException();
     }
 
-    protected boolean safeReadFullRecord(byte[] record)
+    protected boolean safeReadFullRecord(byte[] input, int inputOff, int inputLen)
         throws IOException
     {
         try
         {
-            return recordStream.readFullRecord(record);
+            return recordStream.readFullRecord(input, inputOff, inputLen);
         }
         catch (TlsFatalAlert e)
         {
@@ -749,7 +771,8 @@ public abstract class TlsProtocol
                  * 
                  * DO NOT REMOVE THIS CODE, EXCEPT YOU KNOW EXACTLY WHAT YOU ARE DOING HERE.
                  */
-                switch (appDataSplitMode) {
+                switch (getAppDataSplitMode())
+                {
                     case ADS_MODE_0_N_FIRSTONLY:
                         this.appDataSplitEnabled = false;
                         // fall through intended!
@@ -776,7 +799,13 @@ public abstract class TlsProtocol
         }
     }
 
-    protected void setAppDataSplitMode(int appDataSplitMode) {
+    public int getAppDataSplitMode()
+    {
+        return appDataSplitMode;
+    }
+
+    public void setAppDataSplitMode(int appDataSplitMode)
+    {
         if (appDataSplitMode < ADS_MODE_1_Nsub1 ||
             appDataSplitMode > ADS_MODE_0_N_FIRSTONLY)
         {
@@ -789,6 +818,16 @@ public abstract class TlsProtocol
 		this.soTimeout = timeout;
 	}
     
+    public boolean isResumableHandshake()
+    {
+        return resumableHandshake;
+    }
+
+    public void setResumableHandshake(boolean resumableHandshake)
+    {
+        this.resumableHandshake = resumableHandshake;
+    }
+
     protected void writeHandshakeMessage(byte[] buf, int off, int len) throws IOException
     {
         if (len < 4)
@@ -907,7 +946,7 @@ public abstract class TlsProtocol
 
         if (this.appDataSplitEnabled)
         {
-            switch (appDataSplitMode)
+            switch (getAppDataSplitMode())
             {
                 case ADS_MODE_0_N_FIRSTONLY:
                 case ADS_MODE_0_N:
@@ -936,6 +975,17 @@ public abstract class TlsProtocol
     }
 
     /**
+     * Equivalent to <code>offerInput(input, 0, input.length)</code>
+     * @see TlsProtocol#offerInput(byte[], int, int)
+     * @param input The input buffer to offer
+     * @throws IOException If an error occurs while decrypting or processing a record
+     */
+    public void offerInput(byte[] input) throws IOException
+    {
+        offerInput(input, 0, input.length);
+    }
+
+    /**
      * Offer input from an arbitrary source. Only allowed in non-blocking mode.<br>
      * <br>
      * After this method returns, the input buffer is "owned" by this object. Other code
@@ -951,22 +1001,23 @@ public abstract class TlsProtocol
      * You should always check to see if there is any available output after calling
      * this method by calling {@link #getAvailableOutputBytes()}.
      * @param input The input buffer to offer
+     * @param inputOff The offset within the input buffer that input begins
+     * @param inputLen The number of bytes of input being offered
      * @throws IOException If an error occurs while decrypting or processing a record
      */
-    public void offerInput(byte[] input) throws IOException
+    public void offerInput(byte[] input, int inputOff, int inputLen) throws IOException
     {
         if (blocking)
         {
             throw new IllegalStateException("Cannot use offerInput() in blocking mode! Use getInputStream() instead.");
         }
-        
         if (closed)
         {
             throw new IOException("Connection is closed, cannot accept any more input");
         }
 
         // Fast path if the input is arriving one record at a time
-        if (inputBuffers.available() == 0 && safeReadFullRecord(input))
+        if (inputBuffers.available() == 0 && safeReadFullRecord(input, inputOff, inputLen))
         {
             if (closed)
             {
@@ -979,13 +1030,16 @@ public abstract class TlsProtocol
             return;
         }
 
-        inputBuffers.addBytes(input);
+        inputBuffers.addBytes(input, inputOff, inputLen);
 
         // loop while there are enough bytes to read the length of the next record
         while (inputBuffers.available() >= RecordFormat.FRAGMENT_OFFSET)
         {
             byte[] recordHeader = new byte[RecordFormat.FRAGMENT_OFFSET];
-            inputBuffers.peek(recordHeader);
+            if (RecordFormat.FRAGMENT_OFFSET != inputBuffers.peek(recordHeader))
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
 
             RecordPreview preview = safePreviewRecordHeader(recordHeader);
             if (inputBuffers.available() < preview.getRecordSize())
@@ -994,6 +1048,7 @@ public abstract class TlsProtocol
                 break;
             }
 
+            // NOTE: This is actually reading from inputBuffers, so InterruptedIOException shouldn't be possible
             safeReadRecord();
 
             if (closed)
@@ -1182,10 +1237,17 @@ public abstract class TlsProtocol
         safeWriteRecord(ContentType.alert, alert, 0, 2);
     }
 
+    /** @deprecated */
     protected void sendCertificateMessage(Certificate certificate)
         throws IOException
     {
     	LOG.debug("Send CertificateMessage");
+        sendCertificateMessage(certificate, null);
+    }
+
+    protected void sendCertificateMessage(Certificate certificate, OutputStream endPointHash)
+        throws IOException
+    {
         if (certificate == null)
         {
             certificate = Certificate.EMPTY_CHAIN;
@@ -1193,7 +1255,7 @@ public abstract class TlsProtocol
 
         HandshakeMessage message = new HandshakeMessage(HandshakeType.certificate);
 
-        certificate.encode(message);
+        certificate.encode(getContext(), message, endPointHash);
 
         message.writeToRecordStream();
 
@@ -1264,6 +1326,11 @@ public abstract class TlsProtocol
     public boolean isClosed()
     {
         return closed;
+    }
+
+    public boolean isHandshaking()
+    {
+        return securityParameters != null && this.connection_state != CS_END && !isClosed();
     }
 
     protected short processMaxFragmentLengthExtension(Hashtable clientExtensions, Hashtable serverExtensions,

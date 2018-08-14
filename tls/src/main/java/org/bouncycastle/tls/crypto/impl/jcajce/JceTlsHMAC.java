@@ -88,7 +88,7 @@ public class JceTlsHMAC
         }
         catch (InvalidKeyException e)
         {
-            e.printStackTrace();
+            throw new IllegalArgumentException(e.getMessage());
         }
     }
 
