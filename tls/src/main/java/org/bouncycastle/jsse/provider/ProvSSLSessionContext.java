@@ -234,7 +234,7 @@ class ProvSSLSessionContext implements SSLSessionContext {
 		boolean remove = mapRemove(sessionsByID, sessionEntry.getSessionID(), sessionEntry);
 
 		remove |= removeSessionByPeer(sessionEntry);
-		if (remove) {
+		if (remove && sessionEntry.get() != null) {
 			sessionEntry.get().invalidate();
 		}
 	}

@@ -61,7 +61,7 @@ class ProvTlsClient
 
     ProvTlsClient(ProvTlsManager manager, ProvSSLParameters sslParameters)
     {
-        super(manager.getContextData().getCrypto(), new DefaultTlsKeyExchangeFactory(), new ProvDHConfigVerifier());
+        super(manager.getContextData().getCrypto(), new DefaultTlsKeyExchangeFactory(), new ProvDHConfigVerifier(sslParameters.getAlgorithmConstraints()));
 
         this.manager = manager;
         this.sslParameters = sslParameters;
