@@ -51,6 +51,7 @@ import org.bouncycastle.tls.EncryptionAlgorithm;
 import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.NamedGroup;
 import org.bouncycastle.tls.ProtocolVersion;
+import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsUtils;
@@ -185,7 +186,15 @@ public class BcTlsCrypto
 
     public TlsECDomain createECDomain(TlsECConfig ecConfig)
     {
-        return new BcTlsECDomain(this, ecConfig);
+        switch (ecConfig.getNamedGroup())
+        {
+        case NamedGroup.x25519:
+            return new BcX25519Domain(this);
+        case NamedGroup.x448:
+            return new BcX448Domain(this);
+        default:
+            return new BcTlsECDomain(this, ecConfig);
+        }
     }
 
     protected TlsEncryptor createEncryptor(TlsCertificate certificate)
@@ -245,7 +254,9 @@ public class BcTlsCrypto
 
     public boolean hasAllRawSignatureAlgorithms()
     {
-        return true;
+        // TODO[RFC 8422] Revisit the need to buffer the handshake for "Intrinsic" hash signatures
+        return !hasSignatureAlgorithm(SignatureAlgorithm.ed25519)
+            && !hasSignatureAlgorithm(SignatureAlgorithm.ed448);
     }
 
     public boolean hasDHAgreement()
@@ -313,14 +324,30 @@ public class BcTlsCrypto
         return true;
     }
 
-    public boolean hasSignatureAlgorithm(int signatureAlgorithm)
+    public boolean hasSignatureAlgorithm(short signatureAlgorithm)
     {
-        return true;
+        switch (signatureAlgorithm)
+        {
+        case SignatureAlgorithm.rsa:
+        case SignatureAlgorithm.dsa:
+        case SignatureAlgorithm.ecdsa:
+        case SignatureAlgorithm.ed25519:
+        case SignatureAlgorithm.ed448:
+        case SignatureAlgorithm.rsa_pss_rsae_sha256:
+        case SignatureAlgorithm.rsa_pss_rsae_sha384:
+        case SignatureAlgorithm.rsa_pss_rsae_sha512:
+        case SignatureAlgorithm.rsa_pss_pss_sha256:
+        case SignatureAlgorithm.rsa_pss_pss_sha384:
+        case SignatureAlgorithm.rsa_pss_pss_sha512:
+            return true;
+        default:
+            return false;
+        }
     }
 
     public boolean hasSignatureAndHashAlgorithm(SignatureAndHashAlgorithm sigAndHashAlgorithm)
     {
-        return true;
+        return hasSignatureAlgorithm(sigAndHashAlgorithm.getSignature());
     }
 
     public boolean hasSRPAuthentication()
@@ -371,7 +398,7 @@ public class BcTlsCrypto
         case HashAlgorithm.sha512:
             return new SHA512Digest();
         default:
-            throw new IllegalArgumentException("unknown HashAlgorithm: " + HashAlgorithm.getText(hashAlgorithm));
+            throw new IllegalArgumentException("invalid HashAlgorithm: " + HashAlgorithm.getText(hashAlgorithm));
         }
     }
 
@@ -432,7 +459,7 @@ public class BcTlsCrypto
         case HashAlgorithm.sha512:
             return new SHA512Digest((SHA512Digest)hash);
         default:
-            throw new IllegalArgumentException("unknown HashAlgorithm: " + HashAlgorithm.getText(hashAlgorithm));
+            throw new IllegalArgumentException("invalid HashAlgorithm: " + HashAlgorithm.getText(hashAlgorithm));
         }
     }
 

@@ -156,13 +156,18 @@ public class BCDHPublicKey
             DHParameters params = ((DHDomainParameterSpec)dhSpec).getDomainParameters();
             DHValidationParameters validationParameters = params.getValidationParameters();
             ValidationParams vParams = null;
-            if (validationParameters == null)
+            if (validationParameters != null)
             {
                 vParams = new ValidationParams(validationParameters.getSeed(), validationParameters.getCounter());
             }
             return KeyUtil.getEncodedSubjectPublicKeyInfo(new AlgorithmIdentifier(X9ObjectIdentifiers.dhpublicnumber, new DomainParameters(params.getP(), params.getG(), params.getQ(), params.getJ(), vParams).toASN1Primitive()), new ASN1Integer(y));
         }
         return KeyUtil.getEncodedSubjectPublicKeyInfo(new AlgorithmIdentifier(PKCSObjectIdentifiers.dhKeyAgreement, new DHParameter(dhSpec.getP(), dhSpec.getG(), dhSpec.getL()).toASN1Primitive()), new ASN1Integer(y));
+    }
+
+    public String toString()
+    {
+        return DHUtil.publicKeyToString("DH", y, new DHParameters(dhSpec.getP(), dhSpec.getG()));
     }
 
     public DHParameterSpec getParams()

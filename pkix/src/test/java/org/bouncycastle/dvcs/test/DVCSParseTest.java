@@ -33,6 +33,7 @@ import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.cms.CMSSignedData;
 import org.bouncycastle.dvcs.DVCSException;
+import org.bouncycastle.util.Integers;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
 
@@ -269,7 +270,7 @@ public class DVCSParseTest
      */
     private void validate(String name, DVCSRequestInformation info, DVCSRequestInformation expected)
     {
-        validate(name + ".version", new Integer(info.getVersion()), new Integer(expected.getVersion()));
+        validate(name + ".version", Integers.valueOf(info.getVersion()), Integers.valueOf(expected.getVersion()));
         validate(name + ".service", info.getService().getValue(), expected.getService().getValue());
         validate(name + ".nonce", info.getNonce(), expected.getNonce());
         validate(name + ".requestTime", info.getRequestTime(), expected.getRequestTime());
@@ -345,7 +346,7 @@ public class DVCSParseTest
         {
             return;
         }
-        validate(name + ".version", new Integer(result.getVersion()), new Integer(expected.getVersion()));
+        validate(name + ".version", Integers.valueOf(result.getVersion()), Integers.valueOf(expected.getVersion()));
         validate(name + ".dvReqInfo", result.getDvReqInfo(), expected.getDvReqInfo());
         validate(name + ".messageImprint", result.getMessageImprint(), expected.getMessageImprint());
         validate(name + ".serialNumber", result.getSerialNumber(), expected.getSerialNumber());

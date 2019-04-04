@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.security.Principal;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.logging.Level;
@@ -18,9 +21,12 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.bouncycastle.jsse.BCExtendedSSLSession;
 import org.bouncycastle.jsse.BCSSLConnection;
 import org.bouncycastle.jsse.BCSSLParameters;
+import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.TlsClientProtocol;
+import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsProtocol;
 import org.bouncycastle.tls.TlsServerProtocol;
 
@@ -28,7 +34,7 @@ class ProvSSLSocketDirect
     extends ProvSSLSocketBase
     implements ProvTlsManager
 {
-    private static Logger LOG = Logger.getLogger(ProvSSLSocketDirect.class.getName());
+    private static final Logger LOG = Logger.getLogger(ProvSSLSocketDirect.class.getName());
 
     protected final AppDataInput appDataIn = new AppDataInput();
     protected final AppDataOutput appDataOut = new AppDataOutput();
@@ -37,13 +43,15 @@ class ProvSSLSocketDirect
     protected final ContextData contextData;
     protected final ProvSSLParameters sslParameters;
 
+    protected String peerHost = null;
+    protected String peerHostSNI = null;
     protected boolean enableSessionCreation = true;
     protected boolean useClientMode = true;
 
     protected TlsProtocol protocol = null;
     protected ProvTlsPeer protocolPeer = null;
-    protected BCSSLConnection connection = null;
-    protected SSLSession handshakeSession = null;
+    protected ProvSSLConnection connection = null;
+    protected ProvSSLSessionHandshake handshakeSession = null;
 
     /** This constructor is the one used (only) by ProvSSLServerSocket */
     ProvSSLSocketDirect(ProvSSLContextSpi context, ContextData contextData, boolean enableSessionCreation,
@@ -94,6 +102,7 @@ class ProvSSLSocketDirect
         this.context = context;
         this.contextData = contextData;
         this.sslParameters = context.getDefaultParameters(!useClientMode);
+        this.peerHost = host;
     }
 
     protected ProvSSLSocketDirect(ProvSSLContextSpi context, ContextData contextData, String host, int port) throws IOException, UnknownHostException
@@ -103,6 +112,7 @@ class ProvSSLSocketDirect
         this.context = context;
         this.contextData = contextData;
         this.sslParameters = context.getDefaultParameters(!useClientMode);
+        this.peerHost = host;
     }
 
     public ProvSSLContextSpi getContext()
@@ -113,6 +123,40 @@ class ProvSSLSocketDirect
     public ContextData getContextData()
     {
         return contextData;
+    }
+
+    public void checkClientTrusted(X509Certificate[] chain, String authType) throws IOException
+    {
+        try
+        {
+            contextData.getX509TrustManager().checkClientTrusted(chain, authType, this);
+        }
+        catch (CertificateException e)
+        {
+            throw new TlsFatalAlert(AlertDescription.certificate_unknown, e);
+        }
+    }
+
+    public void checkServerTrusted(X509Certificate[] chain, String authType) throws IOException
+    {
+        try
+        {
+            contextData.getX509TrustManager().checkServerTrusted(chain, authType, this);
+        }
+        catch (CertificateException e)
+        {
+            throw new TlsFatalAlert(AlertDescription.certificate_unknown, e);
+        }
+    }
+
+    public String chooseClientAlias(String[] keyType, Principal[] issuers)
+    {
+        return contextData.getX509KeyManager().chooseClientAlias(keyType, issuers, this);
+    }
+
+    public String chooseServerAlias(String keyType, Principal[] issuers)
+    {
+        return contextData.getX509KeyManager().chooseServerAlias(keyType, issuers, this);
     }
 
     @Override
@@ -126,6 +170,24 @@ class ProvSSLSocketDirect
         {
             protocol.close();
         }
+    }
+
+    @Override
+    public void connect(SocketAddress endpoint, int timeout) throws IOException
+    {
+        if (!(endpoint instanceof InetSocketAddress))
+        {
+            throw new SocketException("Only InetSocketAddress is supported.");
+        }
+
+        super.connect(endpoint, timeout);
+
+        notifyConnected();
+    }
+
+    public synchronized BCExtendedSSLSession getBCHandshakeSession()
+    {
+        return handshakeSession;
     }
 
     public synchronized BCSSLConnection getConnection()
@@ -163,7 +225,7 @@ class ProvSSLSocketDirect
     @Override
     public synchronized SSLSession getHandshakeSession()
     {
-        return handshakeSession;
+        return null == handshakeSession ? null : handshakeSession.getExportSSLSession();
     }
 
     @Override
@@ -192,9 +254,11 @@ class ProvSSLSocketDirect
     @Override
     public synchronized SSLSession getSession()
     {
-        BCSSLConnection connection = getConnection();
+        getConnection();
 
-        return connection == null ? ProvSSLSessionImpl.NULL_SESSION.getExportSession() : connection.getSession();
+        ProvSSLSession sslSession = (null == connection) ? ProvSSLSession.NULL_SESSION : connection.getSession();
+
+        return sslSession.getExportSSLSession();
     }
 
     @Override
@@ -245,6 +309,12 @@ class ProvSSLSocketDirect
         this.enableSessionCreation = flag;
     }
 
+    public synchronized void setHost(String host)
+    {
+        this.peerHost = host;
+        this.peerHostSNI = host;
+    }
+
     @Override
     public synchronized void setNeedClientAuth(boolean need)
     {
@@ -271,21 +341,19 @@ class ProvSSLSocketDirect
     }
 
     @Override
-    public synchronized void setUseClientMode(boolean mode)
+    public synchronized void setUseClientMode(boolean useClientMode)
     {
-        if (this.useClientMode == mode)
-        {
-            return;
-        }
-
-        if (protocol != null)
+        if (null != protocol)
         {
             throw new IllegalArgumentException("Mode cannot be changed after the initial handshake has begun");
         }
 
-        this.useClientMode = mode;
+        if (this.useClientMode != useClientMode)
+        {
+            context.updateDefaultProtocols(sslParameters, !useClientMode);
 
-        context.updateDefaultProtocols(sslParameters, !useClientMode);
+            this.useClientMode = useClientMode;
+        }
     }
 
     @Override
@@ -304,9 +372,6 @@ class ProvSSLSocketDirect
     {
         if (protocol == null)
         {
-            // TODO[jsse] Check for session to re-use and apply to handshake
-            // TODO[jsse] Allocate this.handshakeSession and update it during handshake
-
             InputStream input = super.getInputStream();
             OutputStream output = super.getOutputStream();
 
@@ -346,19 +411,14 @@ class ProvSSLSocketDirect
         }
     }
 
-    public String getPeerHost()
+    public synchronized String getPeerHost()
     {
-        InetAddress peerAddress = getInetAddress();
-        if (peerAddress != null)
-        {
-            String peerHost = peerAddress.toString();
-            int pos = peerHost.lastIndexOf('/');
-            if (pos > 0)
-            {
-                return peerHost.substring(0,  pos);
-            }
-        }
-        return null;
+        return peerHost;
+    }
+
+    public synchronized String getPeerHostSNI()
+    {
+        return peerHostSNI;
     }
 
     public int getPeerPort()
@@ -366,25 +426,7 @@ class ProvSSLSocketDirect
         return getPort();
     }
 
-    public boolean isClientTrusted(X509Certificate[] chain, String authType)
-    {
-        // TODO[jsse] Consider X509ExtendedTrustManager and/or HostnameVerifier functionality
-
-        X509TrustManager tm = contextData.getTrustManager();
-        if (tm != null)
-        {
-            try
-            {
-                tm.checkClientTrusted(chain, authType);
-                return true;
-            }
-            catch (CertificateException e)
-            {
-            }
-        }
-        return false;
-    }
-
+<<<<<<< HEAD
     
     public boolean isServerTrusted(X509Certificate[] chain, String authType)
     {
@@ -411,13 +453,23 @@ class ProvSSLSocketDirect
             catch (CertificateException e)
             {
             }
+=======
+    public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
+    {
+        if (null != handshakeSession && !handshakeSession.isValid())
+        {
+            connection.getSession().invalidate();
+>>>>>>> r1rv61
         }
-        return false;
+
+        this.handshakeSession = null;
+        this.connection = connection;
     }
     
 
-    public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
+    public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
     {
+<<<<<<< HEAD
         this.connection = connection;
         
         if (!listeners.isEmpty())
@@ -431,6 +483,9 @@ class ProvSSLSocketDirect
         		}
         	}
         }
+=======
+        this.handshakeSession = handshakeSession;
+>>>>>>> r1rv61
     }
 
     synchronized void handshakeIfNecessary(boolean resumable) throws IOException
@@ -439,6 +494,44 @@ class ProvSSLSocketDirect
         {
             startHandshake(resumable);
         }
+    }
+
+    synchronized void notifyConnected()
+    {
+        if (null != peerHost && peerHost.length() > 0)
+        {
+            this.peerHostSNI = peerHost;
+            return;
+        }
+
+        InetAddress peerAddress = getInetAddress();
+        if (null == peerAddress)
+        {
+            return;
+        }
+
+        /*
+         * TODO[jsse] If we could somehow access the 'originalHostName' of peerAddress, it would be
+         * usable as a default SNI host_name.
+         */
+//        String originalHostName = null;
+//        if (null != originalHostName)
+//        {
+//            this.peerHost = originalHostName;
+//            this.peerHostSNI = originalHostName;
+//            return;
+//        }
+
+        if (useClientMode && provJdkTlsTrustNameService)
+        {
+            this.peerHost = peerAddress.getHostName();
+        }
+        else
+        {
+            this.peerHost = peerAddress.getHostAddress();
+        }
+
+        this.peerHostSNI = null;
     }
 
     class AppDataInput extends InputStream

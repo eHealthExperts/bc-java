@@ -3,7 +3,6 @@ package org.bouncycastle.tls.test;
 import java.util.Random;
 import java.util.Vector;
 
-import junit.framework.TestCase;
 import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.KeyExchangeAlgorithm;
 import org.bouncycastle.tls.ProtocolVersion;
@@ -16,6 +15,8 @@ import org.bouncycastle.tls.TlsSession;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.tls.crypto.TlsNonceGenerator;
+
+import junit.framework.TestCase;
 
 public class TlsUtilsTest
     extends TestCase
@@ -42,9 +43,24 @@ public class TlsUtilsTest
                 return null;
             }
 
+            public SecurityParameters getSecurityParametersConnection()
+            {
+                return null;
+            }
+
+            public SecurityParameters getSecurityParametersHandshake()
+            {
+                return null;
+            }
+
             public boolean isServer()
             {
                 return false;
+            }
+
+            public ProtocolVersion[] getClientSupportedVersions()
+            {
+                return null;
             }
 
             public ProtocolVersion getClientVersion()
@@ -88,7 +104,7 @@ public class TlsUtilsTest
             }
         };
 
-        short signatureAlgorithm = TlsUtils.getSignatureAlgorithm(keyExchangeAlgorithm);
+        short signatureAlgorithm = TlsUtils.getLegacySignatureAlgorithmServer(keyExchangeAlgorithm);
 
         Vector supportedSignatureAlgorithms = getSignatureAlgorithms(false);
         SignatureAndHashAlgorithm sigAlg = TlsUtils.chooseSignatureAndHashAlgorithm(context,

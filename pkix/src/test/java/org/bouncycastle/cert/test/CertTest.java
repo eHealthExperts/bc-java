@@ -69,6 +69,8 @@ import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.IssuingDistributionPoint;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x9.ECNamedCurveTable;
+import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.asn1.x9.X9ObjectIdentifiers;
 import org.bouncycastle.cert.X509AttributeCertificateHolder;
 import org.bouncycastle.cert.X509CRLEntryHolder;
@@ -108,6 +110,7 @@ import org.bouncycastle.operator.bc.BcRSAContentVerifierProviderBuilder;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
+import org.bouncycastle.pqc.jcajce.spec.QTESLAParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.SPHINCS256KeyGenParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.XMSSMTParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.XMSSParameterSpec;
@@ -1911,16 +1914,9 @@ public class CertTest
      */
     public void checkCreation3()
     {
-        ECCurve curve = new ECCurve.Fp(
-            new BigInteger("883423532389192164791648750360308885314476597252960362792450860609699839"), // q
-            new BigInteger("7fffffffffffffffffffffff7fffffffffff8000000000007ffffffffffc", 16), // a
-            new BigInteger("6b016c3bdcf18941d0d654921475ca71a9db2fb27d1d37796185c2942c0a", 16)); // b
-
-        ECParameterSpec spec = new ECParameterSpec(
-            curve,
-            curve.decodePoint(Hex.decode("020ffa963cdca8816ccc33b8642bedf905c3d358573d3f27fbbd3b3cb9aaaf")), // G
-            new BigInteger("883423532389192164791648750360308884807550341691627752275345424702807307")); // n
-
+        X9ECParameters x9 = ECNamedCurveTable.getByName("prime239v1");
+        ECCurve curve = x9.getCurve();
+        ECParameterSpec spec = new ECParameterSpec(curve, x9.getG(), x9.getN(), x9.getH());
 
         ECPrivateKeySpec privKeySpec = new ECPrivateKeySpec(
             new BigInteger("876300101507107567501066130761671078357010671067781776716671676178726717"), // d
@@ -2042,15 +2038,9 @@ public class CertTest
     private void createECCert(String algorithm, ASN1ObjectIdentifier algOid)
         throws Exception
     {
-        ECCurve.Fp curve = new ECCurve.Fp(
-            new BigInteger("6864797660130609714981900799081393217269435300143305409394463459185543183397656052122559640661454554977296311391480858037121987999716643812574028291115057151"), // q (or p)
-            new BigInteger("01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC", 16),   // a
-            new BigInteger("0051953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00", 16));  // b
-
-        ECParameterSpec spec = new ECParameterSpec(
-            curve,
-            curve.decodePoint(Hex.decode("0200C6858E06B70404E9CD9E3ECB662395B4429C648139053FB521F828AF606B4D3DBAA14B5E77EFE75928FE1DC127A2FFA8DE3348B3C1856A429BF97E7E31C2E5BD66")), // G
-            new BigInteger("01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA51868783BF2F966B7FCC0148F709A5D03BB5C9B8899C47AEBB6FB71E91386409", 16)); // n
+        X9ECParameters x9 = ECNamedCurveTable.getByName("secp521r1");
+        ECCurve curve = x9.getCurve();
+        ECParameterSpec spec = new ECParameterSpec(curve, x9.getG(), x9.getN(), x9.getH());
 
         ECPrivateKeySpec privKeySpec = new ECPrivateKeySpec(
             new BigInteger("5769183828869504557786041598510887460263120754767955773309066354712783118202294874205844512909370791582896372147797293913785865682804434049019366394746072023"), // d
@@ -3024,7 +3014,7 @@ public class CertTest
     }
 
     /*
-     * we generate a self signed certificate for the sake of testing - XMSS
+     * we generate a self signed certificate for the sake of testing - XMSS^MT
      */
     public void checkCreation9()
         throws Exception
@@ -3050,6 +3040,57 @@ public class CertTest
         // create the certificate - version 3
         //
         ContentSigner sigGen = new JcaContentSignerBuilder("SHAKE256withXMSSMT").setProvider("BCPQC").build(privKey);
+        X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(builder.build(), BigInteger.valueOf(1), new Date(System.currentTimeMillis() - 50000), new Date(System.currentTimeMillis() + 50000), builder.build(), pubKey);
+
+        X509Certificate cert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
+
+        cert.checkValidity(new Date());
+
+        //
+        // check verifies in general
+        //
+        cert.verify(pubKey);
+
+        //
+        // check verifies with contained key
+        //
+        cert.verify(cert.getPublicKey());
+
+        ByteArrayInputStream bIn = new ByteArrayInputStream(cert.getEncoded());
+        CertificateFactory fact = CertificateFactory.getInstance("X.509", BC);
+
+        cert = (X509Certificate)fact.generateCertificate(bIn);
+
+        //System.out.println(cert);
+    }
+
+    /*
+     * we generate a self signed certificate for the sake of testing - qTESLA
+     */
+    public void checkCreationQTESLA()
+        throws Exception
+    {
+        //
+        // set up the keys
+        //
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("qTESLA", "BCPQC");
+
+        kpg.initialize(new QTESLAParameterSpec(QTESLAParameterSpec.HEURISTIC_I), new SecureRandom());
+
+        KeyPair kp = kpg.generateKeyPair();
+
+        PrivateKey privKey = kp.getPrivate();
+        PublicKey pubKey = kp.getPublic();
+
+        //
+        // distinguished name table.
+        //
+        X500NameBuilder builder = createStdBuilder();
+
+        //
+        // create the certificate - version 3
+        //
+        ContentSigner sigGen = new JcaContentSignerBuilder(pubKey.getAlgorithm()).setProvider("BCPQC").build(privKey);
         X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(builder.build(), BigInteger.valueOf(1), new Date(System.currentTimeMillis() - 50000), new Date(System.currentTimeMillis() + 50000), builder.build(), pubKey);
 
         X509Certificate cert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
@@ -3944,6 +3985,11 @@ public class CertTest
     public void performTest()
         throws Exception
     {
+        if (Security.getProvider("BCPQC") == null)
+        {
+            Security.addProvider(new BouncyCastlePQCProvider());
+        }
+        
         testDirect();
         testIndirect();
         testIndirect2();
@@ -3988,6 +4034,7 @@ public class CertTest
         checkCreation8();
         checkCreation9();
 
+        checkCreationQTESLA();
         checkCreationDSA();
         checkCreationECDSA();
         checkCreationRSA();

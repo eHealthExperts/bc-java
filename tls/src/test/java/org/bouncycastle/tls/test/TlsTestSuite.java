@@ -1,9 +1,8 @@
 package org.bouncycastle.tls.test;
 
+import java.security.SecureRandom;
 import java.security.Security;
 
-import junit.framework.Test;
-import junit.framework.TestSuite;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.HashAlgorithm;
@@ -11,9 +10,18 @@ import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
 import org.bouncycastle.tls.TlsUtils;
+import org.bouncycastle.tls.crypto.TlsCrypto;
+import org.bouncycastle.tls.crypto.impl.bc.BcTlsCrypto;
+import org.bouncycastle.tls.crypto.impl.jcajce.JcaTlsCryptoProvider;
+
+import junit.framework.Test;
+import junit.framework.TestSuite;
 
 public class TlsTestSuite extends TestSuite
 {
+    static TlsCrypto BC_CRYPTO = new BcTlsCrypto(new SecureRandom()); 
+    static TlsCrypto JCA_CRYPTO = new JcaTlsCryptoProvider().setProvider(new BouncyCastleProvider()).create(new SecureRandom());
+
     // Make the access to constants less verbose 
     static abstract class C extends TlsTestConfig {}
 
@@ -58,8 +66,8 @@ public class TlsTestSuite extends TestSuite
 
         {
             TlsTestConfig c = createTlsTestConfig(ProtocolVersion.TLSv12, clientCrypto, serverCrypto);
-            c.clientOfferVersion = ProtocolVersion.TLSv11;
             c.clientFallback = true;
+            c.clientSupportedVersions = ProtocolVersion.TLSv11.downTo(ProtocolVersion.TLSv10);
             c.expectServerFatalAlert(AlertDescription.inappropriate_fallback);
 
             addTestCase(testSuite, c, prefix + "FallbackBad");
@@ -67,7 +75,7 @@ public class TlsTestSuite extends TestSuite
 
         {
             TlsTestConfig c = createTlsTestConfig(ProtocolVersion.TLSv12, clientCrypto, serverCrypto);
-            c.clientOfferVersion = ProtocolVersion.TLSv11;
+            c.clientSupportedVersions = ProtocolVersion.TLSv11.downTo(ProtocolVersion.TLSv10);
 
             addTestCase(testSuite, c, prefix + "FallbackNone");
         }
@@ -94,6 +102,7 @@ public class TlsTestSuite extends TestSuite
             c.clientAuth = C.CLIENT_AUTH_VALID;
             c.clientAuthSigAlg = new SignatureAndHashAlgorithm(HashAlgorithm.md5, SignatureAlgorithm.rsa);
             c.serverCertReqSigAlgs = TlsUtils.getDefaultRSASignatureAlgorithms();
+            c.serverCheckSigAlgOfClientCerts = false;
             c.expectClientFatalAlert(AlertDescription.internal_error);
 
             addTestCase(testSuite, c, prefix + "BadCertificateVerifyHashAlg");
@@ -111,6 +120,7 @@ public class TlsTestSuite extends TestSuite
             c.clientAuth = C.CLIENT_AUTH_VALID;
             c.clientAuthSigAlg = new SignatureAndHashAlgorithm(HashAlgorithm.sha1, SignatureAlgorithm.rsa);
             c.serverCertReqSigAlgs = TlsUtils.getDefaultECDSASignatureAlgorithms();
+            c.serverCheckSigAlgOfClientCerts = false;
             c.expectServerFatalAlert(AlertDescription.illegal_parameter);
 
             addTestCase(testSuite, c, prefix + "BadCertificateVerifySigAlg");
@@ -130,7 +140,7 @@ public class TlsTestSuite extends TestSuite
             c.clientAuthSigAlg = new SignatureAndHashAlgorithm(HashAlgorithm.sha1, SignatureAlgorithm.rsa);
             c.clientAuthSigAlgClaimed = new SignatureAndHashAlgorithm(HashAlgorithm.sha1, SignatureAlgorithm.ecdsa);
             c.serverCertReqSigAlgs = TlsUtils.getDefaultECDSASignatureAlgorithms();
-            c.expectServerFatalAlert(AlertDescription.decrypt_error);
+            c.expectServerFatalAlert(AlertDescription.bad_certificate);
 
             addTestCase(testSuite, c, prefix + "BadCertificateVerifySigAlgMismatch");
         }
@@ -161,6 +171,21 @@ public class TlsTestSuite extends TestSuite
         }
 
         /*
+         * Server sends SHA-256/RSA certificate, which is not the default {sha1,rsa} implied by the
+         * absent signature_algorithms extension. We expect fatal alert from the client when it
+         * verifies the certificate's 'signatureAlgorithm' against the implicit default signature_algorithms.
+         */
+        if (TlsUtils.isTLSv12(version))
+        {
+            TlsTestConfig c = createTlsTestConfig(version, clientCrypto, serverCrypto);
+            c.clientSendSignatureAlgorithms = false;
+            c.serverAuthSigAlg = new SignatureAndHashAlgorithm(HashAlgorithm.sha256, SignatureAlgorithm.rsa);
+            c.expectClientFatalAlert(AlertDescription.bad_certificate);
+
+            addTestCase(testSuite, c, prefix + "BadServerCertSigAlg");
+        }
+
+        /*
          * Server selects MD5/RSA for ServerKeyExchange signature, which is not in the default
          * supported signature algorithms that the client sent. We expect fatal alert from the
          * client when it verifies the selected algorithm against the supported algorithms.
@@ -182,6 +207,7 @@ public class TlsTestSuite extends TestSuite
         if (TlsUtils.isTLSv12(version))
         {
             TlsTestConfig c = createTlsTestConfig(version, clientCrypto, serverCrypto);
+            c.clientCheckSigAlgOfServerCerts = false;
             c.clientSendSignatureAlgorithms = false;
             c.serverAuthSigAlg = new SignatureAndHashAlgorithm(HashAlgorithm.md5, SignatureAlgorithm.rsa);
             c.expectClientFatalAlert(AlertDescription.illegal_parameter);
@@ -202,6 +228,20 @@ public class TlsTestSuite extends TestSuite
 
             addTestCase(testSuite, c, prefix + "GoodOptionalCertReqDeclined");
         }
+
+        /*
+         * Server generates downgraded (RFC 8446) 1.1 ServerHello. We expect fatal alert
+         * (illegal_parameter) from the client.
+         */
+        if (!TlsUtils.isTLSv12(version))
+        {
+            TlsTestConfig c = createTlsTestConfig(version, clientCrypto, serverCrypto);
+            c.serverNegotiateVersion = version;
+            c.serverSupportedVersions = ProtocolVersion.TLSv12.downTo(version);
+            c.expectClientFatalAlert(AlertDescription.illegal_parameter);
+
+            addTestCase(testSuite, c, prefix + "BadDowngrade");
+        }
     }
 
     private static void addTestCase(TestSuite testSuite, TlsTestConfig config, String name)
@@ -209,15 +249,13 @@ public class TlsTestSuite extends TestSuite
         testSuite.addTest(new TlsTestCase(config, name));
     }
 
-    private static TlsTestConfig createTlsTestConfig(ProtocolVersion version, int clientCrypto, int serverCrypto)
+    private static TlsTestConfig createTlsTestConfig(ProtocolVersion serverMaxVersion, int clientCrypto, int serverCrypto)
     {
         TlsTestConfig c = new TlsTestConfig();
         c.clientCrypto = clientCrypto;
-        c.clientMinimumVersion = ProtocolVersion.TLSv10;
-        c.clientOfferVersion = ProtocolVersion.TLSv12;
+        c.clientSupportedVersions = ProtocolVersion.TLSv12.downTo(ProtocolVersion.TLSv10);
         c.serverCrypto = serverCrypto;
-        c.serverMaximumVersion = version;
-        c.serverMinimumVersion = ProtocolVersion.TLSv10;
+        c.serverSupportedVersions = serverMaxVersion.downTo(ProtocolVersion.TLSv10);
         return c;
     }
 

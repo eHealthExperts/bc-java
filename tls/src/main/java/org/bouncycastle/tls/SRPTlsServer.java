@@ -4,13 +4,11 @@ import java.io.IOException;
 import java.util.Hashtable;
 
 import org.bouncycastle.tls.crypto.TlsCrypto;
-import org.bouncycastle.util.Arrays;
 
 public class SRPTlsServer
     extends AbstractTlsServer
 {
-    // TODO[tls] Perhaps not ideal to keep this in a writable array
-    public static final int[] BASE_CIPHER_SUITES = new int[]
+    private static final int[] DEFAULT_CIPHER_SUITES = new int[]
     {
         CipherSuite.TLS_SRP_SHA_DSS_WITH_AES_256_CBC_SHA,
         CipherSuite.TLS_SRP_SHA_DSS_WITH_AES_128_CBC_SHA,
@@ -21,23 +19,15 @@ public class SRPTlsServer
     };
 
     protected TlsSRPIdentityManager srpIdentityManager;
-    protected int[] supportedCipherSuites;
 
     protected byte[] srpIdentity = null;
-    protected TlsSRPLoginParameters loginParameters = null;
-
-    // TODO[tls-ops] Need to restore a single-arg constructor here
+    protected TlsSRPLoginParameters srpLoginParameters = null;
 
     public SRPTlsServer(TlsCrypto crypto, TlsSRPIdentityManager srpIdentityManager)
     {
-        this(crypto, new DefaultTlsKeyExchangeFactory(), srpIdentityManager);
-    }
+        super(crypto);
 
-    public SRPTlsServer(TlsCrypto crypto, TlsKeyExchangeFactory keyExchangeFactory, TlsSRPIdentityManager srpIdentityManager)
-    {
-        super(crypto, keyExchangeFactory);
         this.srpIdentityManager = srpIdentityManager;
-        this.supportedCipherSuites = TlsUtils.getSupportedCipherSuites(crypto, BASE_CIPHER_SUITES);
     }
 
     protected TlsCredentialedSigner getDSASignerCredentials()
@@ -52,9 +42,9 @@ public class SRPTlsServer
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    protected int[] getCipherSuites()
+    protected int[] getSupportedCipherSuites()
     {
-        return Arrays.clone(supportedCipherSuites);
+        return TlsUtils.getSupportedCipherSuites(context.getCrypto(), DEFAULT_CIPHER_SUITES);
     }
 
     public void processClientExtensions(Hashtable clientExtensions) throws IOException
@@ -72,10 +62,10 @@ public class SRPTlsServer
         {
             if (srpIdentity != null)
             {
-                this.loginParameters = srpIdentityManager.getLoginParameters(srpIdentity);
+                this.srpLoginParameters = srpIdentityManager.getLoginParameters(srpIdentity);
             }
 
-            if (loginParameters == null)
+            if (srpLoginParameters == null)
             {
                 throw new TlsFatalAlert(AlertDescription.unknown_psk_identity);
             }
@@ -105,30 +95,8 @@ public class SRPTlsServer
         }
     }
 
-    public TlsKeyExchange getKeyExchange()
-        throws IOException
+    public TlsSRPLoginParameters getSRPLoginParameters() throws IOException
     {
-        int keyExchangeAlgorithm = TlsUtils.getKeyExchangeAlgorithm(selectedCipherSuite);
-
-        switch (keyExchangeAlgorithm)
-        {
-        case KeyExchangeAlgorithm.SRP:
-        case KeyExchangeAlgorithm.SRP_DSS:
-        case KeyExchangeAlgorithm.SRP_RSA:
-            return createSRPKeyExchange(keyExchangeAlgorithm);
-
-        default:
-            /*
-             * Note: internal error here; the TlsProtocol implementation verifies that the
-             * server-selected cipher suite was in the list of client-offered cipher suites, so if
-             * we now can't produce an implementation, we shouldn't have offered it!
-             */
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
-    }
-
-    protected TlsKeyExchange createSRPKeyExchange(int keyExchange) throws IOException
-    {
-        return keyExchangeFactory.createSRPKeyExchangeServer(keyExchange, supportedSignatureAlgorithms, srpIdentity, loginParameters);
+        return srpLoginParameters;
     }
 }

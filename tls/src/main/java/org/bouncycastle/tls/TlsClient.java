@@ -22,29 +22,9 @@ public interface TlsClient
      */
     TlsSession getSessionToResume();
 
-    /**
-     * Return the {@link ProtocolVersion} to use for the <code>TLSPlaintext.version</code> field prior to
-     * receiving the server version. NOTE: This method is <b>not</b> called for DTLS.
-     *
-     * <p>
-     * See RFC 5246 E.1.: "TLS clients that wish to negotiate with older servers MAY send any value
-     * {03,XX} as the record layer version number. Typical values would be {03,00}, the lowest
-     * version number supported by the client, and the value of ClientHello.client_version. No
-     * single value will guarantee interoperability with all old servers, but this is a complex
-     * topic beyond the scope of this document."
-     * </p>
-     *
-     * @return The {@link ProtocolVersion} to use.
-     */
-    ProtocolVersion getClientHelloRecordLayerVersion();
-
-    ProtocolVersion getClientVersion();
-
     boolean isFallback();
 
     int[] getCipherSuites();
-
-    short[] getCompressionMethods();
 
     // Hashtable is (Integer -> byte[])
     Hashtable getClientExtensions()
@@ -63,8 +43,6 @@ public interface TlsClient
 
     void notifySelectedCipherSuite(int selectedCipherSuite);
 
-    void notifySelectedCompressionMethod(short selectedCompressionMethod);
-
     // Hashtable is (Integer -> byte[])
     void processServerExtensions(Hashtable serverExtensions)
         throws IOException;
@@ -73,8 +51,13 @@ public interface TlsClient
     void processServerSupplementalData(Vector serverSupplementalData)
         throws IOException;
 
-    TlsKeyExchange getKeyExchange()
-        throws IOException;
+    TlsPSKIdentity getPSKIdentity() throws IOException;
+
+    TlsSRPIdentity getSRPIdentity() throws IOException;
+
+    TlsDHGroupVerifier getDHGroupVerifier() throws IOException;
+
+    TlsSRPConfigVerifier getSRPConfigVerifier() throws IOException;
 
     TlsAuthentication getAuthentication()
         throws IOException;

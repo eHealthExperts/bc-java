@@ -1,26 +1,36 @@
 package org.bouncycastle.jsse.provider;
 
-import javax.net.ssl.SSLSession;
-
 import org.bouncycastle.jsse.BCSSLConnection;
 import org.bouncycastle.tls.ChannelBinding;
+import org.bouncycastle.tls.ProtocolName;
+import org.bouncycastle.tls.SecurityParameters;
 import org.bouncycastle.tls.TlsContext;
 
 class ProvSSLConnection
     implements BCSSLConnection
 {
     protected final TlsContext tlsContext;
-    protected final ProvSSLSessionImpl sessionImpl; 
+    protected final ProvSSLSession session; 
 
-    ProvSSLConnection(TlsContext tlsContext, ProvSSLSessionImpl sessionImpl)
+    ProvSSLConnection(TlsContext tlsContext, ProvSSLSession session)
     {
         this.tlsContext = tlsContext;
-        this.sessionImpl = sessionImpl;
+        this.session = session;
     }
 
-    ProvSSLSessionImpl getSessionImpl()
+    public String getApplicationProtocol()
     {
-        return sessionImpl;
+        SecurityParameters sp = tlsContext.getSecurityParametersConnection();
+        if (null != sp)
+        {
+            ProtocolName applicationProtocol = sp.getApplicationProtocol();
+            if (null != applicationProtocol)
+            {
+                return applicationProtocol.getUtf8Decoding();
+            }
+        }
+
+        return "";
     }
 
     public byte[] getChannelBinding(String channelBinding)
@@ -38,8 +48,8 @@ class ProvSSLConnection
         throw new UnsupportedOperationException();
     }
 
-    public SSLSession getSession()
+    public ProvSSLSession getSession()
     {
-        return sessionImpl.getExportSession();
+        return session;
     }
 }

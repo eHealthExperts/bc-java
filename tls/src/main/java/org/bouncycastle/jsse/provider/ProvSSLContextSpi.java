@@ -1,16 +1,19 @@
 package org.bouncycastle.jsse.provider;
 
-import java.security.GeneralSecurityException;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.net.ssl.KeyManager;
@@ -23,9 +26,11 @@ import javax.net.ssl.SSLSessionContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509ExtendedKeyManager;
 import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.bouncycastle.jsse.BCX509ExtendedTrustManager;
 import org.bouncycastle.tls.CipherSuite;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.TlsUtils;
@@ -35,10 +40,16 @@ import org.bouncycastle.tls.crypto.TlsCryptoProvider;
 class ProvSSLContextSpi
     extends SSLContextSpi
 {
-    private static Logger LOG = Logger.getLogger(ProvSSLContextSpi.class.getName());
+    private static final Logger LOG = Logger.getLogger(ProvSSLContextSpi.class.getName());
 
     private static final String PROPERTY_CLIENT_PROTOCOLS = "jdk.tls.client.protocols";
+    private static final String PROPERTY_SERVER_PROTOCOLS = "jdk.tls.server.protocols";
 
+    /*
+     * TODO[jsse] Should separate this into "understood" cipher suite int<->String maps
+     * and a Set of supported cipher suite values, so we can cover TLS_NULL_WITH_NULL_NULL and
+     * the SCSV values.
+     */
     private static final Map<String, Integer> SUPPORTED_CIPHERSUITE_MAP = createSupportedCipherSuiteMap();
     private static final Map<String, Integer> SUPPORTED_CIPHERSUITE_MAP_FIPS = createSupportedCipherSuiteMapFips(SUPPORTED_CIPHERSUITE_MAP);
 
@@ -179,41 +190,41 @@ class ProvSSLContextSpi
         return Collections.unmodifiableMap(ps);
     }
 
-    private static String[] getDefaultProtocolsClient(String[] specifiedProtocols)
+    private static String[] getDefaultProtocols(String[] specifiedProtocols, String propertyName)
     {
         if (specifiedProtocols != null)
         {
             return specifiedProtocols;
         }
 
-        String[] clientProtocols = getJdkTlsClientProtocols();
-        if (clientProtocols != null)
+        String[] propertyProtocols = getJdkTlsProtocols(propertyName);
+        if (propertyProtocols != null)
         {
-            return clientProtocols;
+            return propertyProtocols;
         }
 
         return DEFAULT_PROTOCOLS;
+    }
+
+    private static String[] getDefaultProtocolsClient(String[] specifiedProtocols)
+    {
+        return getDefaultProtocols(specifiedProtocols, PROPERTY_CLIENT_PROTOCOLS);
     }
 
     private static String[] getDefaultProtocolsServer(String[] specifiedProtocols)
     {
-        if (specifiedProtocols != null)
-        {
-            return specifiedProtocols;
-        }
-
-        return DEFAULT_PROTOCOLS;
+        return getDefaultProtocols(specifiedProtocols, PROPERTY_SERVER_PROTOCOLS);
     }
 
-    private static String[] getJdkTlsClientProtocols()
+    private static String[] getJdkTlsProtocols(String propertyName)
     {
-        String prop = PropertyUtils.getStringSystemProperty(PROPERTY_CLIENT_PROTOCOLS);
+        String prop = PropertyUtils.getStringSystemProperty(propertyName);
         if (prop == null)
         {
             return null;
         }
 
-        String[] entries = JsseUtils.stripQuotes(prop.trim()).split(",");
+        String[] entries = JsseUtils.stripDoubleQuotes(prop.trim()).split(",");
         String[] result = new String[entries.length];
         int count = 0;
         for (String entry : entries)
@@ -224,7 +235,7 @@ class ProvSSLContextSpi
 
             if (!supportedProtocols.containsKey(protocol))
             {
-                LOG.warning("'" + PROPERTY_CLIENT_PROTOCOLS + "' contains unsupported protocol: " + protocol);
+                LOG.warning("'" + propertyName + "' contains unsupported protocol: " + protocol);
             }
             else if (!JsseUtils.contains(result, protocol))
             {
@@ -233,7 +244,7 @@ class ProvSSLContextSpi
         }
         if (count < 1)
         {
-            LOG.severe("'" + PROPERTY_CLIENT_PROTOCOLS + "' contained no usable protocol values (ignoring)");
+            LOG.severe("'" + propertyName + "' contained no usable protocol values (ignoring)");
             return null;
         }
         if (count < result.length)
@@ -253,6 +264,22 @@ class ProvSSLContextSpi
         return getArray(m.keySet());
     }
 
+    static KeyManager[] getDefaultKeyManagers() throws Exception
+    {
+        KeyStoreConfig keyStoreConfig = ProvKeyManagerFactorySpi.getDefaultKeyStore();
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStoreConfig.keyStore, keyStoreConfig.password);
+        return kmf.getKeyManagers();
+    }
+
+    static TrustManager[] getDefaultTrustManagers() throws Exception
+    {
+        KeyStore trustStore = ProvTrustManagerFactorySpi.getDefaultTrustStore();
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(trustStore);
+        return tmf.getTrustManagers();
+    }
+
     protected final boolean isInFipsMode;
     protected final TlsCryptoProvider cryptoProvider;
     protected final String[] defaultProtocolsClient;
@@ -264,8 +291,8 @@ class ProvSSLContextSpi
     protected boolean initialized = false;
 
     private TlsCrypto crypto;
-    private X509KeyManager km;
-    private X509TrustManager tm;
+    private X509ExtendedKeyManager x509KeyManager;
+    private BCX509ExtendedTrustManager x509TrustManager;
     private ProvSSLSessionContext clientSessionContext;
     private ProvSSLSessionContext serverSessionContext;
 
@@ -299,6 +326,12 @@ class ProvSSLContextSpi
 
     String getCipherSuiteString(int suite)
     {
+        // TODO[jsse] Place into "understood" cipher suite map
+        if (CipherSuite.TLS_NULL_WITH_NULL_NULL == suite)
+        {
+            return "TLS_NULL_WITH_NULL_NULL";
+        }
+
         if (TlsUtils.isValidUint16(suite))
         {
             for (Map.Entry<String, Integer> entry : supportedCipherSuites.entrySet())
@@ -337,46 +370,6 @@ class ProvSSLContextSpi
         return defaultProtocolsServer;
     }
 
-    ProtocolVersion getMaximumVersion(String[] protocols)
-    {
-        ProtocolVersion max = null;
-        if (protocols != null)
-        {
-            for (String protocol : protocols)
-            {
-                if (protocol != null)
-                {
-                    ProtocolVersion v = supportedProtocols.get(protocol);
-                    if (v != null && (max == null || v.isLaterVersionOf(max)))
-                    {
-                        max = v;
-                    }
-                }
-            }
-        }
-        return max;
-    }
-
-    ProtocolVersion getMinimumVersion(String[] protocols)
-    {
-        ProtocolVersion min = null;
-        if (protocols != null)
-        {
-            for (String protocol : protocols)
-            {
-                if (protocol != null)
-                {
-                    ProtocolVersion v = supportedProtocols.get(protocol);
-                    if (v != null && (min == null || min.isLaterVersionOf(v)))
-                    {
-                        min = v;
-                    }
-                }
-            }
-        }
-        return min;
-    }
-
     String getProtocolString(ProtocolVersion v)
     {
         if (v != null)
@@ -390,6 +383,35 @@ class ProvSSLContextSpi
             }
         }
         return null;
+    }
+
+    ProtocolVersion[] getSupportedVersions(String[] protocols)
+    {
+        if (protocols == null)
+        {
+            return null;
+        }
+
+        SortedSet<ProtocolVersion> versions = new TreeSet<ProtocolVersion>(new Comparator<ProtocolVersion>(){
+            public int compare(ProtocolVersion o1, ProtocolVersion o2)
+            {
+                return o1.isLaterVersionOf(o2) ? -1 : o2.isLaterVersionOf(o1) ? 1 : 0;
+            }
+        });
+
+        for (String protocol : protocols)
+        {
+            if (protocol != null)
+            {
+                ProtocolVersion version = supportedProtocols.get(protocol);
+                if (version != null)
+                {
+                    versions.add(version);
+                }
+            }
+        }
+
+        return versions.toArray(new ProtocolVersion[versions.size()]);
     }
 
     boolean isDefaultProtocols(String[] protocols)
@@ -527,20 +549,25 @@ class ProvSSLContextSpi
     protected synchronized void engineInit(KeyManager[] kms, TrustManager[] tms, SecureRandom sr) throws KeyManagementException
     {
         this.initialized = false;
+
         this.crypto = cryptoProvider.create(sr);
-        this.km = selectKeyManager(kms);
-        this.tm = selectTrustManager(tms);
+        this.x509KeyManager = selectX509KeyManager(kms);
+        this.x509TrustManager = selectX509TrustManager(tms);
         this.clientSessionContext = createSSLSessionContext();
         this.serverSessionContext = createSSLSessionContext();
+
+        // Trigger (possibly expensive) RNG initialization here to avoid timeout in an actual handshake
+        this.crypto.getSecureRandom().nextInt();
+
         this.initialized = true;
     }
 
     protected ContextData createContextData()
     {
-        return new ContextData(crypto, km, tm, clientSessionContext, serverSessionContext);
+        return new ContextData(crypto, x509KeyManager, x509TrustManager, clientSessionContext, serverSessionContext);
     }
 
-    protected X509KeyManager findX509KeyManager(KeyManager[] kms)
+    protected X509ExtendedKeyManager selectX509KeyManager(KeyManager[] kms) throws KeyManagementException
     {
         if (kms != null)
         {
@@ -548,52 +575,14 @@ class ProvSSLContextSpi
             {
                 if (km instanceof X509KeyManager)
                 {
-                    return (X509KeyManager)km;
+                    return X509KeyManagerUtil.importX509KeyManager((X509KeyManager)km);
                 }
             }
         }
-        return null;
+        return DummyX509KeyManager.INSTANCE;
     }
 
-    protected X509TrustManager findX509TrustManager(TrustManager[] tms)
-    {
-        if (tms != null)
-        {
-            for (TrustManager tm : tms)
-            {
-                if (tm instanceof X509TrustManager)
-                {
-                    return (X509TrustManager)tm;
-                }
-            }
-        }
-        return null;
-    }
-
-    protected X509KeyManager selectKeyManager(KeyManager[] kms) throws KeyManagementException
-    {
-        if (kms == null)
-        {
-            try
-            {
-                /*
-                 * "[...] the installed security providers will be searched for the highest priority
-                 * implementation of the appropriate factory."
-                 */
-                KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-                kmf.init(null, null);
-                kms = kmf.getKeyManagers();
-            }
-            catch (GeneralSecurityException e)
-            {
-                throw new KeyManagementException(e);
-            }
-        }
-
-        return findX509KeyManager(kms);
-    }
-
-    protected X509TrustManager selectTrustManager(TrustManager[] tms) throws KeyManagementException
+    protected BCX509ExtendedTrustManager selectX509TrustManager(TrustManager[] tms) throws KeyManagementException
     {
         if (tms == null)
         {
@@ -607,12 +596,21 @@ class ProvSSLContextSpi
                 tmf.init((KeyStore)null);
                 tms = tmf.getTrustManagers();
             }
-            catch (GeneralSecurityException e)
+            catch (Exception e)
             {
-                throw new KeyManagementException(e);
+                LOG.log(Level.WARNING, "Failed to load default trust managers", e);
             }
         }
-
-        return findX509TrustManager(tms);
+        if (tms != null)
+        {
+            for (TrustManager tm : tms)
+            {
+                if (tm instanceof X509TrustManager)
+                {
+                    return X509TrustManagerUtil.importX509TrustManager((X509TrustManager)tm);
+                }
+            }
+        }
+        return DummyX509TrustManager.INSTANCE;
     }
 }

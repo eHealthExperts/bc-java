@@ -8,19 +8,24 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.security.SecureRandom;
 
+import junit.framework.TestCase;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.TlsProtocol;
 import org.bouncycastle.util.Arrays;
 
-import junit.framework.TestCase;
-
 public class TlsTestCase extends TestCase
 {
-    private static void checkTLSVersion(ProtocolVersion version)
+    private static void checkTLSVersions(ProtocolVersion[] versions)
     {
-        if (version != null && !version.isTLS())
+        if (versions != null)
         {
-            throw new IllegalStateException("Non-TLS version");
+            for (int i = 0; i < versions.length; ++i)
+            {
+                if (!versions[i].isTLS())
+                {
+                    throw new IllegalStateException("Non-TLS version");
+                }
+            }
         }
     }
 
@@ -37,10 +42,8 @@ public class TlsTestCase extends TestCase
     {
         super(name);
 
-        checkTLSVersion(config.clientMinimumVersion);
-        checkTLSVersion(config.clientOfferVersion);
-        checkTLSVersion(config.serverMaximumVersion);
-        checkTLSVersion(config.serverMinimumVersion);
+        checkTLSVersions(config.clientSupportedVersions);
+        checkTLSVersions(config.serverSupportedVersions);
 
         this.config = config;
     }
@@ -60,8 +63,8 @@ public class TlsTestCase extends TestCase
 
         SecureRandom secureRandom = new SecureRandom();
         
-        PipedInputStream clientRead = new PipedInputStream();
-        PipedInputStream serverRead = new PipedInputStream();
+        PipedInputStream clientRead = TlsTestUtils.createPipedInputStream();
+        PipedInputStream serverRead = TlsTestUtils.createPipedInputStream();
         PipedOutputStream clientWrite = new PipedOutputStream(serverRead);
         PipedOutputStream serverWrite = new PipedOutputStream(clientRead);
 

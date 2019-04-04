@@ -18,8 +18,8 @@ public class TlsSRPProtocolTest
     {
         SecureRandom secureRandom = new SecureRandom();
 
-        PipedInputStream clientRead = new PipedInputStream();
-        PipedInputStream serverRead = new PipedInputStream();
+        PipedInputStream clientRead = TlsTestUtils.createPipedInputStream();
+        PipedInputStream serverRead = TlsTestUtils.createPipedInputStream();
         PipedOutputStream clientWrite = new PipedOutputStream(serverRead);
         PipedOutputStream serverWrite = new PipedOutputStream(clientRead);
 
@@ -29,7 +29,7 @@ public class TlsSRPProtocolTest
         ServerThread serverThread = new ServerThread(serverProtocol);
         serverThread.start();
 
-        MockSRPTlsClient client = new MockSRPTlsClient(null, MockSRPTlsServer.TEST_IDENTITY, MockSRPTlsServer.TEST_PASSWORD);
+        MockSRPTlsClient client = new MockSRPTlsClient(null, MockSRPTlsServer.TEST_SRP_IDENTITY);
         clientProtocol.connect(client);
 
         // NOTE: Because we write-all before we read-any, this length can't be more than the pipe capacity

@@ -56,7 +56,7 @@ public class MockDTLSServer
             ClientCertificateType.dss_sign, ClientCertificateType.ecdsa_sign };
 
         Vector serverSigAlgs = null;
-        if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(serverVersion))
+        if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(context.getServerVersion()))
         {
             serverSigAlgs = TlsUtils.getDefaultSupportedSignatureAlgorithms(context);
         }
@@ -86,14 +86,9 @@ public class MockDTLSServer
         }
     }
 
-    protected ProtocolVersion getMaximumVersion()
+    public ProtocolVersion[] getSupportedVersions()
     {
-        return ProtocolVersion.DTLSv12;
-    }
-
-    protected ProtocolVersion getMinimumVersion()
-    {
-        return ProtocolVersion.DTLSv10;
+        return ProtocolVersion.DTLSv12.downTo(ProtocolVersion.DTLSv10);
     }
 
     protected TlsCredentialedDecryptor getRSAEncryptionCredentials()
@@ -105,7 +100,7 @@ public class MockDTLSServer
 
     protected TlsCredentialedSigner getRSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentials(context, supportedSignatureAlgorithms, SignatureAlgorithm.rsa,
-            "x509-server-rsa-sign.pem", "x509-server-key-rsa-sign.pem");
+        Vector clientSigAlgs = context.getSecurityParametersHandshake().getClientSigAlgs();
+        return TlsTestUtils.loadSignerCredentialsServer(context, clientSigAlgs, SignatureAlgorithm.rsa);
     }
 }

@@ -1,7 +1,6 @@
 package org.bouncycastle.tls;
 
 import java.io.IOException;
-import java.util.Vector;
 
 import org.bouncycastle.tls.crypto.TlsDHConfig;
 import org.bouncycastle.tls.crypto.TlsECConfig;
@@ -9,88 +8,85 @@ import org.bouncycastle.tls.crypto.TlsECConfig;
 public class DefaultTlsKeyExchangeFactory
     extends AbstractTlsKeyExchangeFactory
 {
-    public TlsKeyExchange createDHKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfigVerifier dhConfigVerifier) throws IOException
+    public TlsKeyExchange createDHKeyExchange(int keyExchange) throws IOException
     {
-        return new TlsDHKeyExchange(keyExchange, supportedSignatureAlgorithms, dhConfigVerifier);
+        return new TlsDHKeyExchange(keyExchange);
     }
 
-    public TlsKeyExchange createDHKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfig dhConfig) throws IOException
-    {
-        return new TlsDHKeyExchange(keyExchange, supportedSignatureAlgorithms, dhConfig);
-    }
-
-    public TlsKeyExchange createDHEKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfigVerifier dhConfigVerifier) throws IOException
-    {
-        return new TlsDHEKeyExchange(keyExchange, supportedSignatureAlgorithms, dhConfigVerifier);
-    }
-
-    public TlsKeyExchange createDHEKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfig dhConfig) throws IOException
-    {
-        return new TlsDHEKeyExchange(keyExchange, supportedSignatureAlgorithms, dhConfig);
-    }
-
-    public TlsKeyExchange createECDHKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfigVerifier ecConfigVerifier, short[] clientECPointFormats, short[] serverECPointFormats)
+    public TlsKeyExchange createDHanonKeyExchangeClient(int keyExchange, TlsDHGroupVerifier dhGroupVerifier)
         throws IOException
     {
-        return new TlsECDHKeyExchange(keyExchange, supportedSignatureAlgorithms, ecConfigVerifier, clientECPointFormats,
-            serverECPointFormats);
+        return new TlsDHanonKeyExchange(keyExchange, dhGroupVerifier);
     }
 
-    public TlsKeyExchange createECDHKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfig ecConfig, short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createDHanonKeyExchangeServer(int keyExchange, TlsDHConfig dhConfig) throws IOException
     {
-        return new TlsECDHKeyExchange(keyExchange, supportedSignatureAlgorithms, ecConfig, serverECPointFormats);
+        return new TlsDHanonKeyExchange(keyExchange, dhConfig);
     }
 
-    public TlsKeyExchange createECDHEKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfigVerifier ecConfigVerifier, short[] clientECPointFormats, short[] serverECPointFormats)
+    public TlsKeyExchange createDHEKeyExchangeClient(int keyExchange, TlsDHGroupVerifier dhGroupVerifier)
         throws IOException
     {
-        return new TlsECDHEKeyExchange(keyExchange, supportedSignatureAlgorithms, ecConfigVerifier,
-            clientECPointFormats, serverECPointFormats);
+        return new TlsDHEKeyExchange(keyExchange, dhGroupVerifier);
     }
 
-    public TlsKeyExchange createECDHEKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfig ecConfig, short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createDHEKeyExchangeServer(int keyExchange, TlsDHConfig dhConfig) throws IOException
     {
-        return new TlsECDHEKeyExchange(keyExchange, supportedSignatureAlgorithms, ecConfig, serverECPointFormats);
+        return new TlsDHEKeyExchange(keyExchange, dhConfig);
     }
 
-    public TlsKeyExchange createPSKKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsPSKIdentity pskIdentity, TlsDHConfigVerifier dhConfigVerifier, TlsECConfigVerifier ecConfigVerifier,
-        short[] clientECPointFormats, short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createECDHKeyExchange(int keyExchange) throws IOException
     {
-        return new TlsPSKKeyExchange(keyExchange, supportedSignatureAlgorithms, pskIdentity, dhConfigVerifier,
-            ecConfigVerifier, clientECPointFormats, serverECPointFormats);
+        return new TlsECDHKeyExchange(keyExchange);
     }
 
-    public TlsKeyExchange createPSKKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsPSKIdentityManager pskIdentityManager, TlsDHConfig dhConfig, TlsECConfig ecConfig,
-        short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createECDHanonKeyExchangeClient(int keyExchange) throws IOException
     {
-        return new TlsPSKKeyExchange(keyExchange, supportedSignatureAlgorithms, null, pskIdentityManager, dhConfig,
-            ecConfig, serverECPointFormats);
+        return new TlsECDHanonKeyExchange(keyExchange);
     }
 
-    public TlsKeyExchange createRSAKeyExchange(Vector supportedSignatureAlgorithms) throws IOException
+    public TlsKeyExchange createECDHanonKeyExchangeServer(int keyExchange, TlsECConfig ecConfig) throws IOException
     {
-        return new TlsRSAKeyExchange(supportedSignatureAlgorithms);
+        return new TlsECDHanonKeyExchange(keyExchange, ecConfig);
     }
 
-    public TlsKeyExchange createSRPKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsSRPConfigVerifier srpConfigVerifier, byte[] identity, byte[] password) throws IOException
+    public TlsKeyExchange createECDHEKeyExchangeClient(int keyExchange)
+        throws IOException
     {
-        return new TlsSRPKeyExchange(keyExchange, supportedSignatureAlgorithms, srpConfigVerifier, identity, password);
+        return new TlsECDHEKeyExchange(keyExchange);
     }
 
-    public TlsKeyExchange createSRPKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        byte[] identity, TlsSRPLoginParameters loginParameters) throws IOException
+    public TlsKeyExchange createECDHEKeyExchangeServer(int keyExchange, TlsECConfig ecConfig) throws IOException
     {
-        return new TlsSRPKeyExchange(keyExchange, supportedSignatureAlgorithms, identity, loginParameters);
+        return new TlsECDHEKeyExchange(keyExchange, ecConfig);
+    }
+
+    public TlsKeyExchange createPSKKeyExchangeClient(int keyExchange, TlsPSKIdentity pskIdentity,
+        TlsDHGroupVerifier dhGroupVerifier) throws IOException
+    {
+        return new TlsPSKKeyExchange(keyExchange, pskIdentity, dhGroupVerifier);
+    }
+
+    public TlsKeyExchange createPSKKeyExchangeServer(int keyExchange, TlsPSKIdentityManager pskIdentityManager,
+        TlsDHConfig dhConfig, TlsECConfig ecConfig) throws IOException
+    {
+        return new TlsPSKKeyExchange(keyExchange, pskIdentityManager, dhConfig, ecConfig);
+    }
+
+    public TlsKeyExchange createRSAKeyExchange(int keyExchange) throws IOException
+    {
+        return new TlsRSAKeyExchange(keyExchange);
+    }
+
+    public TlsKeyExchange createSRPKeyExchangeClient(int keyExchange, TlsSRPIdentity srpIdentity,
+        TlsSRPConfigVerifier srpConfigVerifier) throws IOException
+    {
+        return new TlsSRPKeyExchange(keyExchange, srpIdentity, srpConfigVerifier);
+    }
+
+    public TlsKeyExchange createSRPKeyExchangeServer(int keyExchange, TlsSRPLoginParameters loginParameters)
+        throws IOException
+    {
+        return new TlsSRPKeyExchange(keyExchange, loginParameters);
     }
 }

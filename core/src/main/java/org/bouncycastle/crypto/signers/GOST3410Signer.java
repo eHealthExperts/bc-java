@@ -5,18 +5,19 @@ import java.security.SecureRandom;
 
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.CryptoServicesRegistrar;
-import org.bouncycastle.crypto.DSA;
+import org.bouncycastle.crypto.DSAExt;
 import org.bouncycastle.crypto.params.GOST3410KeyParameters;
 import org.bouncycastle.crypto.params.GOST3410Parameters;
 import org.bouncycastle.crypto.params.GOST3410PrivateKeyParameters;
 import org.bouncycastle.crypto.params.GOST3410PublicKeyParameters;
 import org.bouncycastle.crypto.params.ParametersWithRandom;
+import org.bouncycastle.util.BigIntegers;
 
 /**
  * GOST R 34.10-94 Signature Algorithm
  */
 public class GOST3410Signer
-        implements DSA
+        implements DSAExt
 {
         GOST3410KeyParameters key;
 
@@ -47,6 +48,11 @@ public class GOST3410Signer
             }
         }
 
+        public BigInteger getOrder()
+        {
+            return key.getParameters().getQ();
+        }
+
         /**
          * generate a signature for the given message using the key we were
          * initialised with. For conventional GOST3410 the message should be a GOST3411
@@ -69,7 +75,7 @@ public class GOST3410Signer
 
             do
             {
-                k = new BigInteger(params.getQ().bitLength(), random);
+                k = BigIntegers.createRandomBigInteger(params.getQ().bitLength(), random);
             }
             while (k.compareTo(params.getQ()) >= 0);
 

@@ -93,7 +93,7 @@ public interface TlsCrypto {
      *            the algorithm of interest.
      * @return true if signatureAlgorithm is supported, false otherwise.
      */
-    boolean hasSignatureAlgorithm(int signatureAlgorithm);
+    boolean hasSignatureAlgorithm(short signatureAlgorithm);
 
     /**
      * Return true if this TlsCrypto can support the passed in signature algorithm.

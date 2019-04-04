@@ -2,14 +2,13 @@ package org.bouncycastle.pqc.crypto.xmss;
 
 import java.io.IOException;
 
-import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.util.Arrays;
 
 /**
  * XMSS^MT Private Key.
  */
 public final class XMSSMTPrivateKeyParameters
-    extends AsymmetricKeyParameter
+    extends XMSSMTKeyParameters
     implements XMSSStoreableObjectInterface
 {
 
@@ -23,7 +22,7 @@ public final class XMSSMTPrivateKeyParameters
 
     private XMSSMTPrivateKeyParameters(Builder builder)
     {
-        super(true);
+        super(true, builder.params.getDigest().getAlgorithmName());
         params = builder.params;
         if (params == null)
         {
@@ -72,8 +71,7 @@ public final class XMSSMTPrivateKeyParameters
             {
                 BDSStateMap bdsImport = (BDSStateMap)XMSSUtil.deserialize(bdsStateBinary, BDSStateMap.class);
 
-                bdsImport.setXMSS(builder.xmss);
-                bdsState = bdsImport;
+                bdsState = bdsImport.withWOTSDigest(DigestUtil.getDigestOID(builder.xmss.getDigest().getAlgorithmName()));
             }
             catch (IOException e)
             {
@@ -273,6 +271,11 @@ public final class XMSSMTPrivateKeyParameters
     public long getIndex()
     {
         return index;
+    }
+
+    public long getUsagesRemaining()
+    {
+        return (1L << this.getParameters().getHeight()) - this.getIndex();
     }
 
     public byte[] getSecretKeySeed()

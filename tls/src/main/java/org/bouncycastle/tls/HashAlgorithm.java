@@ -13,6 +13,11 @@ public class HashAlgorithm
     public static final short sha384 = 5;
     public static final short sha512 = 6;
 
+    /*
+     * RFC 8422
+     */
+    public static final short Intrinsic = 8;
+
     public static String getName(short hashAlgorithm)
     {
         switch (hashAlgorithm)
@@ -31,8 +36,31 @@ public class HashAlgorithm
             return "sha384";
         case sha512:
             return "sha512";
+        case Intrinsic:
+            return "Intrinsic";
         default:
             return "UNKNOWN";
+        }
+    }
+
+    public static int getOutputSize(short hashAlgorithm)
+    {
+        switch (hashAlgorithm)
+        {
+        case md5:
+            return 16;
+        case sha1:
+            return 20;
+        case sha224:
+            return 28;
+        case sha256:
+            return 32;
+        case sha384:
+            return 48;
+        case sha512:
+            return 64;
+        default:
+            return -1;
         }
     }
 
@@ -56,6 +84,7 @@ public class HashAlgorithm
         case sha256:
         case sha384:
         case sha512:
+        case Intrinsic:
             return true;
         default:
             return false;

@@ -388,7 +388,7 @@ public class TeleTrusTNamedCurves
      * contained in this structure.
      */
     public static Enumeration getNames()
-    {
+    {    // we need to use names so we get the mixed case names.
         return names.elements();
     }
 

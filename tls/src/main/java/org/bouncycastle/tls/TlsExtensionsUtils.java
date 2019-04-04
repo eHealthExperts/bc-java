@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.Hashtable;
 import java.util.Vector;
 
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
 
 public class TlsExtensionsUtils
@@ -13,15 +14,20 @@ public class TlsExtensionsUtils
     public static final Integer EXT_application_layer_protocol_negotiation = Integers.valueOf(ExtensionType.application_layer_protocol_negotiation);
     public static final Integer EXT_client_certificate_type = Integers.valueOf(ExtensionType.client_certificate_type);
     public static final Integer EXT_client_certificate_url = Integers.valueOf(ExtensionType.client_certificate_url);
+    public static final Integer EXT_ec_point_formats = Integers.valueOf(ExtensionType.ec_point_formats);
     public static final Integer EXT_encrypt_then_mac = Integers.valueOf(ExtensionType.encrypt_then_mac);
     public static final Integer EXT_extended_master_secret = Integers.valueOf(ExtensionType.extended_master_secret);
     public static final Integer EXT_heartbeat = Integers.valueOf(ExtensionType.heartbeat);
     public static final Integer EXT_max_fragment_length = Integers.valueOf(ExtensionType.max_fragment_length);
     public static final Integer EXT_padding = Integers.valueOf(ExtensionType.padding);
+    public static final Integer EXT_record_size_limit = Integers.valueOf(ExtensionType.record_size_limit);
     public static final Integer EXT_server_certificate_type = Integers.valueOf(ExtensionType.server_certificate_type);
     public static final Integer EXT_server_name = Integers.valueOf(ExtensionType.server_name);
+    public static final Integer EXT_signature_algorithms = Integers.valueOf(ExtensionType.signature_algorithms);
+    public static final Integer EXT_signature_algorithms_cert = Integers.valueOf(ExtensionType.signature_algorithms_cert);
     public static final Integer EXT_status_request = Integers.valueOf(ExtensionType.status_request);
     public static final Integer EXT_supported_groups = Integers.valueOf(ExtensionType.supported_groups);
+    public static final Integer EXT_supported_versions = Integers.valueOf(ExtensionType.supported_versions);
     public static final Integer EXT_truncated_hmac = Integers.valueOf(ExtensionType.truncated_hmac);
     public static final Integer EXT_trusted_ca_keys = Integers.valueOf(ExtensionType.trusted_ca_keys);
 
@@ -88,6 +94,12 @@ public class TlsExtensionsUtils
         extensions.put(EXT_padding, createPaddingExtension(dataLength));
     }
 
+    public static void addRecordSizeLimitExtension(Hashtable extensions, int recordSizeLimit)
+        throws IOException
+    {
+        extensions.put(EXT_record_size_limit, createRecordSizeLimitExtension(recordSizeLimit));
+    }
+
     public static void addServerCertificateTypeExtensionClient(Hashtable extensions, short[] certificateTypes)
         throws IOException
     {
@@ -100,10 +112,35 @@ public class TlsExtensionsUtils
         extensions.put(EXT_server_certificate_type, createCertificateTypeExtensionServer(certificateType));
     }
 
+    /** @deprecated Use {@link #addServerNameExtensionClient(Hashtable, Vector)} instead. */
     public static void addServerNameExtension(Hashtable extensions, ServerNameList serverNameList)
         throws IOException
     {
         extensions.put(EXT_server_name, createServerNameExtension(serverNameList));
+    }
+
+    public static void addServerNameExtensionClient(Hashtable extensions, Vector serverNameList)
+        throws IOException
+    {
+        extensions.put(EXT_server_name, createServerNameExtensionClient(serverNameList));
+    }
+
+    public static void addServerNameExtensionServer(Hashtable extensions)
+        throws IOException
+    {
+        extensions.put(EXT_server_name, createServerNameExtensionServer());
+    }
+
+    public static void addSignatureAlgorithmsExtension(Hashtable extensions, Vector supportedSignatureAlgorithms)
+        throws IOException
+    {
+        extensions.put(EXT_signature_algorithms, createSignatureAlgorithmsExtension(supportedSignatureAlgorithms));
+    }
+
+    public static void addSignatureAlgorithmsCertExtension(Hashtable extensions, Vector supportedSignatureAlgorithms)
+        throws IOException
+    {
+        extensions.put(EXT_signature_algorithms_cert, createSignatureAlgorithmsCertExtension(supportedSignatureAlgorithms));
     }
 
     public static void addStatusRequestExtension(Hashtable extensions, CertificateStatusRequest statusRequest)
@@ -115,6 +152,22 @@ public class TlsExtensionsUtils
     public static void addSupportedGroupsExtension(Hashtable extensions, Vector namedGroups) throws IOException
     {
         extensions.put(EXT_supported_groups, createSupportedGroupsExtension(namedGroups));
+    }
+
+    public static void addSupportedPointFormatsExtension(Hashtable extensions, short[] ecPointFormats)
+        throws IOException
+    {
+        extensions.put(EXT_ec_point_formats, createSupportedPointFormatsExtension(ecPointFormats));
+    }
+
+    public static void addSupportedVersionsExtensionClient(Hashtable extensions, ProtocolVersion[] versions) throws IOException
+    {
+        extensions.put(EXT_supported_versions, createSupportedVersionsExtensionClient(versions));
+    }
+
+    public static void addSupportedVersionsExtensionServer(Hashtable extensions, ProtocolVersion selectedVersion) throws IOException
+    {
+        extensions.put(EXT_supported_versions, createSupportedVersionsExtensionServer(selectedVersion));
     }
 
     public static void addTruncatedHMacExtension(Hashtable extensions)
@@ -183,6 +236,13 @@ public class TlsExtensionsUtils
         return extensionData == null ? -1 : readPaddingExtension(extensionData);
     }
 
+    public static int getRecordSizeLimitExtension(Hashtable extensions)
+        throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_record_size_limit);
+        return extensionData == null ? -1 : readRecordSizeLimitExtension(extensionData);
+    }
+
     public static short[] getServerCertificateTypeExtensionClient(Hashtable extensions)
         throws IOException
     {
@@ -197,11 +257,33 @@ public class TlsExtensionsUtils
         return extensionData == null ? -1 : readCertificateTypeExtensionServer(extensionData);
     }
 
+    /** @deprecated Use {@link #getServerNameExtensionClient(Hashtable)} instead. */
     public static ServerNameList getServerNameExtension(Hashtable extensions)
         throws IOException
     {
         byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_server_name);
         return extensionData == null ? null : readServerNameExtension(extensionData);
+    }
+
+    public static Vector getServerNameExtensionClient(Hashtable extensions)
+        throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_server_name);
+        return extensionData == null ? null : readServerNameExtensionClient(extensionData);
+    }
+
+    public static Vector getSignatureAlgorithmsExtension(Hashtable extensions)
+        throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_signature_algorithms);
+        return extensionData == null ? null : readSignatureAlgorithmsExtension(extensionData);
+    }
+
+    public static Vector getSignatureAlgorithmsCertExtension(Hashtable extensions)
+        throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_signature_algorithms_cert);
+        return extensionData == null ? null : readSignatureAlgorithmsCertExtension(extensionData);
     }
 
     public static CertificateStatusRequest getStatusRequestExtension(Hashtable extensions)
@@ -215,6 +297,24 @@ public class TlsExtensionsUtils
     {
         byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_supported_groups);
         return extensionData == null ? null : readSupportedGroupsExtension(extensionData);
+    }
+
+    public static short[] getSupportedPointFormatsExtension(Hashtable extensions) throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_ec_point_formats);
+        return extensionData == null ? null : readSupportedPointFormatsExtension(extensionData);
+    }
+
+    public static ProtocolVersion[] getSupportedVersionsExtensionClient(Hashtable extensions) throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_supported_versions);
+        return extensionData == null ? null : readSupportedVersionsExtensionClient(extensionData);
+    }
+
+    public static ProtocolVersion getSupportedVersionsExtensionServer(Hashtable extensions) throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_supported_versions);
+        return extensionData == null ? null : readSupportedVersionsExtensionServer(extensionData);
     }
 
     public static Vector getTrustedCAKeysExtensionClient(Hashtable extensions)
@@ -240,6 +340,13 @@ public class TlsExtensionsUtils
     {
         byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_extended_master_secret);
         return extensionData == null ? false : readExtendedMasterSecretExtension(extensionData);
+    }
+
+    public static boolean hasServerNameExtensionServer(Hashtable extensions)
+        throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_server_name);
+        return extensionData == null ? false : readServerNameExtensionServer(extensionData);
     }
 
     public static boolean hasTruncatedHMacExtension(Hashtable extensions) throws IOException
@@ -354,6 +461,18 @@ public class TlsExtensionsUtils
         return new byte[dataLength];
     }
 
+    public static byte[] createRecordSizeLimitExtension(int recordSizeLimit)
+        throws IOException
+    {
+        if (recordSizeLimit < 64)
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        return TlsUtils.encodeUint16(recordSizeLimit);
+    }
+
+    /** @deprecated Use {@link #createServerNameExtensionClient(Vector)} instead. */
     public static byte[] createServerNameExtension(ServerNameList serverNameList)
         throws IOException
     {
@@ -367,6 +486,42 @@ public class TlsExtensionsUtils
         serverNameList.encode(buf);
 
         return buf.toByteArray();
+    }
+
+    public static byte[] createServerNameExtensionClient(Vector serverNameList)
+        throws IOException
+    {
+        if (serverNameList == null)
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+
+        new ServerNameList(serverNameList).encode(buf);
+
+        return buf.toByteArray();
+    }
+
+    public static byte[] createServerNameExtensionServer()
+    {
+        return createEmptyExtensionData();
+    }
+
+    public static byte[] createSignatureAlgorithmsExtension(Vector supportedSignatureAlgorithms)
+        throws IOException
+    {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+
+        TlsUtils.encodeSupportedSignatureAlgorithms(supportedSignatureAlgorithms, buf);
+
+        return buf.toByteArray();
+    }
+
+    public static byte[] createSignatureAlgorithmsCertExtension(Vector supportedSignatureAlgorithms)
+        throws IOException
+    {
+        return createSignatureAlgorithmsExtension(supportedSignatureAlgorithms);
     }
 
     public static byte[] createStatusRequestExtension(CertificateStatusRequest statusRequest)
@@ -399,6 +554,44 @@ public class TlsExtensionsUtils
         }
 
         return TlsUtils.encodeUint16ArrayWithUint16Length(values);
+    }
+
+    public static byte[] createSupportedPointFormatsExtension(short[] ecPointFormats) throws IOException
+    {
+        if (ecPointFormats == null || !Arrays.contains(ecPointFormats, ECPointFormat.uncompressed))
+        {
+            /*
+             * RFC 4492 5.1. If the Supported Point Formats Extension is indeed sent, it MUST
+             * contain the value 0 (uncompressed) as one of the items in the list of point formats.
+             */
+
+            // NOTE: We add it at the start (highest preference)
+            ecPointFormats = Arrays.prepend(ecPointFormats, ECPointFormat.uncompressed);
+        }
+
+        return TlsUtils.encodeUint8ArrayWithUint8Length(ecPointFormats);
+    }
+
+    public static byte[] createSupportedVersionsExtensionClient(ProtocolVersion[] versions) throws IOException
+    {
+        if (versions == null || versions.length < 1 || versions.length > 127)
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        int count = versions.length;
+        byte[] data = new byte[1 + count * 2];
+        TlsUtils.writeUint8(count * 2, data, 0);
+        for (int i = 0; i < count; ++i)
+        {
+            TlsUtils.writeVersion((ProtocolVersion)versions[i], data, 1 + i * 2);
+        }
+        return data;
+    }
+
+    public static byte[] createSupportedVersionsExtensionServer(ProtocolVersion selectedVersion) throws IOException
+    {
+        return TlsUtils.encodeVersion(selectedVersion);
     }
 
     public static byte[] createTruncatedHMacExtension()
@@ -556,6 +749,19 @@ public class TlsExtensionsUtils
         return extensionData.length;
     }
 
+    public static int readRecordSizeLimitExtension(byte[] extensionData)
+        throws IOException
+    {
+        int recordSizeLimit = TlsUtils.decodeUint16(extensionData);
+        if (recordSizeLimit < 64)
+        {
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+
+        return recordSizeLimit;
+    }
+
+    /** @deprecated Use {@link #readServerNameExtensionClient(byte[])} instead. */
     public static ServerNameList readServerNameExtension(byte[] extensionData)
         throws IOException
     {
@@ -571,6 +777,51 @@ public class TlsExtensionsUtils
         TlsProtocol.assertEmpty(buf);
 
         return serverNameList;
+    }
+
+    public static Vector readServerNameExtensionClient(byte[] extensionData)
+        throws IOException
+    {
+        if (extensionData == null)
+        {
+            throw new IllegalArgumentException("'extensionData' cannot be null");
+        }
+
+        ByteArrayInputStream buf = new ByteArrayInputStream(extensionData);
+
+        ServerNameList serverNameList = ServerNameList.parse(buf);
+
+        TlsProtocol.assertEmpty(buf);
+
+        return serverNameList.getServerNameList();
+    }
+
+    public static boolean readServerNameExtensionServer(byte[] extensionData) throws IOException
+    {
+        return readEmptyExtensionData(extensionData);
+    }
+
+    public static Vector readSignatureAlgorithmsExtension(byte[] extensionData)
+        throws IOException
+    {
+        if (extensionData == null)
+        {
+            throw new IllegalArgumentException("'extensionData' cannot be null");
+        }
+
+        ByteArrayInputStream buf = new ByteArrayInputStream(extensionData);
+
+        Vector supported_signature_algorithms = TlsUtils.parseSupportedSignatureAlgorithms(buf);
+
+        TlsProtocol.assertEmpty(buf);
+
+        return supported_signature_algorithms;
+    }
+
+    public static Vector readSignatureAlgorithmsCertExtension(byte[] extensionData)
+        throws IOException
+    {
+        return readSignatureAlgorithmsExtension(extensionData);
     }
 
     public static CertificateStatusRequest readStatusRequestExtension(byte[] extensionData)
@@ -612,6 +863,59 @@ public class TlsExtensionsUtils
         return namedGroups;
     }
 
+    public static short[] readSupportedPointFormatsExtension(byte[] extensionData) throws IOException
+    {
+        short[] ecPointFormats = TlsUtils.decodeUint8ArrayWithUint8Length(extensionData);
+        if (!Arrays.contains(ecPointFormats, ECPointFormat.uncompressed))
+        {
+            /*
+             * RFC 4492 5.1. If the Supported Point Formats Extension is indeed sent, it MUST
+             * contain the value 0 (uncompressed) as one of the items in the list of point formats.
+             */
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+        return ecPointFormats;
+    }
+
+    public static ProtocolVersion[] readSupportedVersionsExtensionClient(byte[] extensionData) throws IOException
+    {
+        if (extensionData == null)
+        {
+            throw new IllegalArgumentException("'extensionData' cannot be null");
+        }
+        if (extensionData.length < 3 || extensionData.length > 255 || (extensionData.length & 1) == 0)
+        {
+            throw new TlsFatalAlert(AlertDescription.decode_error);
+        }
+
+        int length = TlsUtils.readUint8(extensionData, 0);
+        if (length != (extensionData.length - 1))
+        {
+            throw new TlsFatalAlert(AlertDescription.decode_error);
+        }
+
+        int count = length / 2;
+        ProtocolVersion[] versions = new ProtocolVersion[count];
+        for (int i = 0; i < count; ++i)
+        {
+            versions[i] = TlsUtils.readVersion(extensionData, 1 + i * 2);
+        }
+        return versions;
+    }
+
+    public static ProtocolVersion readSupportedVersionsExtensionServer(byte[] extensionData) throws IOException
+    {
+        if (extensionData == null)
+        {
+            throw new IllegalArgumentException("'extensionData' cannot be null");
+        }
+        if (extensionData.length != 2)
+        {
+            throw new TlsFatalAlert(AlertDescription.decode_error);
+        }
+        return TlsUtils.readVersion(extensionData, 0);
+    }
+
     public static boolean readTruncatedHMacExtension(byte[] extensionData) throws IOException
     {
         return readEmptyExtensionData(extensionData);
@@ -622,6 +926,10 @@ public class TlsExtensionsUtils
         if (extensionData == null)
         {
             throw new IllegalArgumentException("'extensionData' cannot be null");
+        }
+        if (extensionData.length < 2)
+        {
+            throw new TlsFatalAlert(AlertDescription.decode_error);
         }
 
         ByteArrayInputStream buf = new ByteArrayInputStream(extensionData);

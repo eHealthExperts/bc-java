@@ -9,7 +9,6 @@ import java.security.KeyPairGenerator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
@@ -32,6 +31,18 @@ import org.bouncycastle.util.BigIntegers;
 public class JceTlsDHDomain
     implements TlsDHDomain
 {
+    private static byte[] encodeValue(DHParameterSpec dh, boolean padded, BigInteger x)
+    {
+        return padded
+            ?   BigIntegers.asUnsignedByteArray(getValueLength(dh), x)
+            :   BigIntegers.asUnsignedByteArray(x);
+    }
+
+    private static int getValueLength(DHParameterSpec dh)
+    {
+        return (dh.getP().bitLength() + 7) / 8;
+    }
+
     public static DHParameterSpec getParameters(TlsDHConfig dhConfig)
     {
         DHGroup dhGroup = TlsDHUtils.getDHGroup(dhConfig);
@@ -67,6 +78,7 @@ public class JceTlsDHDomain
              * used as the pre_master_secret. We use the convention established by the JSSE to signal this
              * by asking for "TlsPremasterSecret".
              */
+<<<<<<< HEAD
             SecretKey secretKey = crypto.calculateKeyAgreement("DH", privateKey, publicKey, "TlsPremasterSecret");
 
             // TODO Need to consider cases where SecretKey may not be encodable
@@ -79,6 +91,11 @@ public class JceTlsDHDomain
             }
             
             return adoptLocalSecret;
+=======
+            byte[] secret = crypto.calculateKeyAgreement("DH", privateKey, publicKey, "TlsPremasterSecret");
+
+            return crypto.adoptLocalSecret(secret);
+>>>>>>> r1rv61
         }
         catch (GeneralSecurityException e)
         {
@@ -119,12 +136,12 @@ public class JceTlsDHDomain
 
     public byte[] encodeParameter(BigInteger x) throws IOException
     {
-        return BigIntegers.asUnsignedByteArray(x);
+        return encodeValue(dhParameterSpec, false, x);
     }
 
     public byte[] encodePublicKey(DHPublicKey publicKey) throws IOException
     {
-        return encodeParameter(publicKey.getY());
+        return encodeValue(dhParameterSpec, true, publicKey.getY());
     }
 
     public KeyPair generateKeyPair() throws IOException

@@ -23,6 +23,23 @@ public class RFC6637Utils
     // "Anonymous Sender    ", which is the octet sequence
     private static final byte[] ANONYMOUS_SENDER = Hex.decode("416E6F6E796D6F75732053656E64657220202020");
 
+    public static String getXDHAlgorithm(PublicKeyPacket pubKeyData)
+    {
+        ECDHPublicBCPGKey ecKey = (ECDHPublicBCPGKey)pubKeyData.getKey();
+
+        switch (ecKey.getHashAlgorithm())
+        {
+        case HashAlgorithmTags.SHA256:
+            return "X25519withSHA256CKDF";
+        case HashAlgorithmTags.SHA384:
+            return "X25519withSHA384CKDF";
+        case HashAlgorithmTags.SHA512:
+            return "X25519withSHA512CKDF";
+        default:
+            throw new IllegalArgumentException("Unknown hash algorithm specified: " + ecKey.getHashAlgorithm());
+        }
+    }
+
     public static String getAgreementAlgorithm(PublicKeyPacket pubKeyData)
     {
         ECDHPublicBCPGKey ecKey = (ECDHPublicBCPGKey)pubKeyData.getKey();

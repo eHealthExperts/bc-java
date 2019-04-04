@@ -1,15 +1,12 @@
 package org.bouncycastle.pqc.crypto.xmss;
 
-import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
-
 /**
  * XMSS^MT Public Key.
  */
 public final class XMSSMTPublicKeyParameters
-    extends AsymmetricKeyParameter
+    extends XMSSMTKeyParameters
     implements XMSSStoreableObjectInterface
 {
-
     private final XMSSMTParameters params;
     // private final int oid;
     private final byte[] root;
@@ -17,7 +14,7 @@ public final class XMSSMTPublicKeyParameters
 
     private XMSSMTPublicKeyParameters(Builder builder)
     {
-        super(false);
+        super(false, builder.params.getDigest().getAlgorithmName());
         params = builder.params;
         if (params == null)
         {

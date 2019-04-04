@@ -24,6 +24,11 @@ public abstract class ECFieldElement
     public abstract ECFieldElement invert();
     public abstract ECFieldElement sqrt();
 
+    public ECFieldElement()
+    {
+
+    }
+    
     public int bitLength()
     {
         return toBigInteger().bitLength();
@@ -499,7 +504,7 @@ public abstract class ECFieldElement
     {
         public ECFieldElement halfTrace()
         {
-            int m = getFieldSize();
+            int m = this.getFieldSize();
             if ((m & 1) == 0)
             {
                 throw new IllegalStateException("Half-trace only defined for odd m");
@@ -518,7 +523,7 @@ public abstract class ECFieldElement
 
         public int trace()
         {
-            int m = getFieldSize();
+            int m = this.getFieldSize();
             ECFieldElement fe = this;
             ECFieldElement tr = fe;
             for (int i = 1; i < m; ++i)

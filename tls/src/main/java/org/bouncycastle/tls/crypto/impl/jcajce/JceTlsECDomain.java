@@ -19,9 +19,12 @@ import java.security.spec.EllipticCurve;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+<<<<<<< HEAD
 import javax.crypto.SecretKey;
 import javax.security.auth.DestroyFailedException;
 
+=======
+>>>>>>> r1rv61
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.tls.AlertDescription;
@@ -67,6 +70,7 @@ public class JceTlsECDomain
              *
              * We use the convention established by the JSSE to signal this by asking for "TlsPremasterSecret".
              */
+<<<<<<< HEAD
             SecretKey secretKey = crypto.calculateKeyAgreement("ECDH", privateKey, publicKey, "TlsPremasterSecret");
 
             // TODO Need to consider cases where SecretKey may not be encodable
@@ -80,6 +84,11 @@ public class JceTlsECDomain
             
             
             return adoptLocalSecret;
+=======
+            byte[] secret = crypto.calculateKeyAgreement("ECDH", privateKey, publicKey, "TlsPremasterSecret");
+
+            return crypto.adoptLocalSecret(secret);
+>>>>>>> r1rv61
         }
         catch (GeneralSecurityException e)
         {
@@ -119,7 +128,7 @@ public class JceTlsECDomain
     public byte[] encodePoint(ECPoint point)
         throws IOException
     {
-        return point.getEncoded(ecConfig.getPointCompression());
+        return point.getEncoded(false);
     }
 
     public byte[] encodePublicKey(ECPublicKey publicKey)
@@ -140,7 +149,7 @@ public class JceTlsECDomain
         }
         catch (GeneralSecurityException e)
         {
-            throw new IllegalStateException("unable to create key pair: " + e.getMessage(), e);
+            throw Exceptions.illegalStateException("unable to create key pair: " + e.getMessage(), e);
         }
     }
 
@@ -193,7 +202,7 @@ public class JceTlsECDomain
         }
         catch (GeneralSecurityException e)
         {
-            throw new IllegalStateException("unable to create key pair: " + e.getMessage(), e);
+            throw Exceptions.illegalStateException("unable to create key pair: " + e.getMessage(), e);
         }
     }
 

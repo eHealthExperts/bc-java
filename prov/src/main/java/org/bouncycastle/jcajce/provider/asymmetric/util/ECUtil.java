@@ -231,9 +231,20 @@ public class ECUtil
                 s = BouncyCastleProvider.CONFIGURATION.getEcImplicitlyCa();
             }
 
-            return new ECPrivateKeyParameters(
-                            k.getD(),
-                            new ECDomainParameters(s.getCurve(), s.getG(), s.getN(), s.getH(), s.getSeed()));
+            if (k.getParameters() instanceof ECNamedCurveParameterSpec)
+            {
+                String name = ((ECNamedCurveParameterSpec)k.getParameters()).getName();
+                return new ECPrivateKeyParameters(
+                    k.getD(),
+                    new ECNamedDomainParameters(ECNamedCurveTable.getOID(name),
+                        s.getCurve(), s.getG(), s.getN(), s.getH(), s.getSeed()));
+            }
+            else
+            {
+                return new ECPrivateKeyParameters(
+                    k.getD(),
+                    new ECDomainParameters(s.getCurve(), s.getG(), s.getN(), s.getH(), s.getSeed()));
+            }
         }
         else if (key instanceof java.security.interfaces.ECPrivateKey)
         {

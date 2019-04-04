@@ -14,16 +14,25 @@ import org.bouncycastle.tls.crypto.TlsStreamSigner;
 /**
  * JCA base class for the signers implementing the two DSA style algorithms from FIPS PUB 186-4: DSA and ECDSA.
  */
-public class JcaTlsDSSSigner
+public abstract class JcaTlsDSSSigner
     implements TlsSigner
 {
-    private final JcaTlsCrypto crypto;
-    private final PrivateKey privateKey;
-    private final short algorithmType;
-    private final String algorithmName;
+    protected final JcaTlsCrypto crypto;
+    protected final PrivateKey privateKey;
+    protected final short algorithmType;
+    protected final String algorithmName;
 
-    public JcaTlsDSSSigner(JcaTlsCrypto crypto, PrivateKey privateKey, short algorithmType, String algorithmName)
+    protected JcaTlsDSSSigner(JcaTlsCrypto crypto, PrivateKey privateKey, short algorithmType, String algorithmName)
     {
+        if (null == crypto)
+        {
+            throw new NullPointerException("crypto");
+        }
+        if (null == privateKey)
+        {
+            throw new NullPointerException("privateKey");
+        }
+
         this.crypto = crypto;
         this.privateKey = privateKey;
         this.algorithmType = algorithmType;

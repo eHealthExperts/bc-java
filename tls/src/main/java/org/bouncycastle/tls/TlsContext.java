@@ -14,12 +14,18 @@ public interface TlsContext
 
     SecurityParameters getSecurityParameters();
 
+    SecurityParameters getSecurityParametersConnection();
+
+    SecurityParameters getSecurityParametersHandshake();
+
     /**
      * Return true if this context is for a server, false otherwise.
      *
      * @return true for a server based context, false for a client based one.
      */
     boolean isServer();
+
+    ProtocolVersion[] getClientSupportedVersions();
 
     ProtocolVersion getClientVersion();
 

@@ -15,6 +15,9 @@ import org.bouncycastle.gpg.keybox.FirstBlob;
 import org.bouncycastle.gpg.keybox.KeyBlob;
 import org.bouncycastle.gpg.keybox.KeyBox;
 import org.bouncycastle.gpg.keybox.PublicKeyRingBlob;
+import org.bouncycastle.gpg.keybox.bc.BcBlobVerifier;
+import org.bouncycastle.gpg.keybox.bc.BcKeyBox;
+import org.bouncycastle.gpg.keybox.jcajce.JcaKeyBoxBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
@@ -46,7 +49,14 @@ public class KeyBoxTest
     public void testSuccessfulLoad()
         throws Exception
     {
-        KeyBox keyBox = new KeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/pubring.kbx"), new BcKeyFingerprintCalculator());
+        loadCheck(new BcKeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/pubring.kbx")));
+        loadCheck(new JcaKeyBoxBuilder().build(KeyBoxTest.class.getResourceAsStream("/pgpdata/pubring.kbx")));
+    }
+
+    private void loadCheck(KeyBox keyBox)
+        throws Exception
+    {
+
         FirstBlob firstBlob = keyBox.getFirstBlob();
 
 
@@ -125,7 +135,13 @@ public class KeyBoxTest
     public void testSanityElGamal()
         throws Exception
     {
-        KeyBox keyBox = new KeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/eg_pubring.kbx"), new BcKeyFingerprintCalculator());
+        testSanityElGamal_verify(new BcKeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/eg_pubring.kbx")));
+        testSanityElGamal_verify(new JcaKeyBoxBuilder().setProvider("BC").build(KeyBoxTest.class.getResourceAsStream("/pgpdata/eg_pubring.kbx")));
+    }
+
+    private void testSanityElGamal_verify(KeyBox keyBox)
+        throws Exception
+    {
         FirstBlob firstBlob = keyBox.getFirstBlob();
 
 
@@ -151,7 +167,6 @@ public class KeyBoxTest
         Iterator<PGPPublicKey> it = ring.getPublicKeys();
         it.next();
         TestCase.assertEquals("Must be ELGAMAL_ENCRYPT", PublicKeyAlgorithmTags.ELGAMAL_ENCRYPT, it.next().getAlgorithm());
-
     }
 
 
@@ -168,16 +183,31 @@ public class KeyBoxTest
 
         raw[36] ^= 1; // Single bit error in first key block.
 
+
+        // BC
         try
         {
-            new KeyBox(raw, new BcKeyFingerprintCalculator());
+            new KeyBox(raw, new BcKeyFingerprintCalculator(), new BcBlobVerifier());
             fail("Must have invalid checksum");
         }
         catch (IOException ioex)
         {
             isEquals("Blob with base offset of 32 has incorrect digest.", ioex.getMessage());
         }
+
+        // JCA
+        try
+        {
+            new JcaKeyBoxBuilder().setProvider("BC").build(raw);
+            fail("Must have invalid checksum");
+        }
+        catch (IOException ioex)
+        {
+            isEquals("Blob with base offset of 32 has incorrect digest.", ioex.getMessage());
+        }
+
     }
+
 
     public void testBrokenMagic()
         throws Exception
@@ -186,10 +216,23 @@ public class KeyBoxTest
 
         raw[8] ^= 1; // Single bit error in magic number.
 
+        // BC
         try
         {
-            new KeyBox(raw, new BcKeyFingerprintCalculator());
+            new KeyBox(raw, new BcKeyFingerprintCalculator(), new BcBlobVerifier());
             fail("Must have invalid magic");
+        }
+        catch (IOException ioex)
+        {
+            isEquals("Incorrect magic expecting 4b425866 but got 4a425866", ioex.getMessage());
+        }
+
+
+        // JCA
+        try
+        {
+            new JcaKeyBoxBuilder().setProvider("BC").build(raw);
+            fail("Must have invalid checksum");
         }
         catch (IOException ioex)
         {
@@ -202,37 +245,77 @@ public class KeyBoxTest
     {
         InputStream zulu = null;
 
+        // BC
         try
         {
-            new KeyBox(zulu, new BcKeyFingerprintCalculator());
+            new KeyBox(zulu, new BcKeyFingerprintCalculator(), new BcBlobVerifier());
             fail("Must fail.");
         }
         catch (IllegalArgumentException ioex)
         {
             isEquals("Cannot take get instance of null", ioex.getMessage());
         }
-    }
 
-    public void testDoubleFirstBlob()
-        throws Exception
-    {
+        // JCA
         try
         {
-            new KeyBox(new byte[0], new BcKeyFingerprintCalculator());
+            new JcaKeyBoxBuilder().setProvider("BC").build(zulu);
+            fail("Must fail.");
+        }
+        catch (IllegalArgumentException ioex)
+        {
+            isEquals("Cannot take get instance of null", ioex.getMessage());
+        }
+
+    }
+
+
+    public void testNoFirstBlob()
+        throws Exception
+    {
+        // BC
+        try
+        {
+            new KeyBox(new byte[0], new BcKeyFingerprintCalculator(), new BcBlobVerifier());
             fail("Must fail.");
         }
         catch (IOException ioex)
         {
             isEquals("No first blob, is the source zero length?", ioex.getMessage());
         }
-    }
 
-    public void testNoFirstBlob()
-        throws Exception
-    {
+        // JCA
         try
         {
-            new KeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/doublefirst.kbx"), new BcKeyFingerprintCalculator());
+            new JcaKeyBoxBuilder().setProvider("BC").build(new byte[0]);
+            fail("Must fail.");
+        }
+        catch (IOException ioex)
+        {
+            isEquals("No first blob, is the source zero length?", ioex.getMessage());
+        }
+
+    }
+
+    public void testDoubleFirstBlob()
+        throws Exception
+    {
+        // BC
+        try
+        {
+            new KeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/doublefirst.kbx"), new BcKeyFingerprintCalculator(), new BcBlobVerifier());
+            fail("Must fail.");
+        }
+        catch (IOException ioex)
+        {
+            isEquals("Unexpected second 'FirstBlob', there should only be one FirstBlob at the start of the file.", ioex.getMessage());
+        }
+
+
+        // JCA
+        try
+        {
+            new JcaKeyBoxBuilder().setProvider("BC").build(KeyBoxTest.class.getResourceAsStream("/pgpdata/doublefirst.kbx"));
             fail("Must fail.");
         }
         catch (IOException ioex)
@@ -247,7 +330,8 @@ public class KeyBoxTest
         //
         // Expect no failure.
         //
-        new KeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/md5kbx.kbx"), new BcKeyFingerprintCalculator());
+        new BcKeyBox(KeyBoxTest.class.getResourceAsStream("/pgpdata/md5kbx.kbx"));
+        new JcaKeyBoxBuilder().build(KeyBoxTest.class.getResourceAsStream("/pgpdata/md5kbx.kbx"));
     }
 
     public void testKeyBoxWithBrokenMD5()
@@ -257,9 +341,10 @@ public class KeyBoxTest
 
         raw[36] ^= 1; // Single bit error in first key block.
 
+        // BC
         try
         {
-            new KeyBox(raw, new BcKeyFingerprintCalculator());
+            new KeyBox(raw, new BcKeyFingerprintCalculator(), new BcBlobVerifier());
             fail("Must have invalid checksum");
         }
         catch (IOException ioex)
@@ -267,11 +352,24 @@ public class KeyBoxTest
             isEquals("Blob with base offset of 32 has incorrect digest.", ioex.getMessage());
         }
 
+        // JCA
+        try
+        {
+            new JcaKeyBoxBuilder().setProvider("BC").build(raw);
+            fail("Must have invalid checksum");
+        }
+        catch (IOException ioex)
+        {
+            isEquals("Blob with base offset of 32 has incorrect digest.", ioex.getMessage());
+        }
+
+
     }
 
     public void performTest()
         throws Exception
     {
+        testNoFirstBlob();
         testSanityElGamal();
         testKeyBoxWithBrokenMD5();
         testKeyBoxWithMD5Sanity();

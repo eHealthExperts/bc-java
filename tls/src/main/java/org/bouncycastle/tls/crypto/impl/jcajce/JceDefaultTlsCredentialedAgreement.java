@@ -8,7 +8,6 @@ import java.security.interfaces.ECPrivateKey;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.security.auth.DestroyFailedException;
 
@@ -30,7 +29,7 @@ public class JceDefaultTlsCredentialedAgreement
         {
             return "DH";
         }
-        if (privateKey instanceof ECPrivateKey)
+        if (ECUtil.isECPrivateKey(privateKey))
         {
             return "ECDH";
         }
@@ -93,8 +92,9 @@ public class JceDefaultTlsCredentialedAgreement
              */
             PublicKey publicKey = JcaTlsCertificate.convert(crypto, peerCertificate).getPublicKey();
 
-            SecretKey secretKey = crypto.calculateKeyAgreement(agreementAlgorithm, privateKey, publicKey, "TlsPremasterSecret");
+            byte[] secret = crypto.calculateKeyAgreement(agreementAlgorithm, privateKey, publicKey, "TlsPremasterSecret");
 
+<<<<<<< HEAD
             // TODO Need to consider cases where SecretKey may not be encodable
             JceTlsSecret adoptLocalSecret = crypto.adoptLocalSecret(secretKey.getEncoded());
 
@@ -105,6 +105,9 @@ public class JceDefaultTlsCredentialedAgreement
             }  
             
             return adoptLocalSecret;
+=======
+            return crypto.adoptLocalSecret(secret);
+>>>>>>> r1rv61
         }
         catch (GeneralSecurityException e)
         {

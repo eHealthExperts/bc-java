@@ -7,8 +7,9 @@ import java.util.List;
 
 import org.bouncycastle.jsse.BCSNIMatcher;
 import org.bouncycastle.jsse.BCSNIServerName;
+import org.bouncycastle.jsse.java.security.BCAlgorithmConstraints;
 
-class ProvSSLParameters
+final class ProvSSLParameters
 {
     private static <T> List<T> copyList(Collection<T> list)
     {
@@ -29,11 +30,12 @@ class ProvSSLParameters
     private String[] protocols;
     private boolean needClientAuth = false;
     private boolean wantClientAuth = false;
-    private Object algorithmConstraints;      // object not introduced till 1.6
+    private BCAlgorithmConstraints algorithmConstraints;
     private String endpointIdentificationAlgorithm;
     private boolean useCipherSuitesOrder;
     private List<BCSNIMatcher> sniMatchers;
     private List<BCSNIServerName> sniServerNames;
+    private String[] applicationProtocols = new String[0];
 
     ProvSSLParameters(ProvSSLContextSpi context, String[] cipherSuites, String[] protocols)
     {
@@ -53,7 +55,13 @@ class ProvSSLParameters
         p.useCipherSuitesOrder = useCipherSuitesOrder;
         p.sniMatchers = sniMatchers;
         p.sniServerNames = sniServerNames;
+        p.applicationProtocols = applicationProtocols;
         return p;
+    }
+
+    public String[] getCipherSuites()
+    {
+        return cipherSuites.clone();
     }
 
     public void setCipherSuites(String[] cipherSuites)
@@ -64,6 +72,17 @@ class ProvSSLParameters
         }
 
         this.cipherSuites = cipherSuites.clone();
+    }
+
+    public String[] getProtocols()
+    {
+        return protocols.clone();
+    }
+
+    String[] getProtocolsArray()
+    {
+        // NOTE: The mechanism of ProvSSLContextSpi.updateDefaultProtocols depends on this not making a copy
+        return protocols;
     }
 
     public void setProtocols(String[] protocols)
@@ -82,10 +101,20 @@ class ProvSSLParameters
         this.protocols = protocols;
     }
 
+    public boolean getNeedClientAuth()
+    {
+        return needClientAuth;
+    }
+
     public void setNeedClientAuth(boolean needClientAuth)
     {
         this.needClientAuth = needClientAuth;
         this.wantClientAuth = false;
+    }
+
+    public boolean getWantClientAuth()
+    {
+        return wantClientAuth;
     }
 
     public void setWantClientAuth(boolean wantClientAuth)
@@ -94,38 +123,12 @@ class ProvSSLParameters
         this.wantClientAuth = wantClientAuth;
     }
 
-    public String[] getCipherSuites()
-    {
-        return cipherSuites.clone();
-    }
-
-    public String[] getProtocols()
-    {
-        return protocols.clone();
-    }
-
-    String[] getProtocolsArray()
-    {
-        // NOTE: The mechanism of ProvSSLContextSpi.updateDefaultProtocols depends on this not making a copy
-        return protocols;
-    }
-
-    public boolean getNeedClientAuth()
-    {
-        return needClientAuth;
-    }
-
-    public boolean getWantClientAuth()
-    {
-        return wantClientAuth;
-    }
-
-    public Object getAlgorithmConstraints()
+    public BCAlgorithmConstraints getAlgorithmConstraints()
     {
         return algorithmConstraints;
     }
 
-    public void setAlgorithmConstraints(Object algorithmConstraints)
+    public void setAlgorithmConstraints(BCAlgorithmConstraints algorithmConstraints)
     {
         this.algorithmConstraints = algorithmConstraints;
     }
@@ -145,9 +148,9 @@ class ProvSSLParameters
         return useCipherSuitesOrder;
     }
 
-    public void setUseCipherSuitesOrder(boolean honorOrder)
+    public void setUseCipherSuitesOrder(boolean useCipherSuitesOrder)
     {
-        this.useCipherSuitesOrder = honorOrder;
+        this.useCipherSuitesOrder = useCipherSuitesOrder;
     }
 
     public List<BCSNIServerName> getServerNames()
@@ -168,5 +171,15 @@ class ProvSSLParameters
     public void setSNIMatchers(Collection<BCSNIMatcher> matchers)
     {
         this.sniMatchers = copyList(matchers);
+    }
+
+    public String[] getApplicationProtocols()
+    {
+        return applicationProtocols.clone();
+    }
+
+    public void setApplicationProtocols(String[] applicationProtocols)
+    {
+        this.applicationProtocols = applicationProtocols.clone();
     }
 }

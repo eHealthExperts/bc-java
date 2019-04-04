@@ -4,16 +4,19 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.math.BigInteger;
 import java.security.SecureRandom;
+import java.util.Vector;
 
 import org.bouncycastle.crypto.agreement.srp.SRP6VerifierGenerator;
 import org.bouncycastle.crypto.digests.SHA1Digest;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.AlertLevel;
+import org.bouncycastle.tls.BasicTlsSRPIdentity;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.SRPTlsServer;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SimulatedTlsSRPIdentityManager;
 import org.bouncycastle.tls.TlsCredentialedSigner;
+import org.bouncycastle.tls.TlsSRPIdentity;
 import org.bouncycastle.tls.TlsSRPIdentityManager;
 import org.bouncycastle.tls.TlsSRPLoginParameters;
 import org.bouncycastle.tls.crypto.SRP6Group;
@@ -30,6 +33,7 @@ class MockSRPTlsServer
     static final SRP6Group TEST_GROUP = SRP6StandardGroups.rfc5054_1024;
     static final byte[] TEST_IDENTITY = Strings.toUTF8ByteArray("client");
     static final byte[] TEST_PASSWORD = Strings.toUTF8ByteArray("password");
+    static final TlsSRPIdentity TEST_SRP_IDENTITY = new BasicTlsSRPIdentity(TEST_IDENTITY, TEST_PASSWORD);
     static final byte[] TEST_SALT = Strings.toUTF8ByteArray("salt");
     static final byte[] TEST_SEED_KEY = Strings.toUTF8ByteArray("seed_key");
 
@@ -65,7 +69,7 @@ class MockSRPTlsServer
     {
         super.notifyHandshakeComplete();
 
-        byte[] srpIdentity = context.getSecurityParameters().getSRPIdentity();
+        byte[] srpIdentity = context.getSecurityParametersConnection().getSRPIdentity();
         if (srpIdentity != null)
         {
             String name = Strings.fromUTF8ByteArray(srpIdentity);
@@ -73,9 +77,9 @@ class MockSRPTlsServer
         }
     }
 
-    protected ProtocolVersion getMinimumVersion()
+    public ProtocolVersion[] getSupportedVersions()
     {
-        return ProtocolVersion.TLSv12;
+        return ProtocolVersion.TLSv12.only();
     }
 
     public ProtocolVersion getServerVersion() throws IOException
@@ -89,14 +93,15 @@ class MockSRPTlsServer
 
     protected TlsCredentialedSigner getDSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentials(context, supportedSignatureAlgorithms, SignatureAlgorithm.dsa,
-            "x509-server-dsa.pem", "x509-server-key-dsa.pem");
+        Vector clientSigAlgs = context.getSecurityParametersHandshake().getClientSigAlgs();
+        return TlsTestUtils.loadSignerCredentials(context, clientSigAlgs, SignatureAlgorithm.dsa, "x509-server-dsa.pem",
+            "x509-server-key-dsa.pem");
     }
 
     protected TlsCredentialedSigner getRSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentials(context, supportedSignatureAlgorithms, SignatureAlgorithm.rsa,
-            "x509-server-rsa-sign.pem", "x509-server-key-rsa-sign.pem");
+        Vector clientSigAlgs = context.getSecurityParametersHandshake().getClientSigAlgs();
+        return TlsTestUtils.loadSignerCredentialsServer(context, clientSigAlgs, SignatureAlgorithm.rsa);
     }
 
     static class MyIdentityManager
@@ -122,7 +127,7 @@ class MockSRPTlsServer
                 TlsSRPConfig srpConfig = new TlsSRPConfig();
                 srpConfig.setExplicitNG(new BigInteger[]{ TEST_GROUP.getN(), TEST_GROUP.getG() });
 
-                return new TlsSRPLoginParameters(srpConfig, verifier, TEST_SALT);
+                return new TlsSRPLoginParameters(identity, srpConfig, verifier, TEST_SALT);
             }
 
             return unknownIdentityManager.getLoginParameters(identity);

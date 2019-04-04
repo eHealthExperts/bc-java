@@ -21,27 +21,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Operator supporting the generation of RSA signatures.
+ * Operator supporting the generation of RSASSA-PKCS1-v1_5 signatures.
  */
 public class JcaTlsRSASigner
     implements TlsSigner
 {
     private static final Logger LOG = LoggerFactory.getLogger(JcaTlsRSASigner.class);
-    
-    private final PrivateKey privateKey;
+
     private final JcaTlsCrypto crypto;
+    private final PrivateKey privateKey;
 
     private Signature rawSigner = null;
 
     public JcaTlsRSASigner(JcaTlsCrypto crypto, PrivateKey privateKey)
     {
-        this.crypto = crypto;
-
-        if (privateKey == null)
+        if (null == crypto)
         {
-            throw new IllegalArgumentException("'privateKey' cannot be null");
+            throw new NullPointerException("crypto");
+        }
+        if (null == privateKey)
+        {
+            throw new NullPointerException("privateKey");
         }
 
+        this.crypto = crypto;
         this.privateKey = privateKey;
     }
 

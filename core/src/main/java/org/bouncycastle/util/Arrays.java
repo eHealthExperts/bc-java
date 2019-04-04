@@ -13,6 +13,16 @@ public final class Arrays
         // static class, hide constructor
     }
 
+    public static boolean areAllZeroes(byte[] buf, int off, int len)
+    {
+        int bits = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            bits |= buf[off + i];
+        }
+        return bits == 0;
+    }
+
     public static boolean areEqual(
         boolean[]  a,
         boolean[]  b)
@@ -330,6 +340,18 @@ public final class Arrays
         byte value)
     {
         for (int i = 0; i < array.length; i++)
+        {
+            array[i] = value;
+        }
+    }
+
+    public static void fill(
+        byte[] array,
+        int start,
+        int finish,
+        byte value)
+    {
+        for (int i = start; i < finish; i++)
         {
             array[i] = value;
         }

@@ -5,15 +5,22 @@ import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Provider;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyAgreement;
 import javax.crypto.interfaces.DHKey;
 
+import org.bouncycastle.asn1.cryptlib.CryptlibObjectIdentifiers;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.asn1.x9.ECNamedCurveTable;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.bcpg.ECDHPublicBCPGKey;
@@ -31,6 +38,7 @@ import org.bouncycastle.openpgp.operator.PGPDataDecryptor;
 import org.bouncycastle.openpgp.operator.PGPPad;
 import org.bouncycastle.openpgp.operator.PublicKeyDataDecryptorFactory;
 import org.bouncycastle.openpgp.operator.RFC6637Utils;
+import org.bouncycastle.util.Arrays;
 
 public class JcePublicKeyDataDecryptorFactoryBuilder
 {
@@ -137,7 +145,6 @@ public class JcePublicKeyDataDecryptorFactoryBuilder
     {
         PublicKeyPacket pubKeyData = privKey.getPublicKeyPacket();
         ECDHPublicBCPGKey ecKey = (ECDHPublicBCPGKey)pubKeyData.getKey();
-        X9ECParameters x9Params = ECNamedCurveTable.getByOID(ecKey.getCurveOID());
 
         byte[] enc = secKeyData[0];
 
@@ -150,20 +157,42 @@ public class JcePublicKeyDataDecryptorFactoryBuilder
 
         System.arraycopy(enc, 2 + pLen + 1, keyEnc, 0, keyEnc.length);
 
-        ECPoint publicPoint = x9Params.getCurve().decodePoint(pEnc);
-
         try
         {
-            byte[] userKeyingMaterial = RFC6637Utils.createUserKeyingMaterial(pubKeyData, fingerprintCalculator);
+            KeyAgreement agreement;
+            PublicKey publicKey;
 
-            KeyAgreement agreement = helper.createKeyAgreement(RFC6637Utils.getAgreementAlgorithm(pubKeyData));
+            // XDH
+            if (ecKey.getCurveOID().equals(CryptlibObjectIdentifiers.curvey25519))
+            {
+                agreement = helper.createKeyAgreement(RFC6637Utils.getXDHAlgorithm(pubKeyData));
+
+                KeyFactory keyFact = helper.createKeyFactory("XDH");
+
+                // skip the 0x40 header byte.
+                publicKey = keyFact.generatePublic(
+                    new X509EncodedKeySpec(
+                              new SubjectPublicKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_X25519),
+                                  Arrays.copyOfRange(pEnc, 1, pEnc.length)).getEncoded()));
+            }
+            else
+            {
+                X9ECParameters x9Params = ECNamedCurveTable.getByOID(ecKey.getCurveOID());
+                ECPoint publicPoint = x9Params.getCurve().decodePoint(pEnc);
+
+                agreement = helper.createKeyAgreement(RFC6637Utils.getAgreementAlgorithm(pubKeyData));
+
+                publicKey = converter.getPublicKey(new PGPPublicKey(new PublicKeyPacket(PublicKeyAlgorithmTags.ECDH, new Date(),
+                    new ECDHPublicBCPGKey(ecKey.getCurveOID(), publicPoint, ecKey.getHashAlgorithm(), ecKey.getSymmetricKeyAlgorithm())), fingerprintCalculator));
+            }
+
+            byte[] userKeyingMaterial = RFC6637Utils.createUserKeyingMaterial(pubKeyData, fingerprintCalculator);
 
             PrivateKey privateKey = converter.getPrivateKey(privKey);
 
             agreement.init(privateKey, new UserKeyingMaterialSpec(userKeyingMaterial));
 
-            agreement.doPhase(converter.getPublicKey(new PGPPublicKey(new PublicKeyPacket(PublicKeyAlgorithmTags.ECDH, new Date(),
-                new ECDHPublicBCPGKey(ecKey.getCurveOID(), publicPoint, ecKey.getHashAlgorithm(), ecKey.getSymmetricKeyAlgorithm())), fingerprintCalculator)), true);
+            agreement.doPhase(publicKey, true);
 
             Key key = agreement.generateSecret(RFC6637Utils.getKeyEncryptionOID(ecKey.getSymmetricKeyAlgorithm()).getId());
 

@@ -17,6 +17,7 @@ import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.cryptopro.CryptoProObjectIdentifiers;
 import org.bouncycastle.asn1.cryptopro.ECGOST3410NamedCurves;
 import org.bouncycastle.asn1.cryptopro.GOST3410PublicKeyAlgParameters;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.oiw.ElGamalParameter;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.DHParameter;
@@ -50,11 +51,16 @@ import org.bouncycastle.crypto.params.DHValidationParameters;
 import org.bouncycastle.crypto.params.DSAParameters;
 import org.bouncycastle.crypto.params.DSAPublicKeyParameters;
 import org.bouncycastle.crypto.params.ECDomainParameters;
+import org.bouncycastle.crypto.params.ECGOST3410Parameters;
 import org.bouncycastle.crypto.params.ECNamedDomainParameters;
 import org.bouncycastle.crypto.params.ECPublicKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.crypto.params.Ed448PublicKeyParameters;
 import org.bouncycastle.crypto.params.ElGamalParameters;
 import org.bouncycastle.crypto.params.ElGamalPublicKeyParameters;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
+import org.bouncycastle.crypto.params.X25519PublicKeyParameters;
+import org.bouncycastle.crypto.params.X448PublicKeyParameters;
 import org.bouncycastle.math.ec.ECCurve;
 
 /**
@@ -68,6 +74,7 @@ public class PublicKeyFactory
     static
     {
         converters.put(PKCSObjectIdentifiers.rsaEncryption, new RSAConverter());
+        converters.put(PKCSObjectIdentifiers.id_RSASSA_PSS, new RSAConverter());
         converters.put(X509ObjectIdentifiers.id_ea_rsa, new RSAConverter());
         converters.put(X9ObjectIdentifiers.dhpublicnumber, new DHPublicNumberConverter());
         converters.put(PKCSObjectIdentifiers.dhKeyAgreement, new DHAgreementConverter());
@@ -80,6 +87,10 @@ public class PublicKeyFactory
         converters.put(RosstandartObjectIdentifiers.id_tc26_gost_3410_12_512, new GOST3410_2012Converter());
         converters.put(UAObjectIdentifiers.dstu4145be, new DSTUConverter());
         converters.put(UAObjectIdentifiers.dstu4145le, new DSTUConverter());
+        converters.put(EdECObjectIdentifiers.id_X25519, new X25519Converter());
+        converters.put(EdECObjectIdentifiers.id_X448, new X448Converter());
+        converters.put(EdECObjectIdentifiers.id_Ed25519, new Ed25519Converter());
+        converters.put(EdECObjectIdentifiers.id_Ed448, new Ed448Converter());
     }
 
     /**
@@ -124,7 +135,7 @@ public class PublicKeyFactory
     /**
      * Create a public key from the passed in SubjectPublicKeyInfo
      *
-     * @param keyInfo the SubjectPublicKeyInfo containing the key data
+     * @param keyInfo       the SubjectPublicKeyInfo containing the key data
      * @param defaultParams default parameters that might be needed.
      * @return the appropriate key parameter
      * @throws IOException on an error decoding the key
@@ -141,7 +152,7 @@ public class PublicKeyFactory
         }
         else
         {
-            throw new IOException("algorithm identifier in key not recognised: " + algId.getAlgorithm());
+            throw new IOException("algorithm identifier in public key not recognised: " + algId.getAlgorithm());
         }
     }
 
@@ -283,8 +294,8 @@ public class PublicKeyFactory
                     x9.getCurve(), x9.getG(), x9.getN(), x9.getH(), x9.getSeed());
             }
 
-            DERBitString    bits = keyInfo.getPublicKeyData();
-            byte[]          data = bits.getBytes();
+            DERBitString bits = keyInfo.getPublicKeyData();
+            byte[] data = bits.getBytes();
             ASN1OctetString key = new DEROctetString(data);
 
             //
@@ -341,20 +352,18 @@ public class PublicKeyFactory
                 x9Encoding[i + 32] = keyEnc[64 - i];
             }
 
-            ASN1ObjectIdentifier paramOID;
+            GOST3410PublicKeyAlgParameters gostParams = GOST3410PublicKeyAlgParameters.getInstance(keyInfo.getAlgorithm().getParameters());
 
-            if (keyInfo.getAlgorithm().getParameters() instanceof ASN1ObjectIdentifier)
-            {
-                paramOID = ASN1ObjectIdentifier.getInstance(keyInfo.getAlgorithm().getParameters());
-            }
-            else
-            {
-                GOST3410PublicKeyAlgParameters params = GOST3410PublicKeyAlgParameters.getInstance(keyInfo.getAlgorithm().getParameters());
-                paramOID = params.getPublicKeyParamSet();
-            }
+            ECGOST3410Parameters ecDomainParameters =
+                new ECGOST3410Parameters(
+                    new ECNamedDomainParameters(gostParams.getPublicKeyParamSet(), ECGOST3410NamedCurves.getByOID(gostParams.getPublicKeyParamSet())),
+                    gostParams.getPublicKeyParamSet(),
+                    gostParams.getDigestParamSet(),
+                    gostParams.getEncryptionParamSet());
 
-            ECDomainParameters ecDomainParameters = ECGOST3410NamedCurves.getByOID(paramOID);
+
             return new ECPublicKeyParameters(ecDomainParameters.getCurve().decodePoint(x9Encoding), ecDomainParameters);
+
         }
     }
 
@@ -396,7 +405,14 @@ public class PublicKeyFactory
 
             GOST3410PublicKeyAlgParameters gostParams = GOST3410PublicKeyAlgParameters.getInstance(keyInfo.getAlgorithm().getParameters());
 
-            ECDomainParameters ecDomainParameters = ECGOST3410NamedCurves.getByOID(gostParams.getPublicKeyParamSet());
+            ECGOST3410Parameters ecDomainParameters =
+                new ECGOST3410Parameters(
+                    new ECNamedDomainParameters(gostParams.getPublicKeyParamSet(), ECGOST3410NamedCurves.getByOID(gostParams.getPublicKeyParamSet())),
+                    gostParams.getPublicKeyParamSet(),
+                    gostParams.getDigestParamSet(),
+                    gostParams.getEncryptionParamSet());
+
+
             return new ECPublicKeyParameters(ecDomainParameters.getCurve().decodePoint(x9Encoding), ecDomainParameters);
         }
     }
@@ -467,5 +483,56 @@ public class PublicKeyFactory
                 bytes[bytes.length - 1 - i] = tmp;
             }
         }
+    }
+
+    private static class X25519Converter
+        extends SubjectPublicKeyInfoConverter
+    {
+        AsymmetricKeyParameter getPublicKeyParameters(SubjectPublicKeyInfo keyInfo, Object defaultParams)
+        {
+            return new X25519PublicKeyParameters(getRawKey(keyInfo, defaultParams, X25519PublicKeyParameters.KEY_SIZE), 0);
+        }
+    }
+
+    private static class X448Converter
+        extends SubjectPublicKeyInfoConverter
+    {
+        AsymmetricKeyParameter getPublicKeyParameters(SubjectPublicKeyInfo keyInfo, Object defaultParams)
+        {
+            return new X448PublicKeyParameters(getRawKey(keyInfo, defaultParams, X448PublicKeyParameters.KEY_SIZE), 0);
+        }
+    }
+
+    private static class Ed25519Converter
+        extends SubjectPublicKeyInfoConverter
+    {
+        AsymmetricKeyParameter getPublicKeyParameters(SubjectPublicKeyInfo keyInfo, Object defaultParams)
+        {
+            return new Ed25519PublicKeyParameters(getRawKey(keyInfo, defaultParams, Ed25519PublicKeyParameters.KEY_SIZE), 0);
+        }
+    }
+
+    private static class Ed448Converter
+        extends SubjectPublicKeyInfoConverter
+    {
+        AsymmetricKeyParameter getPublicKeyParameters(SubjectPublicKeyInfo keyInfo, Object defaultParams)
+        {
+            return new Ed448PublicKeyParameters(getRawKey(keyInfo, defaultParams, Ed448PublicKeyParameters.KEY_SIZE), 0);
+        }
+    }
+
+    private static byte[] getRawKey(SubjectPublicKeyInfo keyInfo, Object defaultParams, int expectedSize)
+    {
+        /*
+         * TODO[RFC 8422]
+         * - Require defaultParams == null?
+         * - Require keyInfo.getAlgorithm().getParameters() == null?
+         */
+        byte[] result = keyInfo.getPublicKeyData().getOctets();
+        if (expectedSize != result.length)
+        {
+            throw new RuntimeException("public key encoding has incorrect length");
+        }
+        return result;
     }
 }

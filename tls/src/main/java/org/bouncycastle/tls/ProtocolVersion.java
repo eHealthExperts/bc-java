@@ -1,6 +1,6 @@
 package org.bouncycastle.tls;
 
-import java.io.IOException;
+import java.util.Vector;
 
 import org.bouncycastle.util.Strings;
 
@@ -13,6 +13,101 @@ public final class ProtocolVersion
     public static final ProtocolVersion DTLSv10 = new ProtocolVersion(0xFEFF, "DTLS 1.0");
     public static final ProtocolVersion DTLSv12 = new ProtocolVersion(0xFEFD, "DTLS 1.2");
 
+    public static boolean contains(ProtocolVersion[] versions, ProtocolVersion version)
+    {
+        if (versions != null && version != null)
+        {
+            for (int i = 0; i < versions.length; ++i)
+            {
+                if (version.equals(versions[i]))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static ProtocolVersion getEarliestDTLS(ProtocolVersion[] versions)
+    {
+        ProtocolVersion earliest = null;
+        if (null != versions)
+        {
+            for (int i = 0; i < versions.length; ++i)
+            {
+                ProtocolVersion next = versions[i];
+                if (null != next && next.isDTLS())
+                {
+                    if (null == earliest || next.getMinorVersion() > earliest.getMinorVersion())
+                    {
+                        earliest = next;
+                    }
+                }
+            }
+        }
+        return earliest;
+    }
+
+    public static ProtocolVersion getEarliestTLS(ProtocolVersion[] versions)
+    {
+        ProtocolVersion earliest = null;
+        if (null != versions)
+        {
+            for (int i = 0; i < versions.length; ++i)
+            {
+                ProtocolVersion next = versions[i];
+                if (null != next && next.isTLS())
+                {
+                    if (null == earliest || next.getMinorVersion() < earliest.getMinorVersion())
+                    {
+                        earliest = next;
+                    }
+                }
+            }
+        }
+        return earliest;
+    }
+
+    public static ProtocolVersion getLatestDTLS(ProtocolVersion[] versions)
+    {
+        ProtocolVersion latest = null;
+        if (null != versions)
+        {
+            for (int i = 0; i < versions.length; ++i)
+            {
+                ProtocolVersion next = versions[i];
+                if (null != next && next.isDTLS())
+                {
+                    if (null == latest || next.getMinorVersion() < latest.getMinorVersion())
+                    {
+                        latest = next;
+                    }
+                }
+            }
+        }
+        return latest;
+    }
+
+    public static ProtocolVersion getLatestTLS(ProtocolVersion[] versions)
+    {
+        ProtocolVersion latest = null;
+        if (null != versions)
+        {
+            for (int i = 0; i < versions.length; ++i)
+            {
+                ProtocolVersion next = versions[i];
+                if (null != next && next.isTLS())
+                {
+                    if (null == latest || next.getMinorVersion() > latest.getMinorVersion())
+                    {
+                        latest = next;
+                    }
+                }
+            }
+        }
+        return latest;
+    }
+
     private int version;
     private String name;
 
@@ -20,6 +115,31 @@ public final class ProtocolVersion
     {
         this.version = v & 0xFFFF;
         this.name = name;
+    }
+
+    public ProtocolVersion[] downTo(ProtocolVersion min)
+    {
+        if (!isEqualOrLaterVersionOf(min))
+        {
+            throw new IllegalArgumentException("'min' must be an equal or earlier version of this one");
+        }
+
+        Vector result = new Vector();
+        result.addElement(this);
+
+        ProtocolVersion current = this;
+        while (!current.equals(min))
+        {
+            current = current.getPreviousVersion();
+            result.addElement(current);
+        }
+
+        ProtocolVersion[] versions = new ProtocolVersion[result.size()];
+        for (int i = 0; i < result.size(); ++i)
+        {
+            versions[i] = (ProtocolVersion)result.elementAt(i);
+        }
+        return versions;
     }
 
     public int getFullVersion()
@@ -49,57 +169,102 @@ public final class ProtocolVersion
 
     public ProtocolVersion getEquivalentTLSVersion()
     {
-        if (isTLS())
+        switch (getMajorVersion())
         {
-            return this;
-        }
-        switch (getMinorVersion())
-        {
-        case 0xFF: return TLSv11;
-        case 0xFD: return TLSv12;
-        default:   return null;
+        case 0x03:  return this;
+        case 0xFE:
+            switch(getMinorVersion())
+            {
+            case 0xFF:  return TLSv11;
+            case 0xFD:  return TLSv12;
+            default:    return null;
+            }
+        default:    return null;
         }
     }
 
-    public ProtocolVersion getPreviousVersion() throws IOException
+    public ProtocolVersion getNextVersion()
     {
-        if (isDTLS())
+        int major = getMajorVersion(), minor = getMinorVersion();
+        switch (major)
         {
-            switch(getMinorVersion())
+        case 0x03:
+            switch (minor)
+            {
+            case 0xFF: return null;
+            default  : return get(major, minor + 1);
+            }
+        case 0xFE:
+            switch(minor)
+            {
+            case 0x00: return null;
+            case 0xFF: return DTLSv12;
+            default  : return get(major, minor - 1);
+            }
+        default:    return null;
+        }
+    }
+
+    public ProtocolVersion getPreviousVersion()
+    {
+        int major = getMajorVersion(), minor = getMinorVersion();
+        switch (major)
+        {
+        case 0x03:
+            switch (minor)
+            {
+            case 0x00: return null;
+            default  : return get(major, minor - 1);
+            }
+        case 0xFE:
+            switch(minor)
             {
             case 0xFF: return null;
             case 0xFD: return DTLSv10;
-            default  : return get(getMajorVersion(), getMinorVersion() + 1);
+            default  : return get(major, minor + 1);
             }
+        default:    return null;
         }
-        else
+    }
+
+    public boolean isEarlierVersionOf(ProtocolVersion version)
+    {
+        if (null == version || getMajorVersion() != version.getMajorVersion())
         {
-            switch (getMinorVersion())
-            {
-            case 0x00: return null;
-            default  : return get(getMajorVersion(), getMinorVersion() - 1);
-            }
+            return false;
         }
+        int diffMinorVersion = getMinorVersion() - version.getMinorVersion();
+        return isDTLS() ? diffMinorVersion > 0 : diffMinorVersion < 0;
     }
 
     public boolean isEqualOrEarlierVersionOf(ProtocolVersion version)
     {
-        if (getMajorVersion() != version.getMajorVersion())
+        if (null == version || getMajorVersion() != version.getMajorVersion())
         {
             return false;
         }
-        int diffMinorVersion = version.getMinorVersion() - getMinorVersion();
+        int diffMinorVersion = getMinorVersion() - version.getMinorVersion();
+        return isDTLS() ? diffMinorVersion >= 0 : diffMinorVersion <= 0;
+    }
+
+    public boolean isEqualOrLaterVersionOf(ProtocolVersion version)
+    {
+        if (null == version || getMajorVersion() != version.getMajorVersion())
+        {
+            return false;
+        }
+        int diffMinorVersion = getMinorVersion() - version.getMinorVersion();
         return isDTLS() ? diffMinorVersion <= 0 : diffMinorVersion >= 0;
     }
 
     public boolean isLaterVersionOf(ProtocolVersion version)
     {
-        if (getMajorVersion() != version.getMajorVersion())
+        if (null == version || getMajorVersion() != version.getMajorVersion())
         {
             return false;
         }
-        int diffMinorVersion = version.getMinorVersion() - getMinorVersion();
-        return isDTLS() ? diffMinorVersion > 0 : diffMinorVersion < 0;
+        int diffMinorVersion = getMinorVersion() - version.getMinorVersion();
+        return isDTLS() ? diffMinorVersion < 0 : diffMinorVersion > 0;
     }
 
     public boolean equals(Object other)
@@ -118,7 +283,6 @@ public final class ProtocolVersion
     }
 
     public static ProtocolVersion get(int major, int minor)
-        throws IOException
     {
         switch (major)
         {
@@ -144,7 +308,7 @@ public final class ProtocolVersion
             case 0xFF:
                 return DTLSv10;
             case 0xFE:
-                throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+                throw new IllegalArgumentException("{0xFE, 0xFE} is a reserved protocol version");
             case 0xFD:
                 return DTLSv12;
             }
@@ -152,9 +316,14 @@ public final class ProtocolVersion
         }
         default:
         {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+            return getUnknownVersion(major, minor, "UNKNOWN");
         }
         }
+    }
+
+    public ProtocolVersion[] only()
+    {
+        return new ProtocolVersion[]{ this };
     }
 
     public String toString()
@@ -162,11 +331,18 @@ public final class ProtocolVersion
         return name;
     }
 
-    private static ProtocolVersion getUnknownVersion(int major, int minor, String prefix)
-        throws IOException
+    private static void checkUint8(int versionOctet)
     {
-        TlsUtils.checkUint8(major);
-        TlsUtils.checkUint8(minor);
+        if (!TlsUtils.isValidUint8(versionOctet))
+        {
+            throw new IllegalArgumentException("'versionOctet' is not a valid octet");
+        }
+    }
+
+    private static ProtocolVersion getUnknownVersion(int major, int minor, String prefix)
+    {
+        checkUint8(major);
+        checkUint8(minor);
 
         int v = (major << 8) | minor;
         String hex = Strings.toUpperCase(Integer.toHexString(0x10000 | v).substring(1));

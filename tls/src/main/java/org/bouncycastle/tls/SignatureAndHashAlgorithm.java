@@ -9,8 +9,45 @@ import java.io.OutputStream;
  */
 public class SignatureAndHashAlgorithm
 {
-    protected short hash;
-    protected short signature;
+    public static final SignatureAndHashAlgorithm ed25519 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.ed25519);
+    public static final SignatureAndHashAlgorithm ed448 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.ed448);
+    public static final SignatureAndHashAlgorithm rsa_pss_rsae_sha256 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.rsa_pss_rsae_sha256);
+    public static final SignatureAndHashAlgorithm rsa_pss_rsae_sha384 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.rsa_pss_rsae_sha384);
+    public static final SignatureAndHashAlgorithm rsa_pss_rsae_sha512 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.rsa_pss_rsae_sha512);
+    public static final SignatureAndHashAlgorithm rsa_pss_pss_sha256 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.rsa_pss_pss_sha256);
+    public static final SignatureAndHashAlgorithm rsa_pss_pss_sha384 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.rsa_pss_pss_sha384);
+    public static final SignatureAndHashAlgorithm rsa_pss_pss_sha512 = new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, SignatureAlgorithm.rsa_pss_pss_sha512);
+
+    public static SignatureAndHashAlgorithm getInstance(short hashAlgorithm, short signatureAlgorithm)
+    {
+        switch (hashAlgorithm)
+        {
+        case HashAlgorithm.Intrinsic:
+            return getInstanceIntrinsic(signatureAlgorithm);
+        default:
+            return new SignatureAndHashAlgorithm(hashAlgorithm, signatureAlgorithm);
+        }
+    }
+
+    public static SignatureAndHashAlgorithm getInstanceIntrinsic(short signatureAlgorithm)
+    {
+        switch (signatureAlgorithm)
+        {
+        case SignatureAlgorithm.ed25519:                return ed25519;
+        case SignatureAlgorithm.ed448:                  return ed448;
+        case SignatureAlgorithm.rsa_pss_rsae_sha256:    return rsa_pss_rsae_sha256;
+        case SignatureAlgorithm.rsa_pss_rsae_sha384:    return rsa_pss_rsae_sha384;
+        case SignatureAlgorithm.rsa_pss_rsae_sha512:    return rsa_pss_rsae_sha512;
+        case SignatureAlgorithm.rsa_pss_pss_sha256:     return rsa_pss_pss_sha256;
+        case SignatureAlgorithm.rsa_pss_pss_sha384:     return rsa_pss_pss_sha384;
+        case SignatureAlgorithm.rsa_pss_pss_sha512:     return rsa_pss_pss_sha512;
+        default:
+            return new SignatureAndHashAlgorithm(HashAlgorithm.Intrinsic, signatureAlgorithm);
+        }
+    }
+
+    protected final short hash;
+    protected final short signature;
 
     /**
      * @param hash      {@link HashAlgorithm}
@@ -25,10 +62,6 @@ public class SignatureAndHashAlgorithm
         if (!TlsUtils.isValidUint8(signature))
         {
             throw new IllegalArgumentException("'signature' should be a uint8");
-        }
-        if (signature == SignatureAlgorithm.anonymous)
-        {
-            throw new IllegalArgumentException("'signature' MUST NOT be \"anonymous\"");
         }
 
         this.hash = hash;
@@ -49,21 +82,6 @@ public class SignatureAndHashAlgorithm
     public short getSignature()
     {
         return signature;
-    }
-
-    public boolean equals(Object obj)
-    {
-        if (!(obj instanceof SignatureAndHashAlgorithm))
-        {
-            return false;
-        }
-        SignatureAndHashAlgorithm other = (SignatureAndHashAlgorithm)obj;
-        return other.getHash() == getHash() && other.getSignature() == getSignature();
-    }
-
-    public int hashCode()
-    {
-        return (getHash() << 16) | getSignature();
     }
 
     /**
@@ -91,6 +109,27 @@ public class SignatureAndHashAlgorithm
     {
         short hash = TlsUtils.readUint8(input);
         short signature = TlsUtils.readUint8(input);
-        return new SignatureAndHashAlgorithm(hash, signature);
+
+        return SignatureAndHashAlgorithm.getInstance(hash, signature);
+    }
+
+    public boolean equals(Object obj)
+    {
+        if (!(obj instanceof SignatureAndHashAlgorithm))
+        {
+            return false;
+        }
+        SignatureAndHashAlgorithm other = (SignatureAndHashAlgorithm)obj;
+        return other.getHash() == getHash() && other.getSignature() == getSignature();
+    }
+
+    public int hashCode()
+    {
+        return (getHash() << 16) | getSignature();
+    }
+
+    public String toString()
+    {
+        return "{" + HashAlgorithm.getName(hash) + "," + SignatureAlgorithm.getName(signature) + "}";
     }
 }

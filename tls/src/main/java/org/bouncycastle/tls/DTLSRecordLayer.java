@@ -14,13 +14,13 @@ class DTLSRecordLayer
     private static final long RETRANSMIT_TIMEOUT = TCP_MSL * 2;
 
     private final DatagramTransport transport;
-    private final TlsContext context;
     private final TlsPeer peer;
 
     private final ByteQueue recordQueue = new ByteQueue();
 
     private volatile boolean closed = false;
     private volatile boolean failed = false;
+    // TODO[dtls13] Review the draft/RFC (legacy_record_version) to see if readVersion can be removed
     private volatile ProtocolVersion readVersion = null, writeVersion = null;
     private volatile boolean inHandshake;
     private volatile int plaintextLimit;
@@ -31,10 +31,9 @@ class DTLSRecordLayer
     private DTLSEpoch retransmitEpoch = null;
     private long retransmitExpiry = 0;
 
-    DTLSRecordLayer(DatagramTransport transport, TlsContext context, TlsPeer peer, short contentType)
+    DTLSRecordLayer(DatagramTransport transport, TlsPeer peer, short contentType)
     {
         this.transport = transport;
-        this.context = context;
         this.peer = peer;
 
         this.inHandshake = true;

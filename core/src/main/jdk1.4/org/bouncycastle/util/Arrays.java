@@ -13,6 +13,16 @@ public final class Arrays
         // static class, hide constructor
     }
 
+    public static boolean areAllZeroes(byte[] buf, int off, int len)
+    {
+        int bits = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            bits |= buf[off + i];
+        }
+        return bits == 0;
+    }
+
     public static boolean areEqual(
         boolean[]  a,
         boolean[]  b)
@@ -297,6 +307,18 @@ public final class Arrays
     }
 
     public static void fill(
+        byte[] array,
+        int start,
+        int finish,
+        byte value)
+    {
+        for (int i = start; i < finish; i++)
+        {
+            array[i] = value;
+        }
+    }
+
+    public static void fill(
         char[] array,
         char value)
     {
@@ -335,7 +357,7 @@ public final class Arrays
             array[i] = value;
         }
     }
-    
+
     public static int hashCode(byte[] data)
     {
         if (data == null)
@@ -354,7 +376,7 @@ public final class Arrays
 
         return hc;
     }
-    
+
     public static int hashCode(byte[] data, int off, int len)
     {
         if (data == null)
@@ -443,6 +465,50 @@ public final class Arrays
         return hc;
     }
 
+    public static int hashCode(long[] data)
+    {
+        if (data == null)
+        {
+            return 0;
+        }
+
+        int i = data.length;
+        int hc = i + 1;
+
+        while (--i >= 0)
+        {
+            long di = data[i];
+            hc *= 257;
+            hc ^= (int)di;
+            hc *= 257;
+            hc ^= (int)(di >>> 32);
+        }
+
+        return hc;
+    }
+
+    public static int hashCode(long[] data, int off, int len)
+    {
+        if (data == null)
+        {
+            return 0;
+        }
+
+        int i = len;
+        int hc = i + 1;
+
+        while (--i >= 0)
+        {
+            long di = data[off + i];
+            hc *= 257;
+            hc ^= (int)di;
+            hc *= 257;
+            hc ^= (int)(di >>> 32);
+        }
+
+        return hc;
+    }
+
     public static int hashCode(short[][][] shorts)
     {
         int hc = 0;
@@ -500,28 +566,6 @@ public final class Arrays
         {
             hc *= 257;
             hc ^= data[i].hashCode();
-        }
-
-        return hc;
-    }
-
-    public static int hashCode(long[] data, int off, int len)
-    {
-        if (data == null)
-        {
-            return 0;
-        }
-
-        int i = len;
-        int hc = i + 1;
-
-        while (--i >= 0)
-        {
-            long di = data[off + i];
-            hc *= 257;
-            hc ^= (int)di;
-            hc *= 257;
-            hc ^= (int)(di >>> 32);
         }
 
         return hc;
@@ -882,6 +926,44 @@ public final class Arrays
         System.arraycopy(a, 0, result, 0, length);
         result[length] = b;
         return result;
+    }
+
+    public static int compareUnsigned(byte[] a, byte[] b)
+    {
+        if (a == b)
+        {
+            return 0;
+        }
+        if (a == null)
+        {
+            return -1;
+        }
+        if (b == null)
+        {
+            return 1;
+        }
+        int minLen = Math.min(a.length, b.length);
+        for (int i = 0; i < minLen; ++i)
+        {
+            int aVal = a[i] & 0xFF, bVal = b[i] & 0xFF;
+            if (aVal < bVal)
+            {
+                return -1;
+            }
+            if (aVal > bVal)
+            {
+                return 1;
+            }
+        }
+        if (a.length < b.length)
+        {
+            return -1;
+        }
+        if (a.length > b.length)
+        {
+            return 1;
+        }
+        return 0;
     }
 
     public static byte[] concatenate(byte[] a, byte[] b)

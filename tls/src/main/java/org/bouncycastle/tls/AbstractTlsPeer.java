@@ -22,6 +22,25 @@ public abstract class AbstractTlsPeer
         return crypto;
     }
 
+    public void notifyHandshakeBeginning() throws IOException
+    {
+    }
+
+    public ProtocolVersion[] getSupportedVersions()
+    {
+        return ProtocolVersion.TLSv12.downTo(ProtocolVersion.TLSv10);
+    }
+
+    public boolean requiresExtendedMasterSecret()
+    {
+        return false;
+    }
+
+    public boolean shouldCheckSigAlgOfPeerCerts()
+    {
+        return true;
+    }
+
     public boolean shouldUseExtendedPadding()
     {
         return false;
@@ -50,6 +69,11 @@ public abstract class AbstractTlsPeer
         }
     }
 
+   public TlsKeyExchangeFactory getKeyExchangeFactory() throws IOException
+    {
+        return new DefaultTlsKeyExchangeFactory();
+    }
+
     public void notifyAlertRaised(short alertLevel, short alertDescription, String message, Throwable cause)
     {
     }
@@ -60,5 +84,10 @@ public abstract class AbstractTlsPeer
 
     public void notifyHandshakeComplete() throws IOException
     {
+    }
+
+    public int getRenegotiationPolicy()
+    {
+        return RenegotiationPolicy.DENY;
     }
 }
