@@ -142,24 +142,14 @@ class ProvTlsServer
             return selectDHDefault(minimumFiniteFieldBits);
         }
 
-<<<<<<< HEAD
-        boolean isFips = manager.getContext().isFips();
-
-        return SupportedGroups.getServerSelectedCurve(isFips, getCrypto(), minimumCurveBits, clientSupportedGroups);
-=======
         return SupportedGroups.getServerSelectedFiniteField(getCrypto(), manager.getContext().isFips(),
             minimumFiniteFieldBits, clientSupportedGroups);
->>>>>>> r1rv61
     }
     
     @Override
     protected int selectDHDefault(int minimumFiniteFieldBits)
     {
-<<<<<<< HEAD
-        return SupportedGroups.getServerDefaultCurve(manager.getContext().isFips(), getCrypto(), minimumCurveBits);
-=======
         return SupportedGroups.getServerDefaultDH(manager.getContext().isFips(), minimumFiniteFieldBits);
->>>>>>> r1rv61
     }
 
     @Override
@@ -171,13 +161,7 @@ class ProvTlsServer
             return selectECDHDefault(minimumCurveBits);
         }
 
-<<<<<<< HEAD
-        boolean isFips = manager.getContext().isFips();
-
-        int namedGroup = SupportedGroups.getServerSelectedFiniteField(isFips, getCrypto(), minimumFiniteFieldBits,
-=======
         return SupportedGroups.getServerSelectedCurve(getCrypto(), manager.getContext().isFips(), minimumCurveBits,
->>>>>>> r1rv61
             clientSupportedGroups);
     }
 
@@ -200,34 +184,11 @@ class ProvTlsServer
     }
 
     @Override
-<<<<<<< HEAD
-    public int[] getCipherSuites()
-    {
-        return TlsUtils.getSupportedCipherSuites(manager.getContextData().getCrypto(),
-            manager.getContext().convertCipherSuites(sslParameters.getCipherSuites()));
-    }
-
     public boolean getNeedClientAuth() {
     	return sslParameters.getNeedClientAuth();
     }
     
     @Override
-    protected short[] getCompressionMethods()
-    {
-        return manager.getContext().isFips()
-            ?   new short[]{ CompressionMethod._null }
-            :   super.getCompressionMethods();
-    }
-
-//  public TlsKeyExchange getKeyExchange() throws IOException
-//  {
-//      // TODO[jsse] Check that all key exchanges used in JSSE supportedCipherSuites are handled
-//      return super.getKeyExchange();
-//  }
-
-    @Override
-=======
->>>>>>> r1rv61
     public CertificateRequest getCertificateRequest() throws IOException
     {
         boolean shouldRequest = sslParameters.getNeedClientAuth() || sslParameters.getWantClientAuth();
