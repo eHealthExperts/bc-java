@@ -59,11 +59,7 @@ class ProvTlsClient
 
     ProvTlsClient(ProvTlsManager manager, ProvSSLParameters sslParameters)
     {
-<<<<<<< HEAD
-        super(manager.getContextData().getCrypto(), new DefaultTlsKeyExchangeFactory(), new ProvDHConfigVerifier(sslParameters.getAlgorithmConstraints()));
-=======
         super(manager.getContextData().getCrypto());
->>>>>>> r1rv61
 
         this.manager = manager;
         this.sslParameters = sslParameters;
@@ -84,11 +80,7 @@ class ProvTlsClient
     @Override
     protected Vector getSupportedGroups(Vector namedGroupRoles)
     {
-<<<<<<< HEAD
-        return SupportedGroups.getClientSupportedGroups(manager.getContext().isFips(), getCrypto(), offeringDH, offeringEC);
-=======
         return SupportedGroups.getClientSupportedGroups(getCrypto(), manager.getContext().isFips(), namedGroupRoles);
->>>>>>> r1rv61
     }
     
 
