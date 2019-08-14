@@ -1,6 +1,7 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.io.IOException;
+
 import java.security.GeneralSecurityException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -93,21 +94,7 @@ public class JceDefaultTlsCredentialedAgreement
             PublicKey publicKey = JcaTlsCertificate.convert(crypto, peerCertificate).getPublicKey();
 
             byte[] secret = crypto.calculateKeyAgreement(agreementAlgorithm, privateKey, publicKey, "TlsPremasterSecret");
-
-<<<<<<< HEAD
-            // TODO Need to consider cases where SecretKey may not be encodable
-            JceTlsSecret adoptLocalSecret = crypto.adoptLocalSecret(secretKey.getEncoded());
-
-            try {
-                secretKey.destroy();
-            } catch (DestroyFailedException e) {
-                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
-            }  
-            
-            return adoptLocalSecret;
-=======
             return crypto.adoptLocalSecret(secret);
->>>>>>> r1rv61
         }
         catch (GeneralSecurityException e)
         {

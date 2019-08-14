@@ -19,12 +19,6 @@ import java.security.spec.EllipticCurve;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-<<<<<<< HEAD
-import javax.crypto.SecretKey;
-import javax.security.auth.DestroyFailedException;
-
-=======
->>>>>>> r1rv61
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.tls.AlertDescription;
@@ -70,25 +64,9 @@ public class JceTlsECDomain
              *
              * We use the convention established by the JSSE to signal this by asking for "TlsPremasterSecret".
              */
-<<<<<<< HEAD
-            SecretKey secretKey = crypto.calculateKeyAgreement("ECDH", privateKey, publicKey, "TlsPremasterSecret");
-
-            // TODO Need to consider cases where SecretKey may not be encodable
-            JceTlsSecret adoptLocalSecret = crypto.adoptLocalSecret(secretKey.getEncoded());
-
-            try {
-                secretKey.destroy();
-            } catch (DestroyFailedException e) {
-                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
-            }
-            
-            
-            return adoptLocalSecret;
-=======
             byte[] secret = crypto.calculateKeyAgreement("ECDH", privateKey, publicKey, "TlsPremasterSecret");
 
             return crypto.adoptLocalSecret(secret);
->>>>>>> r1rv61
         }
         catch (GeneralSecurityException e)
         {

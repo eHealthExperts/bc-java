@@ -2,6 +2,7 @@ package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -78,24 +79,9 @@ public class JceTlsDHDomain
              * used as the pre_master_secret. We use the convention established by the JSSE to signal this
              * by asking for "TlsPremasterSecret".
              */
-<<<<<<< HEAD
-            SecretKey secretKey = crypto.calculateKeyAgreement("DH", privateKey, publicKey, "TlsPremasterSecret");
-
-            // TODO Need to consider cases where SecretKey may not be encodable
-            JceTlsSecret adoptLocalSecret = crypto.adoptLocalSecret(secretKey.getEncoded());
-
-            try {
-                secretKey.destroy();
-            } catch (DestroyFailedException e) {
-                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
-            }
-            
-            return adoptLocalSecret;
-=======
             byte[] secret = crypto.calculateKeyAgreement("DH", privateKey, publicKey, "TlsPremasterSecret");
 
             return crypto.adoptLocalSecret(secret);
->>>>>>> r1rv61
         }
         catch (GeneralSecurityException e)
         {

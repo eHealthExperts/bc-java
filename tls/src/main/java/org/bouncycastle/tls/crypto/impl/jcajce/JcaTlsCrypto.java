@@ -411,18 +411,6 @@ public class JcaTlsCrypto
         {
             return false;
         }
-<<<<<<< HEAD
-        
-        switch (namedGroup)
-        {
-        case NamedGroup.secp256r1:
-        case NamedGroup.secp384r1:
-        case NamedGroup.ffdhe2048:
-        case NamedGroup.ffdhe3072:
-        case NamedGroup.ffdhe4096:
-        case NamedGroup.ffdhe6144:
-        case NamedGroup.ffdhe8192: 
-=======
 
         String groupName = NamedGroup.getName(namedGroup);
         if (groupName == null)
@@ -433,7 +421,6 @@ public class JcaTlsCrypto
         Integer key = Integers.valueOf(namedGroup);
 
         synchronized (supportedGroups)
->>>>>>> r1rv61
         {
             String curveName = NamedGroup.getName(namedGroup);
             if (curveName == null)
@@ -462,10 +449,6 @@ public class JcaTlsCrypto
             return result;
         }
 
-<<<<<<< HEAD
-        default:
-            return false;
-=======
         boolean result = true;
         try
         {
@@ -500,7 +483,6 @@ public class JcaTlsCrypto
         synchronized (supportedGroups)
         {
             supportedGroups.put(key, Boolean.valueOf(result));
->>>>>>> r1rv61
         }
 
     }
