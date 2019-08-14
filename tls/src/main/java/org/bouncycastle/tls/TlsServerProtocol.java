@@ -157,26 +157,14 @@ public class TlsServerProtocol
             }
             case CS_START:
             {
-<<<<<<< HEAD
             	resetCurrentSession();
-=======
                 SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
->>>>>>> r1rv61
                 receiveClientHelloMessage(buf);
                 this.connection_state = CS_CLIENT_HELLO;
             	LOG.trace("New connection state CS_CLIENT_HELLO");
 
-<<<<<<< HEAD
                 if(sessionParameters != null && tlsServer.getNeedClientAuth()) 
-=======
-                /*
-                 * NOTE: Currently no server support for session resumption
-                 * 
-                 * If adding support, ensure securityParameters.tlsUnique is set to the localVerifyData, but
-                 * ONLY when extended_master_secret has been negotiated (otherwise NULL).
-                 */
->>>>>>> r1rv61
                 {
                 	if(sessionParameters.getPeerCertificate() == null) 
                 	{
@@ -184,16 +172,13 @@ public class TlsServerProtocol
                 	}
                 }
 
-<<<<<<< HEAD
                 this.resumedSession = sessionParameters != null;
                 if(!this.resumedSession) 
                 {
                     this.tlsSession = TlsUtils.importSession(TlsUtils.generateSessionID(tlsServerContext.getCrypto().getSecureRandom()), null);
-=======
                     securityParameters.sessionID = TlsUtils.EMPTY_BYTES;
 
                     this.tlsSession = TlsUtils.importSession(securityParameters.getSessionID(), null);
->>>>>>> r1rv61
                     this.sessionParameters = null;
                 }
 
@@ -204,7 +189,7 @@ public class TlsServerProtocol
                 recordStream.notifyHelloComplete();
                 
                 if(this.resumedSession) {
-                	recordStream.setPendingConnectionState(getPeer().getCompression(), getPeer().getCipher());
+                	recordStream.setPendingConnectionState(TlsUtils.initCipher(getContext()));
                 	
                     sendChangeCipherSpecMessage();
                     sendFinishedMessage();
@@ -229,14 +214,6 @@ public class TlsServerProtocol
                 {
                     Certificate serverCertificate = null;
 
-<<<<<<< HEAD
-                    serverCertificate = this.serverCredentials.getCertificate();
-                    sendCertificateMessage(serverCertificate, endPointHash);
-                }
-                securityParameters.tlsServerEndPoint = endPointHash.toByteArray();
-                this.connection_state = CS_SERVER_CERTIFICATE;
-            	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
-=======
                     ByteArrayOutputStream endPointHash = new ByteArrayOutputStream();
                     if (null == this.serverCredentials)
                     {
@@ -245,13 +222,12 @@ public class TlsServerProtocol
                     else
                     {
                         this.keyExchange.processServerCredentials(this.serverCredentials);
->>>>>>> r1rv61
-
                         serverCertificate = this.serverCredentials.getCertificate();
                         sendCertificateMessage(serverCertificate, endPointHash);
                     }
                     securityParameters.tlsServerEndPoint = endPointHash.toByteArray();
                     this.connection_state = CS_SERVER_CERTIFICATE;
+                    LOG.trace("New connection state CS_SERVER_CERTIFICATE");
 
                     // TODO[RFC 3546] Check whether empty certificates is possible, allowed, or excludes CertificateStatus
                     if (null == serverCertificate || serverCertificate.isEmpty())
@@ -530,22 +506,12 @@ public class TlsServerProtocol
     protected void receiveClientHelloMessage(ByteArrayInputStream buf)
         throws IOException
     {
-<<<<<<< HEAD
-    	LOG.debug("Receive ClientHelloMessage");
-        ProtocolVersion client_version = TlsUtils.readVersion(buf);
-        recordStream.setWriteVersion(client_version);
-
-        LOG.debug("ClientVersion [{}]", client_version);
-        if (client_version.isDTLS())
-        {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-        }
-=======
+        LOG.debug("Receive ClientHelloMessage");
         // TODO[tls13] For subsequent ClientHello messages (of a TLSv13 handshake) don't do this!
         recordStream.setWriteVersion(ProtocolVersion.TLSv10);
 
         ProtocolVersion client_version = TlsUtils.readVersion(buf);
->>>>>>> r1rv61
+        LOG.debug("ClientVersion [{}]", client_version);
 
         byte[] client_random = TlsUtils.readFully(32, buf);
 
@@ -666,30 +632,23 @@ public class TlsServerProtocol
 
         securityParameters.clientRandom = client_random;
 
-<<<<<<< HEAD
         if (sessionID.length > 0 && this.sessionParameters != null)
         {
+            tlsServer.notifyFallback(sessionParameters.getCipherSuite() == CipherSuite.TLS_FALLBACK_SCSV);
         	tlsServer.notifyOfferedCipherSuites(new int[] {sessionParameters.getCipherSuite()});
-        	tlsServer.notifyOfferedCompressionMethods(new short[] {sessionParameters.getCompressionAlgorithm()});
+        	if (sessionParameters.getCompressionAlgorithm() != CompressionMethod._null)
+        	{
+        	    throw new TlsFatalAlert(AlertDescription.handshake_failure);
+        	}
         }
         else {
+            tlsServer.notifyFallback(Arrays.contains(offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV));
         	tlsServer.notifyOfferedCipherSuites(offeredCipherSuites);
-        	tlsServer.notifyOfferedCompressionMethods(offeredCompressionMethods);
+        	if (!Arrays.contains(offeredCompressionMethods, CompressionMethod._null))
+        	{
+        	    throw new TlsFatalAlert(AlertDescription.handshake_failure);
+        	}
         }
-=======
-        tlsServer.notifyFallback(Arrays.contains(offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV));
-
-        tlsServer.notifyOfferedCipherSuites(offeredCipherSuites);
-
-        if (!Arrays.contains(offeredCompressionMethods, CompressionMethod._null))
-        {
-            throw new TlsFatalAlert(AlertDescription.handshake_failure);
-        }
-
-        /*
-         * TODO[resumption] Check RFC 7627 5.4. for required behaviour 
-         */
->>>>>>> r1rv61
 
         /*
          * RFC 7627 4. Clients and servers SHOULD NOT accept handshakes that do not use the extended
@@ -796,7 +755,6 @@ public class TlsServerProtocol
             // NOTE: Validates the padding extension data, if present
             TlsExtensionsUtils.getPaddingExtension(clientExtensions);
 
-<<<<<<< HEAD
             /*
              * [jsse] RFC 6066 A server that implements this extension MUST NOT accept the
              * request to resume the session if the server_name extension contains a different name.
@@ -812,7 +770,6 @@ public class TlsServerProtocol
             	}
             }
             
-=======
             securityParameters.clientServerNames = TlsExtensionsUtils.getServerNameExtensionClient(clientExtensions);
 
             /*
@@ -827,7 +784,6 @@ public class TlsServerProtocol
 
             securityParameters.clientSupportedGroups = TlsExtensionsUtils.getSupportedGroupsExtension(clientExtensions);
 
->>>>>>> r1rv61
             tlsServer.processClientExtensions(clientExtensions);
         }
     }
@@ -898,31 +854,22 @@ public class TlsServerProtocol
     protected void sendServerHelloMessage()
         throws IOException
     {
-<<<<<<< HEAD
-    	LOG.debug("Send ServerHelloMessage");
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.server_hello);
-=======
+        LOG.debug("Send ServerHelloMessage");
         SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
->>>>>>> r1rv61
 
         ProtocolVersion server_version;
         if (securityParameters.isRenegotiating())
         {
-<<<<<<< HEAD
-            ProtocolVersion server_version = tlsServer.getServerVersion();
-
-        	LOG.debug("ServerVersion [{}]", server_version);
-            if (!server_version.isEqualOrEarlierVersionOf(getContext().getClientVersion()))
-=======
             // Always select the negotiated version from the initial handshake
             server_version = tlsServerContext.getServerVersion();
+            LOG.debug("ServerVersion [{}]", server_version);
         }
         else
         {
             server_version = tlsServer.getServerVersion();
+            LOG.debug("ServerVersion [{}]", server_version);
             if (null == server_version || !ProtocolVersion.TLSv10.isEqualOrEarlierVersionOf(server_version)
                 || !ProtocolVersion.contains(tlsServerContext.getClientSupportedVersions(), server_version))
->>>>>>> r1rv61
             {
                 throw new TlsFatalAlert(AlertDescription.internal_error);
             }
@@ -931,25 +878,6 @@ public class TlsServerProtocol
                 ? ProtocolVersion.TLSv12
                 : server_version;
 
-<<<<<<< HEAD
-        /*
-         * The server may return an session_id to indicate that the session will be cached
-         * and therefore can be resumed.
-         */
-        TlsUtils.writeOpaque8(tlsSession.getSessionID(), message);
-
-    	int selectedCipherSuite = tlsServer.getSelectedCipherSuite();
-    	if (!Arrays.contains(offeredCipherSuites, selectedCipherSuite)
-    			|| selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
-    			|| CipherSuite.isSCSV(selectedCipherSuite)
-    			|| !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, getContext().getServerVersion()))
-    	{
-    		throw new TlsFatalAlert(AlertDescription.internal_error);
-    	}
-    	securityParameters.cipherSuite = selectedCipherSuite;
-        LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
-
-=======
             recordStream.setWriteVersion(legacy_record_version);
             securityParameters.negotiatedVersion = server_version;
         }
@@ -959,7 +887,6 @@ public class TlsServerProtocol
         {
             TlsUtils.writeDowngradeMarker(server_version, securityParameters.getServerRandom());
         }
->>>>>>> r1rv61
 
         {
             int selectedCipherSuite = tlsServer.getSelectedCipherSuite();
@@ -971,16 +898,10 @@ public class TlsServerProtocol
                 throw new TlsFatalAlert(AlertDescription.internal_error);
             }
             securityParameters.cipherSuite = selectedCipherSuite;
+            LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
         }
 
-<<<<<<< HEAD
-        LOG.debug("Selected CompressionMethod [{}]", selectedCompressionMethod);
-
-        TlsUtils.writeUint16(securityParameters.cipherSuite, message);
-        TlsUtils.writeUint8(securityParameters.compressionAlgorithm, message);
-=======
         this.serverExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(tlsServer.getServerExtensions());
->>>>>>> r1rv61
 
         ProtocolVersion legacy_version = server_version;
         if (server_version.isLaterVersionOf(ProtocolVersion.TLSv12))
@@ -1041,14 +962,6 @@ public class TlsServerProtocol
         }
 
         /*
-<<<<<<< HEAD
-         * RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
-         * extensions appearing in the client hello, and send a server hello containing no
-         * extensions.
-         */
-        if (this.serverExtensions != null)
-=======
-         * RFC 7301 3.1. When session resumption or session tickets [...] are used, the previous
          * contents of this extension are irrelevant, and only the values in the new handshake
          * messages are considered.
          */
@@ -1061,7 +974,6 @@ public class TlsServerProtocol
          */
 
         if (!this.serverExtensions.isEmpty())
->>>>>>> r1rv61
         {
             securityParameters.encryptThenMAC = TlsExtensionsUtils.hasEncryptThenMACExtension(serverExtensions);
 
@@ -1081,11 +993,6 @@ public class TlsServerProtocol
             this.expectSessionTicket = !this.resumedSession
                 && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsProtocol.EXT_SessionTicket,
                     AlertDescription.internal_error);
-<<<<<<< HEAD
-
-           	writeExtensions(message, serverExtensions);
-=======
->>>>>>> r1rv61
         }
 
         securityParameters.prfAlgorithm = getPRFAlgorithm(tlsServerContext, securityParameters.getCipherSuite());

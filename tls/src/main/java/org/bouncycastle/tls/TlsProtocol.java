@@ -75,14 +75,7 @@ public abstract class TlsProtocol
     private volatile boolean appDataSplitEnabled = true;
     private volatile boolean resumableHandshake = false;
     private volatile int appDataSplitMode = ADS_MODE_1_Nsub1;
-<<<<<<< HEAD
-    
     private int soTimeout = -1;
-    
-    // TODO[tls-ops] Investigate whether we can handle (expected/actual) verify data using TlsSecret
-    private byte[] expected_verify_data = null;
-=======
->>>>>>> r1rv61
 
     protected TlsSession tlsSession = null;
     protected SessionParameters sessionParameters = null;
@@ -367,13 +360,9 @@ public abstract class TlsProtocol
 
     protected void cleanupHandshake()
     {
-<<<<<<< HEAD
     	LOG.debug("Cleanup handshake");
-        if (this.expected_verify_data != null)
-=======
         SecurityParameters securityParameters = getContext().getSecurityParameters();
         if (null != securityParameters)
->>>>>>> r1rv61
         {
             securityParameters.clear();
         }
@@ -425,16 +414,6 @@ public abstract class TlsProtocol
             {
                 SecurityParameters securityParameters = getContext().getSecurityParametersHandshake();
                 this.sessionParameters = new SessionParameters.Builder()
-<<<<<<< HEAD
-                    .setCipherSuite(this.securityParameters.getCipherSuite())
-                    .setCompressionAlgorithm(this.securityParameters.getCompressionAlgorithm())
-                    .setLocalCertificate(this.localCertificate)
-                    .setMasterSecret(getContext().getCrypto().adoptSecret(this.securityParameters.getMasterSecret()))
-                    .setNegotiatedVersion(getContext().getServerVersion())
-                    .setPeerCertificate(this.peerCertificate)
-                    .setPSKIdentity(this.securityParameters.getPSKIdentity())
-                    .setSRPIdentity(this.securityParameters.getSRPIdentity())
-=======
                     .setCipherSuite(securityParameters.getCipherSuite())
                     .setCompressionAlgorithm(securityParameters.getCompressionAlgorithm())
                     .setExtendedMasterSecret(securityParameters.isExtendedMasterSecret())
@@ -444,8 +423,6 @@ public abstract class TlsProtocol
                     .setPeerCertificate(securityParameters.getPeerCertificate())
                     .setPSKIdentity(securityParameters.getPSKIdentity())
                     .setSRPIdentity(securityParameters.getSRPIdentity())
-                    // TODO Consider filtering extensions that aren't relevant to resumed sessions
->>>>>>> r1rv61
                     .setServerExtensions(this.serverExtensions)
                     .setClientExtensions(this.clientExtensions)
                     .build();
@@ -1268,14 +1245,11 @@ public abstract class TlsProtocol
     protected void processFinishedMessage(ByteArrayInputStream buf)
         throws IOException
     {
-<<<<<<< HEAD
     	LOG.debug("Process FinishedMessage");
-=======
         TlsContext ctx = getContext();
         SecurityParameters securityParameters = ctx.getSecurityParametersHandshake();
 
         byte[] expected_verify_data = securityParameters.getPeerVerifyData();
->>>>>>> r1rv61
         if (expected_verify_data == null)
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
@@ -1334,17 +1308,6 @@ public abstract class TlsProtocol
         safeWriteRecord(ContentType.alert, alert, 0, 2);
     }
 
-<<<<<<< HEAD
-    /** @deprecated */
-    protected void sendCertificateMessage(Certificate certificate)
-        throws IOException
-    {
-    	LOG.debug("Send CertificateMessage");
-        sendCertificateMessage(certificate, null);
-    }
-
-=======
->>>>>>> r1rv61
     protected void sendCertificateMessage(Certificate certificate, OutputStream endPointHash)
         throws IOException
     {
@@ -1379,10 +1342,7 @@ public abstract class TlsProtocol
     protected void sendFinishedMessage()
         throws IOException
     {
-<<<<<<< HEAD
     	LOG.debug("Send FinishedMessage");
-        byte[] verify_data = createVerifyData(getContext().isServer());
-=======
         TlsContext ctx = getContext();
         SecurityParameters securityParameters = ctx.getSecurityParametersHandshake();
 
@@ -1395,7 +1355,6 @@ public abstract class TlsProtocol
                 securityParameters.tlsUnique = verify_data;
             }
         }
->>>>>>> r1rv61
 
         HandshakeMessage message = new HandshakeMessage(HandshakeType.finished, verify_data.length);
 

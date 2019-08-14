@@ -570,23 +570,9 @@ public class TlsClientProtocol
     protected void handleServerCertificate()
         throws IOException
     {
-<<<<<<< HEAD
     	LOG.debug("Handle ServerCertificate");
-        if (this.authentication == null)
-        {
-            // There was no server certificate message; check it's OK
-            securityParameters.tlsServerEndPoint = TlsUtils.EMPTY_BYTES;
-            this.keyExchange.skipServerCredentials();
-        }
-        else
-        {
-            TlsUtils.processServerCertificate(peerCertificate, certificateStatus, keyExchange, authentication,
-                clientExtensions, serverExtensions);
-        }
-=======
         TlsUtils.processServerCertificate(tlsClientContext, tlsClient, certificateStatus, keyExchange, authentication,
             clientExtensions, serverExtensions);
->>>>>>> r1rv61
     }
 
     protected void handleSupplementalData(Vector serverSupplementalData)
@@ -692,23 +678,14 @@ public class TlsClientProtocol
                 throw new TlsFatalAlert(AlertDescription.illegal_parameter);
             }
             securityParameters.cipherSuite = selectedCipherSuite;
+            LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
             this.tlsClient.notifySelectedCipherSuite(selectedCipherSuite);
         }
-<<<<<<< HEAD
-        LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
-        this.tlsClient.notifySelectedCipherSuite(selectedCipherSuite);
-=======
->>>>>>> r1rv61
 
         if (CompressionMethod._null != selectedCompressionMethod)
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
-<<<<<<< HEAD
-        LOG.debug("Selected CompressionMethod [{}]", selectedCompressionMethod);
-        this.tlsClient.notifySelectedCompressionMethod(selectedCompressionMethod);
-=======
->>>>>>> r1rv61
 
         /*
          * RFC 7627 4. Clients and servers SHOULD NOT accept handshakes that do not use the extended
@@ -937,12 +914,8 @@ public class TlsClientProtocol
     protected void sendClientHelloMessage()
         throws IOException
     {
-<<<<<<< HEAD
         LOG.debug("Send ClientHelloMessage");
-        this.recordStream.setWriteVersion(this.tlsClient.getClientHelloRecordLayerVersion());
-=======
         SecurityParameters securityParameters = tlsClientContext.getSecurityParametersHandshake();
->>>>>>> r1rv61
 
         ProtocolVersion client_version;
         if (securityParameters.isRenegotiating())
@@ -962,15 +935,10 @@ public class TlsClientProtocol
                 throw new TlsFatalAlert(AlertDescription.internal_error);
             }
 
-<<<<<<< HEAD
-        getContextAdmin().setClientVersion(client_version);
-        LOG.debug("ClientVersion [{}]", client_version);
-        
-=======
+            LOG.debug("ClientVersion [{}]", client_version);
             tlsClientContext.setClientVersion(client_version);
         }
 
->>>>>>> r1rv61
         /*
          * TODO RFC 5077 3.4. When presenting a ticket, the client MAY generate and include a
          * Session ID in the TLS ClientHello.
@@ -988,15 +956,8 @@ public class TlsClientProtocol
         boolean fallback = this.tlsClient.isFallback();
 
         this.offeredCipherSuites = this.tlsClient.getCipherSuites();
-<<<<<<< HEAD
         LOG.debug("Offered CipherSuites [{}]", offeredCipherSuites);
         
-        this.offeredCompressionMethods = this.tlsClient.getCompressionMethods();
-        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
-        
-=======
-
->>>>>>> r1rv61
         if (session_id.length > 0 && this.sessionParameters != null)
         {
             /*
