@@ -21,6 +21,8 @@ public class JceBlockCipherImpl
 {
     private static Logger LOG = Logger.getLogger(JceBlockCipherImpl.class.getName());
     
+    private static final int BUF_SIZE = 32 * 1024;
+
     private final int cipherMode;
     private final Cipher cipher;
     private final String algorithm;
@@ -63,7 +65,20 @@ public class JceBlockCipherImpl
     {
         try
         {
-            return cipher.doFinal(input, inputOffset, inputLength, output, outputOffset);
+            // to avoid performance issue in FIPS jar  1.0.0-1.0.2
+            int totLen = 0;
+            while (inputLength > BUF_SIZE)
+            {
+                totLen += cipher.update(input, inputOffset, BUF_SIZE, output, outputOffset + totLen);
+
+                inputOffset += BUF_SIZE;
+                inputLength -= BUF_SIZE;
+            }
+
+            totLen += cipher.update(input, inputOffset, inputLength, output, outputOffset + totLen);
+            totLen += cipher.doFinal(output, outputOffset + totLen);
+
+            return totLen;
         }
         catch (GeneralSecurityException e)
         {

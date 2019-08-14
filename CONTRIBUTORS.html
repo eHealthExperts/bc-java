@@ -1,5 +1,5 @@
 <html>
-<object bgcolor=#ffffff>
+<body bgcolor=#ffffff>
 The following organisations and people have contributed to the Bouncy Castle Cryptography Package.
 <p>
 Thanks, may your castles never deflate!
@@ -270,7 +270,7 @@ Optimisation to avoid redundant verification in path validator. Suggestion to us
 ASN.1 encoding of field elements in X9FieldElement class.</li>
 <li>Olaf Keller, &lt;olaf.keller.bc&#064bluewin.ch&gt; - initial implementation of the elliptic curves over binary fields F2m. Additional tests and modifications to elliptic curve support for both F2m and Fp. Performance improvements to F2m multiplication. Initial implementation of WNAF/WTNAF point multiplication. Improvement to k value generation in ECDSA.</li>
 <li>J&ouml;rg Eichhorn &lt;eichhorn&#064ponton-consulting.de&gt; - patch to fix EOF read on SharedFileInputStream, support for F2m compression.</li>
-<li>Karsten Ohme &lt;widerstand&#064t-online.de&gt; - initial check against for out of range data on non byte aligned RSA keys. Addition of equals/hashCode on ECCurve.Fp. Additional curve type support for Fp, contributions to F2m compression. F2m decoding for ECPointUtil. Infinity fix and prime192v2 fix for Fp. Extra validation for RSA key creation. Fix to name typos for some OpenSSL key generators. RFC-1779 table, improved RFC 2253 compliance for X509Name. Additional constructor validation for X.509/ESS ASN.1 classes. Validation for Printable, IA5, and Numeric Strings.
+<li>Karsten Ohme &lt;widerstand&#064t-online.de&gt; - initial check against for out of range data on non byte aligned RSA keys. Addition of equals/hashCode on ECCurve.Fp. Additional curve type support for Fp, contributions to F2m compression. F2m decoding for ECPointUtil. Infinity fix and prime192v2 fix for Fp. Extra validation for RSA key creation. Fix to name typos for some OpenSSL key generators. RFC-1779 table, improved RFC 2253 compliance for X509Name. Additional constructor validation for X.509/ESS ASN.1 classes. Validation for Printable, IA5, and Numeric Strings. Fix for RFC 5280 NameConstraint checking for RDNs.</li>
 Support for surrogate pairs in DERUTF8String, DER UTF8 test. Additional X.509 name attributes for ISIS-MTT, RFC 3039, addition of indirect CRL support, initial X509 LDAP CertStore implementation, CertificatePair class, and X509CertificatePair class. Contributions to X509Store/Parser infrastructure and design.
 CertPath support for implicit DSA parameters and a range of NameConstraints. Addition of support for V1 attribute certificates and attribute certificate path validation. Initial classes for ASN.1 ISIS-MTT support. Enhancements for improving compliance with the NIST CertPath tests.</li>
 <li>Carlos Lozano Ruiz &lt;carlos&#064tradise.com&gt; - patch for &lt;ctrl&gt;&lt;m&gt; only handling in CRLFOutputStream.</li>
@@ -307,7 +307,7 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>Jakub Gwozdz &lt;gwozdziu&#064rpg.pl&gt; - addition of getTsa() to TimeStampTokenInfo.</li>
 <li>Bartosz Malkowski &lt;bmalkow&#064tigase.org&gt; - initial implementation of VMPC cipher, VMPCRandomGenerator, VMPCMac.</li>
 <li>Tal Yacobi &lt;tal.yacobi&#064octavian-tech.com&gt; - fix for issue in OpenPGP examples [#BJA-55].</li>
-<li>Massimiliano Ziccardi &lt;massimiliano.ziccardi&#064gmail.comt&gt; - support for counter signature reading in CMS API, update for multiple counter signature attributes.</li>
+<li>Massimiliano Ziccardi &lt;massimiliano.ziccardi&#064gmail.comt&gt; - support for counter signature reading in CMS API, update for multiple counter signature attributes, JCA compliance patch for PEM parsing in CertificateFactory.</li>
 <li>Andrey Pavlenko &lt;andrey.a.pavlenko&#064gmail.com&gt; - security manager patch for PKCS1Encoding property check.</li>
 <li>J Ross Nicoll &lt;jrn&#064jrn.me.uk&gt; - improved exception handling for getInstance() in ASN.1 library.</li>
 <li>Matthew Stevenson &lt;mavricknz&#064yahoo.com&gt; - patch to construtor for CRMF CertSequence.</li>
@@ -390,7 +390,7 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>Ash Hughes &lt;ashley.hughes&#064blueyonder.co.uk&gt; patches for supporting PGPSecretKeyRing/PGPSecretKeys encodings with empty private keys, initial code for PGPSignatureSubpacketVector.getEmbeddedSignatures().</li>
 <li>Daniel Hirscher &lt;dev&#064daniel-hirscher.de&gt; patch to support parsing of explicit EC parameters in PEM files.</li>
 <li>Daniele Ricci &lt;daniele.athome&#064gmail.com&gt; initial implementation of EC keys for OpenpPGP and RFC6637 support.</li>
-<li>Matti Aarnio &lt;matti.aarnio&#064methics.fi&gt; tweaks to any build to remove dependence on shell scripts. Initial SM3 digest implementation, some EC related code cleanups, JavaDoc improvements for ASN.1 classes.</li>
+<li>Matti Aarnio &lt;matti.aarnio&#064methics.fi&gt; tweaks to any build to remove dependence on shell scripts. Initial SM3 digest implementation, some EC related code cleanups, JavaDoc improvements for ASN.1 classes, addition of NONEwithRSA to lightweight RSADigestSigner.</li>
 <li>Babak Najafi &lt;bnajafi&#064akamai.com&gt; fixes to OpenPGP NotationData to prevent truncation problems.</li>
 <li>Eric M&uuml;ller &lt;eric.mueller&#064sage.de&gt; additional standard algorithm name lookups in JcaPEMKeyConverter.</li>
 <li>Mathias Herberts &lt;Mathias.Herberts&#064gmail.com&gt; fix to inOff usage in RFC3394WrapEngine.</li>
@@ -429,7 +429,7 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>Rich DiCroce&lt;https://github.com/rdicroce&gt; Initial implementation of server-side TLS-SRP support. TLS API extension to support non-blocking usage.</li>
 <li>Bj&ouml;rn Kautler&lt;https://github.com/Vampire&gt; Refinements to cert path validation (authority key addition, certificate order preservation).</li>
 <li>Dominik Sch&uuml;rmann&lt;https://github.com/dschuermann&gt; method for returning signatures/verifications without user IDs on PGPPublicKey, method for exposing S2K in PGPSecretKey, constants for GNU protection modes in S2K classes, optional version header for armored output.</li>
-<li>Michael &lt;MSKnete&#064web.de&gt; initial fix for bitStrength issue for OpenPGP EC keys.</li>
+<li>Michael &lt;MSKnete&#064web.de&gt; initial fix for bitStrength issue for OpenPGP EC keys, correction for generic type on RecipientInformationStore.</li>
 <li>Tobias Wagner &lt;tobias.wagner&#064n-design.de&gt; Fix SecureRandom handling in BcAsymmetricKeyWrapper [#BJA-536].</li>
 <li>Sergio Giro &lt;sgiro&#064google.com&gt; Fixed adding of additional stores from CRL distribution point [#BJA-537]. Fixed missing null check for CRL certificate issuer [#BJA-538], removal of risky zeroisation code in PBE.java, check for salt in PBEKeys that require it.</li>
 <li>bschuette&lt;https://github.com/bschuette&gt; Fixed typo in DefaultSignatureAlgorithmIdentifierFinder, additional methods on CMSSignedDataParser.</li>
@@ -474,7 +474,7 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>Scott Woodward &lt;scott&#064bit3consulting.com&gt; performance fixes for CTRSP800DRBG.</li>
 <li>David Strawn &lt;https://github.com/isomarcte&gt; fix for off by one error in SCRYPT bounds checking.</li>
 <li>chris mccown &lt;0xchrismccown&#064gmail.com&gt; identification of serialisation issue with XMSS/XMSSMT private keys (see also CVE-2018-1000613).</li>
-<li>ZZMarquis &lt;https://github.com/ZZMarquis&gt; offset patch for SM2 decrypt.</li>
+<li>ZZMarquis &lt;https://github.com/ZZMarquis&gt; offset patches for SM2 encryption and decryption, improvement to Array constant time comparison.</li>
 <li>Andreas Kretschmer &lt;https://github.com/Akretsch&gt; NPE fix for CertTemplate.getVersion()</li>
 <li>Armin Lunkeit, Michael Tautenhahn &lt;&gt; identification of M-R test issue on higher certainty values in RSA key pair generation.</li> 
 <li>Vincent Breitmoser &lt;https://github.com/Valodim&gt; fix to ignore unnecessary checksum calculator on PGP secret key encryption.</li>
@@ -492,6 +492,18 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>Vincent Bouckaert &lt;https://github.com/veebee&gt; initial version of RFC 4998 ASN.1 classes.</li>
 <li>Tony Washer &lt;https://github.com/tonywasher&gt; ECIESKeyEncapsulation fix for use of OldCofactor mode.</li>
 <li>Aurimas Liutikas &lt;https://github.com/liutikas&gt; JavaDoc patches to ReasonsMask.</li>
+<li>Gabriel Sroka &lt;https://github.com/gabrielsroka&gt; corrected comments in RSA validation.</li>
+<li>sarah-mdv &lt;https://github.com/sarah-mdv&gt; improvements to JceKeyTransRecipientInfoGenerator, tests for JournalingSecureRandom, initial implementation of JournaledAlgorithm.</li>
+<li>Jesse Feinman &lt;https://github.com/jessefeinman&gt; performance optimisation in RSAKeyParameters.</li>
+<li>Gilis95 &lt;https://github.com/Gilis95&gt; improved JSSE compatibility for setEnabledCipherSuites.</li>
+<li>Haemin Yoo &lt;https://github.com/yoohaemin&gt; Javadoc fixes.</li>
+<li>Antoine Toulme &lt;https://github.com/atoulme&gt; Initial implementation of EthereumIESEngine.</li>
+<li>Golden Looly &lt;https://github.com/looly&gt; Patch for addition of C1C3C2 mode to SM2Engine.</li>
+<li>Moses Palm&eacute;r, TrueSec &lt;Henrik.Palmer&#064truesec.se&gt; Additional improvements to constant time comparisons.</li>
+<li>Ren&eacute; Korthaus&lt;https://github.com/securitykernel&gt; Update to XMSS/XMSS^MT OID values to bring them in line with RFC 8391.</li>
+<li>THausherr&lt;https://github.com/THausherr&gt; Addition generic support for CMS/TSP functions.</li>
+<li>Gaylor Bosson&lt;https://github.com/Gilthoniel&gt; Initial implementation of Blake2xs.</li>
+<li>gaellalire&lt;https://github.com/gaellalire&gt; Patch for unprotected PGP private keys as SExpr.</li>
 </ul>
-</object>
+</body>
 </html>

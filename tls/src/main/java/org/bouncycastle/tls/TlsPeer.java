@@ -5,11 +5,25 @@ import java.io.IOException;
 import org.bouncycastle.tls.crypto.TlsCrypto;
 
 /**
- * Base interface for a TLS endpoint.
+ * Base interface for a (D)TLS endpoint.
  */
 public interface TlsPeer
 {
     TlsCrypto getCrypto();
+
+    /**
+     * <p>
+     * NOTE: Currently only respected by DTLS protocols.
+     * </p>
+     * <p>
+     * Specify the timeout, in milliseconds, to use for the complete handshake process. Negative
+     * values are not allowed. A timeout of zero means an infinite timeout (i.e. the handshake will
+     * never time out).
+     * </p>
+     * 
+     * @return the handshake timeout, in milliseconds.
+     */
+    int getHandshakeTimeoutMillis();
 
     /**
      * Notifies the peer that a new handshake is about to begin.
@@ -93,6 +107,29 @@ public interface TlsPeer
      * Notifies the peer that the handshake has been successfully completed.
      */
     void notifyHandshakeComplete() throws IOException;
+
+    /**
+     * Return a {@link TlsHeartbeat} instance that will control the generation of heartbeats locally
+     * (if permitted by the remote peer), or null to not generate heartbeats. Heartbeats are
+     * described in RFC 6520.
+     * 
+     * @return an instance of {@link TlsHeartbeat}.
+     * @see DefaultTlsHeartbeat
+     */
+    TlsHeartbeat getHeartbeat();
+
+    /**
+     * <p>
+     * Return the heartbeat mode applicable to the remote peer. Heartbeats are described in RFC
+     * 6520.
+     * </p>
+     * <p>
+     * See enumeration class {@link HeartbeatMode} for appropriate return values.
+     * </p>
+     * 
+     * @return the {@link HeartbeatMode} value.
+     */
+    short getHeartbeatPolicy();
 
     /**
      * WARNING: EXPERIMENTAL FEATURE

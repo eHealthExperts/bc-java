@@ -4,10 +4,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.SecureRandom;
 
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.util.Arrays;
 
 /**
- * A SecureRandom that maintains a journal of its output.
+* A SecureRandom that maintains a journal of its output.
+* This can be used to recreate an output that was based on randomness
+* For the transcript to be reusable, the order of the requests for randomness during recreation must be consistent with the initial requests and no other sources of randomness may be used.
  */
 public class JournalingSecureRandom
     extends SecureRandom
@@ -15,10 +18,19 @@ public class JournalingSecureRandom
     private static byte[] EMPTY_TRANSCRIPT = new byte[0];
 
     private final SecureRandom base;
-    private final byte[] transcript;
 
     private TranscriptStream tOut = new TranscriptStream();
+    private byte[] transcript;
+
     private int index = 0;
+
+    /**
+     * Default constructor that takes an arbitrary SecureRandom as initial random
+     */
+    public JournalingSecureRandom()
+    {
+        this(CryptoServicesRegistrar.getSecureRandom());
+    }
 
     /**
      * Base constructor - no prior transcript.
@@ -36,16 +48,16 @@ public class JournalingSecureRandom
      * any new randomness are journaled.
      *
      * @param transcript initial transcript of randomness.
-     * @param random source of randomness we will be journaling when the transcript runs out.
+     * @param random     source of randomness we will be journaling when the transcript runs out.
      */
     public JournalingSecureRandom(byte[] transcript, SecureRandom random)
     {
-         this.base = random;
-         this.transcript = Arrays.clone(transcript);
+        this.base = random;
+        this.transcript = Arrays.clone(transcript);
     }
 
     /**
-     * Fill bytes with random data, journaling the random data before returning.
+     * Fill bytes with random data, journaling the random data before returning or re-use previously used random data, depending on the state of the transcript.
      *
      * @param bytes a block of bytes to be filled with random data.
      */
@@ -102,6 +114,19 @@ public class JournalingSecureRandom
     }
 
     /**
+     * Resets the index to zero such that the randomness will now be reused
+     */
+    public void reset()
+    {
+        index = 0;
+        if (index == transcript.length)
+        {
+            transcript = tOut.toByteArray();
+        }
+        tOut.reset();
+    }
+
+    /**
      * Return the transcript so far,
      *
      * @return a copy of the randomness produced so far.
@@ -109,6 +134,20 @@ public class JournalingSecureRandom
     public byte[] getTranscript()
     {
         return tOut.toByteArray();
+    }
+
+    /**
+     * Return the full transcript, such as would be needed to create a copy of this JournalingSecureRandom,
+     *
+     * @return a copy of the original transcript on construction, plus any randomness added since.
+     */
+    public byte[] getFullTranscript()
+    {
+         if (index == transcript.length)
+         {
+             return tOut.toByteArray();
+         }
+         return Arrays.clone(transcript);
     }
 
     private class TranscriptStream

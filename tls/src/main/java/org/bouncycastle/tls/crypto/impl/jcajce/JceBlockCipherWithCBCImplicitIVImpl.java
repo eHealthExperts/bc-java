@@ -19,6 +19,8 @@ import org.bouncycastle.util.Arrays;
 public class JceBlockCipherWithCBCImplicitIVImpl
     implements TlsBlockCipherImpl
 {
+    private static final int BUF_SIZE = 32 * 1024;
+
     private final Cipher cipher;
     private final String algorithm;
     private final boolean isEncrypting;
@@ -62,14 +64,25 @@ public class JceBlockCipherWithCBCImplicitIVImpl
                 nextIV = Arrays.copyOfRange(input, inputOffset + inputLength - cipher.getBlockSize(), inputOffset + inputLength);
             }
 
-            int len = cipher.doFinal(input, inputOffset, inputLength, output, outputOffset);
+            // to avoid performance issue in FIPS jar  1.0.0-1.0.2
+            int totLen = 0;
+            while (inputLength > BUF_SIZE)
+            {
+                totLen += cipher.update(input, inputOffset, BUF_SIZE, output, outputOffset + totLen);
+
+                inputOffset += BUF_SIZE;
+                inputLength -= BUF_SIZE;
+            }
+
+            totLen += cipher.update(input, inputOffset, inputLength, output, outputOffset + totLen);
+            totLen += cipher.doFinal(output, outputOffset + totLen);
 
             if (isEncrypting)
             {
-                nextIV = Arrays.copyOfRange(output, outputOffset + inputLength - cipher.getBlockSize(), outputOffset + inputLength);
+                nextIV = Arrays.copyOfRange(output, outputOffset + totLen - cipher.getBlockSize(), outputOffset + totLen);
             }
 
-            return len;
+            return totLen;
         }
         catch (GeneralSecurityException e)
         {

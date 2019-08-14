@@ -22,6 +22,11 @@ public abstract class AbstractTlsPeer
         return crypto;
     }
 
+    public int getHandshakeTimeoutMillis()
+    {
+        return 0;
+    }
+
     public void notifyHandshakeBeginning() throws IOException
     {
     }
@@ -84,6 +89,16 @@ public abstract class AbstractTlsPeer
 
     public void notifyHandshakeComplete() throws IOException
     {
+    }
+
+    public TlsHeartbeat getHeartbeat()
+    {
+        return null;
+    }
+
+    public short getHeartbeatPolicy()
+    {
+        return HeartbeatMode.peer_not_allowed_to_send;
     }
 
     public int getRenegotiationPolicy()

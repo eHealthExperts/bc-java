@@ -219,6 +219,13 @@ public class JcaTlsCrypto
         }
     }
 
+    public TlsHMAC createHMAC(short hashAlgorithm)
+    {
+        String digestName = getDigestName(hashAlgorithm).replaceAll("-", "");
+        String hmacName = "Hmac" + digestName;
+        return createHMAC(hmacName);
+    }
+
     public TlsHMAC createHMAC(int macAlgorithm)
     {
         switch (macAlgorithm)
@@ -646,6 +653,11 @@ public class JcaTlsCrypto
                 }
             }
         };
+    }
+
+    public TlsSecret hkdfInit(short hashAlgorithm)
+    {
+        return adoptLocalSecret(new byte[HashAlgorithm.getOutputSize(hashAlgorithm)]);
     }
 
     /**

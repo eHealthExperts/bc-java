@@ -12,6 +12,7 @@ import java.nio.channels.SocketChannel;
 import java.security.Principal;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,7 +22,9 @@ import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.SSLSocket;
 
+import org.bouncycastle.jsse.BCApplicationProtocolSelector;
 import org.bouncycastle.jsse.BCExtendedSSLSession;
 import org.bouncycastle.jsse.BCSSLConnection;
 import org.bouncycastle.jsse.BCSSLParameters;
@@ -73,8 +76,6 @@ class ProvSSLSocketWrap
     protected ProvSSLSocketWrap(ProvSSLContextSpi context, ContextData contextData, Socket s, InputStream consumed, boolean autoClose)
         throws IOException
     {
-        super();
-
         this.context = context;
         this.contextData = contextData;
         this.wrapSocket = checkSocket(s);
@@ -89,8 +90,6 @@ class ProvSSLSocketWrap
     protected ProvSSLSocketWrap(ProvSSLContextSpi context, ContextData contextData, Socket s, String host, int port, boolean autoClose)
         throws IOException
     {
-        super();
-
         this.context = context;
         this.contextData = contextData;
         this.wrapSocket = checkSocket(s);
@@ -189,14 +188,42 @@ class ProvSSLSocketWrap
     }
 
     @Override
-    public SocketChannel getChannel()
+    protected void finalize() throws Throwable
     {
-        return wrapSocket.getChannel();
+        try
+        {
+            close();
+        }
+        catch (IOException e)
+        {
+            // Ignore
+        }
+        finally
+        {
+            super.finalize();
+        }
+    }
+
+    // An SSLSocket method from JDK 9, but also a BCSSLSocket method
+    public synchronized String getApplicationProtocol()
+    {
+        return null == connection ? null : connection.getApplicationProtocol();
+    }
+
+    public synchronized BCApplicationProtocolSelector<SSLSocket> getBCHandshakeApplicationProtocolSelector()
+    {
+        return sslParameters.getSocketAPSelector();
     }
 
     public synchronized BCExtendedSSLSession getBCHandshakeSession()
     {
         return handshakeSession;
+    }
+
+    @Override
+    public SocketChannel getChannel()
+    {
+        return wrapSocket.getChannel();
     }
 
     public synchronized BCSSLConnection getConnection()
@@ -229,6 +256,12 @@ class ProvSSLSocketWrap
     public synchronized boolean getEnableSessionCreation()
     {
         return enableSessionCreation;
+    }
+
+    // An SSLSocket method from JDK 9, but also a BCSSLSocket method
+    public synchronized String getHandshakeApplicationProtocol()
+    {
+        return null == handshakeSession ? null : handshakeSession.getApplicationProtocol();
     }
 
     @Override
@@ -412,6 +445,11 @@ class ProvSSLSocketWrap
     public boolean isOutputShutdown()
     {
         return wrapSocket.isOutputShutdown();
+    }
+
+    public synchronized void setBCHandshakeApplicationProtocolSelector(BCApplicationProtocolSelector<SSLSocket> selector)
+    {
+        sslParameters.setSocketAPSelector(selector);
     }
 
     @Override
@@ -624,6 +662,11 @@ class ProvSSLSocketWrap
     public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
     {
         this.handshakeSession = handshakeSession;
+    }
+
+    public synchronized String selectApplicationProtocol(List<String> protocols)
+    {
+        return sslParameters.getSocketAPSelector().select(this, protocols);
     }
 
     synchronized void handshakeIfNecessary(boolean resumable) throws IOException

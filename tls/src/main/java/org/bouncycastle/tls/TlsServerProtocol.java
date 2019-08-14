@@ -449,7 +449,7 @@ public class TlsServerProtocol
         case HandshakeType.server_key_exchange:
         case HandshakeType.certificate_request:
         case HandshakeType.server_hello_done:
-        case HandshakeType.session_ticket:
+        case HandshakeType.new_session_ticket:
         default:
             throw new TlsFatalAlert(AlertDescription.unexpected_message);
         }
@@ -510,16 +510,15 @@ public class TlsServerProtocol
         // TODO[tls13] For subsequent ClientHello messages (of a TLSv13 handshake) don't do this!
         recordStream.setWriteVersion(ProtocolVersion.TLSv10);
 
-        ProtocolVersion client_version = TlsUtils.readVersion(buf);
+        ClientHello clientHello = ClientHello.parse(buf, null);
+        ProtocolVersion client_version = clientHello.getClientVersion();
         LOG.debug("ClientVersion [{}]", client_version);
-
-        byte[] client_random = TlsUtils.readFully(32, buf);
-
+        
         /*
          * TODO RFC 5077 3.4. If a ticket is presented by the client, the server MUST NOT attempt to
          * use the Session ID in the ClientHello for stateful session resumption.
          */
-        byte[] sessionID = TlsUtils.readOpaque8(buf, 0, 32);
+        byte[] sessionID = clientHello.getSessionID();
 
         
         TlsSession sessionToResume = tlsServer.getSessionToResume(sessionID);
@@ -538,15 +537,10 @@ public class TlsServerProtocol
                 }
         	}
         }
-        
-        int cipher_suites_length = TlsUtils.readUint16(buf);
-        if (cipher_suites_length < 2 || (cipher_suites_length & 1) != 0)
-        {
-            throw new TlsFatalAlert(AlertDescription.decode_error);
-        }
-        this.offeredCipherSuites = TlsUtils.readUint16Array(cipher_suites_length / 2, buf);
+
+        this.offeredCipherSuites = clientHello.getCipherSuites();
         LOG.debug("Offered CipherSuites [{}]", offeredCipherSuites);
-        
+
         /*
          * RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
          * resumption request), this vector MUST include at least the cipher_suite from that
@@ -556,38 +550,16 @@ public class TlsServerProtocol
         {
             if (!Arrays.contains(this.offeredCipherSuites, sessionParameters.getCipherSuite()))
             {
-            	resetCurrentSession();
+                resetCurrentSession();
             }
         }
-        
-        int compression_methods_length = TlsUtils.readUint8(buf);
-        if (compression_methods_length < 1)
-        {
-            throw new TlsFatalAlert(AlertDescription.decode_error);
-        }
 
-        short[] offeredCompressionMethods = TlsUtils.readUint8Array(compression_methods_length, buf);
-
-        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
-      
-        /*
-         * RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
-         * resumption request), it MUST include the compression_method from that session.
-         */
-        if (sessionID.length > 0 && this.sessionParameters != null)
-        {
-            if (!Arrays.contains(this.offeredCompressionMethods, sessionParameters.getCompressionAlgorithm()))
-            {
-            	resetCurrentSession();
-            }
-        }
-        
         /*
          * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
          * extensions appearing in the client hello, and send a server hello containing no
          * extensions.
          */
-        this.clientExtensions = readExtensions(buf);
+        this.clientExtensions = clientHello.getExtensions();
 
 
  
@@ -630,24 +602,16 @@ public class TlsServerProtocol
 
         tlsServer.notifyClientVersion(tlsServerContext.getClientVersion());
 
-        securityParameters.clientRandom = client_random;
+        securityParameters.clientRandom = clientHello.getRandom();
 
         if (sessionID.length > 0 && this.sessionParameters != null)
         {
             tlsServer.notifyFallback(sessionParameters.getCipherSuite() == CipherSuite.TLS_FALLBACK_SCSV);
         	tlsServer.notifyOfferedCipherSuites(new int[] {sessionParameters.getCipherSuite()});
-        	if (sessionParameters.getCompressionAlgorithm() != CompressionMethod._null)
-        	{
-        	    throw new TlsFatalAlert(AlertDescription.handshake_failure);
-        	}
         }
         else {
             tlsServer.notifyFallback(Arrays.contains(offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV));
         	tlsServer.notifyOfferedCipherSuites(offeredCipherSuites);
-        	if (!Arrays.contains(offeredCompressionMethods, CompressionMethod._null))
-        	{
-        	    throw new TlsFatalAlert(AlertDescription.handshake_failure);
-        	}
         }
 
         /*
@@ -844,7 +808,7 @@ public class TlsServerProtocol
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
 
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.session_ticket);
+        HandshakeMessage message = new HandshakeMessage(HandshakeType.new_session_ticket);
 
         newSessionTicket.encode(message);
 
@@ -868,7 +832,10 @@ public class TlsServerProtocol
         {
             server_version = tlsServer.getServerVersion();
             LOG.debug("ServerVersion [{}]", server_version);
-            if (null == server_version || !ProtocolVersion.TLSv10.isEqualOrEarlierVersionOf(server_version)
+
+            if (null == server_version
+                || server_version.isEarlierVersionOf(ProtocolVersion.TLSv10)
+                || server_version.isLaterVersionOf(ProtocolVersion.TLSv12)
                 || !ProtocolVersion.contains(tlsServerContext.getClientSupportedVersions(), server_version))
             {
                 throw new TlsFatalAlert(AlertDescription.internal_error);
@@ -966,6 +933,7 @@ public class TlsServerProtocol
          * messages are considered.
          */
         securityParameters.applicationProtocol = TlsExtensionsUtils.getALPNExtensionServer(serverExtensions);
+        securityParameters.applicationProtocolSet = true;
 
         /*
          * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore

@@ -12,13 +12,14 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 
-import junit.framework.TestCase;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jsse.BCSSLConnection;
 import org.bouncycastle.jsse.BCSSLParameters;
 import org.bouncycastle.jsse.BCSSLSocket;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 import org.bouncycastle.util.Arrays;
+
+import junit.framework.TestCase;
 
 public class CipherSuitesTestCase extends TestCase
 {
@@ -176,15 +177,44 @@ public class CipherSuitesTestCase extends TestCase
                 SSLSocket sslSock = (SSLSocket)sSock.accept();
                 sslSock.setUseClientMode(false);
 
+//                sslSock.setHandshakeApplicationProtocolSelector((socket, protocols) ->
+//                {
+//                    if (protocols.contains("h2"))
+//                    {
+//                        return "h2";
+//                    }
+//                    if (protocols.contains("http/1.1"))
+//                    {
+//                        return "http/1.1";
+//                    }
+//                    return null;
+//                });
+
                 if (sslSock instanceof BCSSLSocket)
                 {
                     BCSSLSocket bcSock = (BCSSLSocket)sslSock;
-    
+
                     BCSSLParameters bcParams = new BCSSLParameters();
                     bcParams.setApplicationProtocols(new String[]{ "h2", "http/1.1" });
     
                     bcSock.setParameters(bcParams);
-    
+
+//                    bcSock.setBCHandshakeApplicationProtocolSelector(new BCApplicationProtocolSelector<SSLSocket>()
+//                    {
+//                        public String select(SSLSocket transport, List<String> protocols)
+//                        {
+//                            if (protocols.contains("h2"))
+//                            {
+//                                return "h2";
+//                            }
+//                            if (protocols.contains("http/1.1"))
+//                            {
+//                                return "http/1.1";
+//                            }
+//                            return null;
+//                        }
+//                    });
+
                     BCSSLConnection bcConn = bcSock.getConnection();
                     if (bcConn != null)
                     {

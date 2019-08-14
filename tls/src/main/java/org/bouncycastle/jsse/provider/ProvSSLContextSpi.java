@@ -58,12 +58,25 @@ class ProvSSLContextSpi
     private static final List<String> DEFAULT_CIPHERSUITE_LIST = createDefaultCipherSuiteList(SUPPORTED_CIPHERSUITE_MAP.keySet());
     private static final List<String> DEFAULT_CIPHERSUITE_LIST_FIPS = createDefaultCipherSuiteListFips(DEFAULT_CIPHERSUITE_LIST);
 
+    // TODO[tls13]
+//    private static final String[] DEFAULT_PROTOCOLS = new String[]{ "TLSv1.2", "TLSv1.3" };
     private static final String[] DEFAULT_PROTOCOLS = new String[]{ "TLSv1.2" };
 
     private static List<String> createDefaultCipherSuiteList(Set<String> supportedCipherSuiteSet)
     {
         ArrayList<String> cs = new ArrayList<String>();
 
+        // TODO[tls13]
+//        /*
+//         * TLS 1.3
+//         */
+//        cs.add("TLS_CHACHA20_POLY1305_SHA256");
+//        cs.add("TLS_AES_256_GCM_SHA256");
+//        cs.add("TLS_AES_128_GCM_SHA256");
+
+        /*
+         * pre-TLS 1.3
+         */
         cs.add("TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256");
         cs.add("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384");
         cs.add("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256");
@@ -171,6 +184,16 @@ class ProvSSLContextSpi
         cs.put("TLS_RSA_WITH_NULL_SHA", CipherSuite.TLS_RSA_WITH_NULL_SHA);
         cs.put("TLS_RSA_WITH_NULL_SHA256", CipherSuite.TLS_RSA_WITH_NULL_SHA256);
 
+        // TODO[tls13]
+//        /*
+//         * TLS 1.3
+//         */
+//        cs.put("TLS_AES_128_GCM_SHA256", CipherSuite.TLS_AES_128_GCM_SHA256);
+//        cs.put("TLS_AES_256_GCM_SHA384", CipherSuite.TLS_AES_256_GCM_SHA384);
+//        cs.put("TLS_CHACHA20_POLY1305_SHA256", CipherSuite.TLS_CHACHA20_POLY1305_SHA256);
+//        cs.put("TLS_AES_128_CCM_SHA256", CipherSuite.TLS_AES_128_CCM_SHA256);
+//        cs.put("TLS_AES_128_CCM_8_SHA256", CipherSuite.TLS_AES_128_CCM_8_SHA256);
+
         return Collections.unmodifiableMap(cs);
     }
 
@@ -187,6 +210,8 @@ class ProvSSLContextSpi
         ps.put("TLSv1", ProtocolVersion.TLSv10);
         ps.put("TLSv1.1", ProtocolVersion.TLSv11);
         ps.put("TLSv1.2", ProtocolVersion.TLSv12);
+        // TODO[tls13]
+//        ps.put("TLSv1.3", ProtocolVersion.TLSv13);
         return Collections.unmodifiableMap(ps);
     }
 
@@ -430,25 +455,32 @@ class ProvSSLContextSpi
         return getKeysArray(supportedProtocols);
     }
 
+    String[] getSupportedCipherSuites(String[] cipherSuites)
+    {
+        if (null == cipherSuites)
+        {
+            throw new NullPointerException("'cipherSuites' cannot be null");
+        }
+
+        ArrayList<String> result = new ArrayList<String>(cipherSuites.length);
+        for (String cipherSuite : cipherSuites)
+        {
+            if (null == cipherSuite || cipherSuite.length() < 1)
+            {
+                throw new IllegalArgumentException("'cipherSuites' cannot contain null or empty string elements");
+            }
+
+            if (supportedCipherSuites.containsKey(cipherSuite))
+            {
+                result.add(cipherSuite);
+            }
+        }
+        return getArray(result);
+    }
+
     boolean isFips()
     {
         return isInFipsMode;
-    }
-
-    boolean isSupportedCipherSuites(String[] suites)
-    {
-        if (suites == null)
-        {
-            return false;
-        }
-        for (String suite : suites)
-        {
-            if (suite == null || !supportedCipherSuites.containsKey(suite))
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
     boolean isSupportedProtocols(String[] protocols)
@@ -499,14 +531,14 @@ class ProvSSLContextSpi
     protected synchronized SSLEngine engineCreateSSLEngine()
     {
         checkInitialized();
-        return new ProvSSLEngine(this, createContextData());
+        return SSLEngineUtil.create(this, createContextData());
     }
 
     @Override
     protected synchronized SSLEngine engineCreateSSLEngine(String host, int port)
     {
         checkInitialized();
-        return new ProvSSLEngine(this, createContextData(), host, port);
+        return SSLEngineUtil.create(this, createContextData(), host, port);
     }
 
     @Override
@@ -539,6 +571,7 @@ class ProvSSLContextSpi
     protected SSLParameters engineGetSupportedSSLParameters()
     {
         // TODO[jsse] Review initial values
+        // TODO[jsse] Compare to 'getDefaultSocket' approach from SunJSSE
         SSLParameters r = new SSLParameters();
         r.setCipherSuites(getSupportedCipherSuites());
         r.setProtocols(getSupportedProtocols());

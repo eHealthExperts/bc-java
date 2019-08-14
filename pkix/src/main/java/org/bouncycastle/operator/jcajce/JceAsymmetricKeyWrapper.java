@@ -12,6 +12,7 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.InvalidParameterSpecException;
 import java.security.spec.MGF1ParameterSpec;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,6 +40,7 @@ import org.bouncycastle.asn1.pkcs.RSAESOAEPparams;
 import org.bouncycastle.asn1.rosstandart.RosstandartObjectIdentifiers;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.jcajce.spec.GOST28147WrapParameterSpec;
 import org.bouncycastle.jcajce.spec.UserKeyingMaterialSpec;
 import org.bouncycastle.jcajce.util.DefaultJcaJceHelper;
@@ -95,6 +97,20 @@ public class JceAsymmetricKeyWrapper
     public JceAsymmetricKeyWrapper(AlgorithmIdentifier algorithmIdentifier, PublicKey publicKey)
     {
         super(algorithmIdentifier);
+
+        this.publicKey = publicKey;
+    }
+
+    /**
+     * Create a wrapper, overriding the algorithm type that is stored in the public key.
+     *
+     * @param algorithmParams algorithm parameters for encryption algorithm to be used.
+     * @param publicKey the public key to be used.
+     */
+    public JceAsymmetricKeyWrapper(AlgorithmParameters algorithmParams, PublicKey publicKey)
+        throws InvalidParameterSpecException
+    {
+        super(extractFromSpec(algorithmParams.getParameterSpec(AlgorithmParameterSpec.class)));
 
         this.publicKey = publicKey;
     }
@@ -165,7 +181,7 @@ public class JceAsymmetricKeyWrapper
             {
                 if (random == null)
                 {
-                    random = new SecureRandom();
+                    random = CryptoServicesRegistrar.getSecureRandom();
                 }
                 KeyPairGenerator kpGen = helper.createKeyPairGenerator(getAlgorithmIdentifier().getAlgorithm());
 
@@ -222,10 +238,11 @@ public class JceAsymmetricKeyWrapper
         else
         {
             Cipher keyEncryptionCipher = helper.createAsymmetricWrapper(getAlgorithmIdentifier().getAlgorithm(), extraMappings);
-            AlgorithmParameters algParams = helper.createAlgorithmParameters(this.getAlgorithmIdentifier());
 
             try
             {
+                AlgorithmParameters algParams = helper.createAlgorithmParameters(this.getAlgorithmIdentifier());
+
                 if (algParams != null)
                 {
                     keyEncryptionCipher.init(Cipher.WRAP_MODE, publicKey, algParams, random);
@@ -307,7 +324,7 @@ public class JceAsymmetricKeyWrapper
 
     static
     {
-        digests.put("SHA-1", new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1, DERNull.INSTANCE));
+        digests.put("SHA1", new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1, DERNull.INSTANCE));
         digests.put("SHA-1", new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1, DERNull.INSTANCE));
         digests.put("SHA224", new AlgorithmIdentifier(NISTObjectIdentifiers.id_sha224, DERNull.INSTANCE));
         digests.put("SHA-224", new AlgorithmIdentifier(NISTObjectIdentifiers.id_sha224, DERNull.INSTANCE));

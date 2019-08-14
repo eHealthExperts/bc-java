@@ -56,6 +56,11 @@ public class JceTlsSecret
         }
     }
 
+    protected TlsSecret adoptLocalSecret(byte[] data)
+    {
+        return crypto.adoptLocalSecret(data);
+    }
+
     protected AbstractTlsCrypto getCrypto()
     {
         return crypto;

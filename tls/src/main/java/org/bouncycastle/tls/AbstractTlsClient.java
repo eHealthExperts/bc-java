@@ -193,7 +193,23 @@ public abstract class AbstractTlsClient
     {
         Hashtable clientExtensions = new Hashtable();
 
-        TlsExtensionsUtils.addEncryptThenMACExtension(clientExtensions);
+        boolean offeringPreTLSv13 = false;
+        {
+            ProtocolVersion[] supportedVersions = getSupportedVersions();
+            for (int i = 0; i < supportedVersions.length; ++i)
+            {
+                if (!TlsUtils.isTLSv13(supportedVersions[i]))
+                {
+                    offeringPreTLSv13 = true;
+                    break;
+                }
+            }
+        }
+
+        if (offeringPreTLSv13)
+        {
+            TlsExtensionsUtils.addEncryptThenMACExtension(clientExtensions);
+        }
 
         Vector protocolNames = getProtocolNames();
         if (protocolNames != null)
@@ -236,14 +252,32 @@ public abstract class AbstractTlsClient
             TlsExtensionsUtils.addSupportedGroupsExtension(clientExtensions, supportedGroups);
         }
 
-        if (namedGroupRoles.contains(Integers.valueOf(NamedGroupRole.ecdh))
-            || namedGroupRoles.contains(Integers.valueOf(NamedGroupRole.ecdsa)))
+        if (offeringPreTLSv13)
         {
-            TlsExtensionsUtils.addSupportedPointFormatsExtension(clientExtensions,
-                new short[]{ ECPointFormat.uncompressed });
+            if (namedGroupRoles.contains(Integers.valueOf(NamedGroupRole.ecdh))
+                || namedGroupRoles.contains(Integers.valueOf(NamedGroupRole.ecdsa)))
+            {
+                TlsExtensionsUtils.addSupportedPointFormatsExtension(clientExtensions, new short[]{ ECPointFormat.uncompressed });
+            }
         }
 
         return clientExtensions;
+    }
+
+    public Vector getEarlyKeyShareGroups()
+    {
+        if (null != supportedGroups)
+        {
+            if (supportedGroups.contains(Integers.valueOf(NamedGroup.x25519)))
+            {
+                return TlsUtils.vectorOfOne(Integers.valueOf(NamedGroup.x25519));
+            }
+            if (supportedGroups.contains(Integers.valueOf(NamedGroup.secp256r1)))
+            {
+                return TlsUtils.vectorOfOne(Integers.valueOf(NamedGroup.secp256r1));
+            }
+        }
+        return null;
     }
 
     public void notifyServerVersion(ProtocolVersion serverVersion)

@@ -1,6 +1,7 @@
 package org.bouncycastle.jsse;
 
 import javax.net.SocketFactory;
+import javax.net.ssl.SSLSocket;
 
 /**
  * A BCJSSE-specific interface to expose extended functionality on {@link javax.net.ssl.SSLSocket}
@@ -8,6 +9,12 @@ import javax.net.SocketFactory;
  */
 public interface BCSSLSocket
 {
+    String getApplicationProtocol();
+
+    BCApplicationProtocolSelector<SSLSocket> getBCHandshakeApplicationProtocolSelector();
+
+    void setBCHandshakeApplicationProtocolSelector(BCApplicationProtocolSelector<SSLSocket> selector);
+
     BCExtendedSSLSession getBCHandshakeSession();
 
     /**
@@ -18,6 +25,8 @@ public interface BCSSLSocket
      * @return A {@link BCSSLConnection} instance.
      */
     BCSSLConnection getConnection();
+
+    String getHandshakeApplicationProtocol();
 
     /**
      * Returns a {@link BCSSLParameters} with properties reflecting the current configuration.

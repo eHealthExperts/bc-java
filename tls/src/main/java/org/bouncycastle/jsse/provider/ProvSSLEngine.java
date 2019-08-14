@@ -5,6 +5,9 @@ import java.nio.ByteBuffer;
 import java.security.Principal;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -17,6 +20,7 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.bouncycastle.jsse.BCApplicationProtocolSelector;
 import org.bouncycastle.jsse.BCExtendedSSLSession;
 import org.bouncycastle.jsse.BCSSLConnection;
 import org.bouncycastle.jsse.BCSSLEngine;
@@ -39,6 +43,8 @@ class ProvSSLEngine
     extends SSLEngine
     implements BCSSLEngine, ProvTlsManager
 {
+    private static final Logger LOG = Logger.getLogger(ProvSSLEngine.class.getName());
+
     protected final ProvSSLContextSpi context;
     protected final ContextData contextData;
     protected final ProvSSLParameters sslParameters;
@@ -46,6 +52,7 @@ class ProvSSLEngine
     protected boolean enableSessionCreation = true;
     protected boolean useClientMode = false;
 
+    protected boolean closedEarly = false;
     protected boolean initialHandshakeBegun = false;
     protected HandshakeStatus handshakeStatus = HandshakeStatus.NOT_HANDSHAKING; 
     protected TlsProtocol protocol = null;
@@ -87,6 +94,10 @@ class ProvSSLEngine
     public synchronized void beginHandshake()
         throws SSLException
     {
+        if (closedEarly)
+        {
+            throw new SSLException("Connection is already closed");
+        }
         if (initialHandshakeBegun)
         {
             throw new UnsupportedOperationException("Renegotiation not supported");
@@ -167,37 +178,60 @@ class ProvSSLEngine
     public synchronized void closeInbound()
         throws SSLException
     {
-        // TODO How to behave when protocol is still null?
-        try
+        if (closedEarly)
         {
-            protocol.closeInput();
+            // SSLEngine already closed before any handshake attempted
         }
-        catch (IOException e)
+        else if (null == protocol)
         {
-            throw new SSLException(e);
+            this.closedEarly = true;
+        }
+        else
+        {
+            try
+            {
+                protocol.closeInput();
+            }
+            catch (IOException e)
+            {
+                throw new SSLException(e);
+            }
         }
     }
 
     @Override
     public synchronized void closeOutbound()
     {
-        // TODO How to behave when protocol is still null?
-        try
+        if (closedEarly)
         {
-            protocol.close();
+            // SSLEngine already closed before any handshake attempted
         }
-        catch (IOException e)
+        else if (null == protocol)
         {
-           // TODO[logging] 
+            this.closedEarly = true;
+        }
+        else
+        {
+            try
+            {
+                protocol.close();
+            }
+            catch (IOException e)
+            {
+                LOG.log(Level.WARNING, "Failed to close outbound", e);
+            }
         }
     }
 
-    // @Override from JDK 9
-    public String getApplicationProtocol()
+    // An SSLEngine method from JDK 9, but also a BCSSLEngine method
+    public synchronized String getApplicationProtocol()
     {
-        BCSSLConnection connection = getConnection();
+        return null == connection ? null : connection.getApplicationProtocol();
+    }
 
-        return connection == null ? null : connection.getApplicationProtocol();
+    public synchronized BCApplicationProtocolSelector<SSLEngine> getBCHandshakeApplicationProtocolSelector()
+    {
+        return sslParameters.getEngineAPSelector();
     }
 
     public synchronized BCExtendedSSLSession getBCHandshakeSession()
@@ -232,6 +266,12 @@ class ProvSSLEngine
     public synchronized boolean getEnableSessionCreation()
     {
         return enableSessionCreation;
+    }
+
+    // An SSLEngine method from JDK 9, but also a BCSSLEngine method
+    public synchronized String getHandshakeApplicationProtocol()
+    {
+        return null == handshakeSession ? null : handshakeSession.getApplicationProtocol();
     }
 
     @Override
@@ -298,13 +338,18 @@ class ProvSSLEngine
     @Override
     public synchronized boolean isInboundDone()
     {
-        return protocol != null && protocol.isClosed();
+        return closedEarly || (null != protocol && protocol.isClosed());
     }
 
     @Override
     public synchronized boolean isOutboundDone()
     {
-        return protocol != null && protocol.isClosed() && protocol.getAvailableOutputBytes() < 1;
+        return closedEarly || (null != protocol && protocol.isClosed() && protocol.getAvailableOutputBytes() < 1);
+    }
+
+    public synchronized void setBCHandshakeApplicationProtocolSelector(BCApplicationProtocolSelector<SSLEngine> selector)
+    {
+        sslParameters.setEngineAPSelector(selector);
     }
 
     @Override
@@ -655,6 +700,11 @@ class ProvSSLEngine
     public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
     {
         this.handshakeSession = handshakeSession;
+    }
+
+    public synchronized String selectApplicationProtocol(List<String> protocols)
+    {
+        return sslParameters.getEngineAPSelector().select(this, protocols);
     }
 
     private RecordPreview getRecordPreview(ByteBuffer src)

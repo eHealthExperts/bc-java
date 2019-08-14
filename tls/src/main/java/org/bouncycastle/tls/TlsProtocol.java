@@ -1052,9 +1052,6 @@ public abstract class TlsProtocol
     /**
      * Offer input from an arbitrary source. Only allowed in non-blocking mode.<br>
      * <br>
-     * After this method returns, the input buffer is "owned" by this object. Other code
-     * must not attempt to do anything with it.<br>
-     * <br>
      * This method will decrypt and process all records that are fully available.
      * If only part of a record is available, the buffer will be retained until the
      * remainder of the record is offered.<br>
@@ -1498,6 +1495,12 @@ public abstract class TlsProtocol
 
         assertEmpty(input);
 
+        return readExtensionsData(extBytes);
+    }
+
+    protected static Hashtable readExtensionsData(byte[] extBytes)
+        throws IOException
+    {
         // Integer -> byte[]
         Hashtable extensions = new Hashtable();
 
@@ -1626,10 +1629,34 @@ public abstract class TlsProtocol
 
     protected static int getPRFAlgorithm(TlsContext context, int cipherSuite) throws IOException
     {
-        boolean isTLSv12 = TlsUtils.isTLSv12(context);
+        boolean isTLSv13 = TlsUtils.isTLSv13(context);
+        boolean isTLSv12 = !isTLSv13 && TlsUtils.isTLSv12(context);
 
         switch (cipherSuite)
         {
+        case CipherSuite.TLS_AES_128_CCM_SHA256:
+        case CipherSuite.TLS_AES_128_CCM_8_SHA256:
+        case CipherSuite.TLS_AES_128_GCM_SHA256:
+        case CipherSuite.TLS_CHACHA20_POLY1305_SHA256:
+        {
+            if (isTLSv13)
+            {
+                // TODO[tls13] Do we need separate PRF entries for TLS 1.3?
+                return PRFAlgorithm.tls_prf_sha256;
+            }
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+
+        case CipherSuite.TLS_AES_256_GCM_SHA384:
+        {
+            if (isTLSv13)
+            {
+                // TODO[tls13] Do we need separate PRF entries for TLS 1.3?
+                return PRFAlgorithm.tls_prf_sha384;
+            }
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+
         case CipherSuite.TLS_DH_anon_WITH_AES_128_CBC_SHA256:
         case CipherSuite.TLS_DH_anon_WITH_AES_128_GCM_SHA256:
         case CipherSuite.TLS_DH_anon_WITH_AES_256_CBC_SHA256:

@@ -21,6 +21,7 @@ public class TlsClientProtocol
     protected TlsClient tlsClient = null;
     TlsClientContextImpl tlsClientContext = null;
 
+    protected Hashtable clientAgreements = null;
     protected TlsKeyExchange keyExchange = null;
     protected TlsAuthentication authentication = null;
 
@@ -510,7 +511,7 @@ public class TlsClientProtocol
         	LOG.trace("New connection state CS_CERTIFICATE_REQUEST");
             break;
         }
-        case HandshakeType.session_ticket:
+        case HandshakeType.new_session_ticket:
         {
             switch (this.connection_state)
             {
@@ -835,6 +836,7 @@ public class TlsClientProtocol
          * messages are considered.
          */
         securityParameters.applicationProtocol = TlsExtensionsUtils.getALPNExtensionServer(serverExtensions);
+        securityParameters.applicationProtocolSet = true;
 
         Hashtable sessionClientExtensions = clientExtensions, sessionServerExtensions = serverExtensions;
         if (this.resumedSession)
@@ -930,7 +932,9 @@ public class TlsClientProtocol
             tlsClientContext.setClientSupportedVersions(tlsClient.getSupportedVersions());
 
             client_version = ProtocolVersion.getLatestTLS(tlsClientContext.getClientSupportedVersions());
-            if (null == client_version || !ProtocolVersion.TLSv10.isEqualOrEarlierVersionOf(client_version))
+            if (null == client_version
+                || client_version.isEarlierVersionOf(ProtocolVersion.TLSv10)
+                || client_version.isLaterVersionOf(ProtocolVersion.TLSv12))
             {
                 throw new TlsFatalAlert(AlertDescription.internal_error);
             }
@@ -993,6 +997,8 @@ public class TlsClientProtocol
 
         securityParameters.clientSupportedGroups = TlsExtensionsUtils.getSupportedGroupsExtension(clientExtensions);
 
+        this.clientAgreements = TlsUtils.addEarlyKeySharesToClientHello(tlsClientContext, tlsClient, clientExtensions);
+
         TlsExtensionsUtils.addExtendedMasterSecretExtension(this.clientExtensions);
 
         securityParameters.clientRandom = createRandomBlock(tlsClient.shouldUseGMTUnixTime(), tlsClientContext);
@@ -1052,20 +1058,11 @@ public class TlsClientProtocol
 
 
 
+        ClientHello clientHello = new ClientHello(legacy_version, securityParameters.getClientRandom(), session_id,
+            null, offeredCipherSuites, clientExtensions);
+
         HandshakeMessage message = new HandshakeMessage(HandshakeType.client_hello);
-
-        TlsUtils.writeVersion(legacy_version, message);
-
-        message.write(securityParameters.getClientRandom());
-
-        TlsUtils.writeOpaque8(session_id, message);
-
-        TlsUtils.writeUint16ArrayWithUint16Length(offeredCipherSuites, message);
-
-        TlsUtils.writeUint8ArrayWithUint8Length(new short[]{ CompressionMethod._null }, message);
-
-        writeExtensions(message, clientExtensions);
-
+        clientHello.encode(tlsClientContext, message);
         message.writeToRecordStream();
     }
 

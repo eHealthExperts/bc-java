@@ -32,6 +32,7 @@ import org.bouncycastle.tls.ClientCertificateType;
 import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.KeyExchangeAlgorithm;
 import org.bouncycastle.tls.ProtocolName;
+import org.bouncycastle.tls.SecurityParameters;
 import org.bouncycastle.tls.ServerName;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
@@ -71,6 +72,22 @@ abstract class JsseUtils
         String[] tmp = new String[newLength];
         System.arraycopy(data, 0, tmp, 0, Math.min(data.length, newLength));
         return tmp;
+    }
+
+    static String getApplicationProtocol(SecurityParameters securityParameters)
+    {
+        if (null == securityParameters || !securityParameters.isApplicationProtocolSet())
+        {
+            return null;
+        }
+
+        ProtocolName applicationProtocol = securityParameters.getApplicationProtocol();
+        if (null == applicationProtocol)
+        {
+            return "";
+        }
+
+        return applicationProtocol.getUtf8Decoding();
     }
 
     static String getAuthStringClient(short signatureAlgorithm) throws IOException
@@ -188,6 +205,22 @@ abstract class JsseUtils
         for (String applicationProtocol : applicationProtocols)
         {
             protocolNames.addElement(ProtocolName.asUtf8Encoding(applicationProtocol));
+        }
+        return protocolNames;
+    }
+
+    public static List<String> getProtocolNames(Vector applicationProtocols)
+    {
+        if (null == applicationProtocols || applicationProtocols.isEmpty())
+        {
+            return null;
+        }
+
+        ArrayList<String> protocolNames = new ArrayList<String>(applicationProtocols.size());
+        for (int i = 0; i < applicationProtocols.size(); ++i)
+        {
+            ProtocolName protocolName = (ProtocolName)applicationProtocols.elementAt(i);
+            protocolNames .add(protocolName.getUtf8Decoding());
         }
         return protocolNames;
     }

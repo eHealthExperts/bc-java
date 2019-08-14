@@ -5,6 +5,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLSocket;
+
+import org.bouncycastle.jsse.BCApplicationProtocolSelector;
 import org.bouncycastle.jsse.BCSNIMatcher;
 import org.bouncycastle.jsse.BCSNIServerName;
 import org.bouncycastle.jsse.java.security.BCAlgorithmConstraints;
@@ -32,10 +36,12 @@ final class ProvSSLParameters
     private boolean wantClientAuth = false;
     private BCAlgorithmConstraints algorithmConstraints;
     private String endpointIdentificationAlgorithm;
-    private boolean useCipherSuitesOrder;
+    private boolean useCipherSuitesOrder = true;
     private List<BCSNIMatcher> sniMatchers;
     private List<BCSNIServerName> sniServerNames;
     private String[] applicationProtocols = new String[0];
+    private BCApplicationProtocolSelector<SSLEngine> engineAPSelector;
+    private BCApplicationProtocolSelector<SSLSocket> socketAPSelector;
 
     ProvSSLParameters(ProvSSLContextSpi context, String[] cipherSuites, String[] protocols)
     {
@@ -56,6 +62,8 @@ final class ProvSSLParameters
         p.sniMatchers = sniMatchers;
         p.sniServerNames = sniServerNames;
         p.applicationProtocols = applicationProtocols;
+        p.engineAPSelector = engineAPSelector;
+        p.socketAPSelector = socketAPSelector;
         return p;
     }
 
@@ -66,12 +74,7 @@ final class ProvSSLParameters
 
     public void setCipherSuites(String[] cipherSuites)
     {
-        if (!context.isSupportedCipherSuites(cipherSuites))
-        {
-            throw new IllegalArgumentException("'cipherSuites' cannot be null, or contain unsupported cipher suites");
-        }
-
-        this.cipherSuites = cipherSuites.clone();
+        this.cipherSuites = context.getSupportedCipherSuites(cipherSuites);
     }
 
     public String[] getProtocols()
@@ -181,5 +184,25 @@ final class ProvSSLParameters
     public void setApplicationProtocols(String[] applicationProtocols)
     {
         this.applicationProtocols = applicationProtocols.clone();
+    }
+    
+    public BCApplicationProtocolSelector<SSLEngine> getEngineAPSelector()
+    {
+        return engineAPSelector;
+    }
+    
+    public void setEngineAPSelector(BCApplicationProtocolSelector<SSLEngine> engineAPSelector)
+    {
+        this.engineAPSelector = engineAPSelector;
+    }
+
+    public BCApplicationProtocolSelector<SSLSocket> getSocketAPSelector()
+    {
+        return socketAPSelector;
+    }
+
+    public void setSocketAPSelector(BCApplicationProtocolSelector<SSLSocket> socketAPSelector)
+    {
+        this.socketAPSelector = socketAPSelector;
     }
 }

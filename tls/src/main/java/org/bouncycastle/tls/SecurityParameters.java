@@ -31,6 +31,7 @@ public class SecurityParameters
     boolean extendedPadding = false;
     boolean truncatedHMac = false;
     ProtocolName applicationProtocol = null;
+    boolean applicationProtocolSet = false;
     Vector clientServerNames = null;
     Vector clientSigAlgs = null;
     Vector clientSigAlgsCert = null;
@@ -218,6 +219,11 @@ public class SecurityParameters
     public ProtocolName getApplicationProtocol()
     {
         return applicationProtocol;
+    }
+
+    public boolean isApplicationProtocolSet()
+    {
+        return applicationProtocolSet;
     }
 
     public byte[] getLocalVerifyData()

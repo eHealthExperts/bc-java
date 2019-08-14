@@ -61,7 +61,7 @@ public abstract class JceKeyAgreeRecipient
 
     public JceKeyAgreeRecipient(PrivateKey recipientKey)
     {
-        this.recipientKey = recipientKey;
+        this.recipientKey = CMSUtils.cleanPrivateKey(recipientKey);
     }
 
     /**
@@ -124,6 +124,8 @@ public abstract class JceKeyAgreeRecipient
         PublicKey senderPublicKey, ASN1OctetString userKeyingMaterial, PrivateKey receiverPrivateKey, KeyMaterialGenerator kmGen)
         throws CMSException, GeneralSecurityException, IOException
     {
+        receiverPrivateKey = CMSUtils.cleanPrivateKey(receiverPrivateKey);
+
         if (CMSUtils.isMQV(keyEncAlg.getAlgorithm()))
         {
             MQVuserKeyingMaterial ukm = MQVuserKeyingMaterial.getInstance(userKeyingMaterial.getOctets());

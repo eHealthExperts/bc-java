@@ -51,7 +51,7 @@ public class DTLSClientProtocol
             }
         }
 
-        DTLSRecordLayer recordLayer = new DTLSRecordLayer(transport, client, ContentType.handshake);
+        DTLSRecordLayer recordLayer = new DTLSRecordLayer(state.clientContext, state.client, transport);
 
         try
         {
@@ -88,7 +88,8 @@ public class DTLSClientProtocol
         throws IOException
     {
         SecurityParameters securityParameters = state.clientContext.getSecurityParametersHandshake();
-        DTLSReliableHandshake handshake = new DTLSReliableHandshake(state.clientContext, recordLayer);
+        DTLSReliableHandshake handshake = new DTLSReliableHandshake(state.clientContext, recordLayer,
+            state.client.getHandshakeTimeoutMillis(), null);
 
         byte[] clientHelloBody = generateClientHello(state);
 
@@ -119,7 +120,7 @@ public class DTLSClientProtocol
             byte[] cookie = processHelloVerifyRequest(state, serverMessage.getBody());
             byte[] patched = patchClientHelloWithCookie(clientHelloBody, cookie);
 
-            handshake.resetHandshakeMessagesDigest();
+            handshake.resetAfterHelloVerifyRequestClient();
             handshake.sendMessage(HandshakeType.client_hello, patched);
 
             serverMessage = handshake.receiveMessage();
@@ -163,6 +164,8 @@ public class DTLSClientProtocol
             }
 
             state.clientContext.handshakeComplete(state.client, state.tlsSession);
+
+            recordLayer.initHeartbeat(state.heartbeat, HeartbeatMode.peer_allowed_to_send == state.heartbeatPolicy);
 
             return new DTLSTransport(recordLayer);
         }
@@ -324,7 +327,7 @@ public class DTLSClientProtocol
         if (state.expectSessionTicket)
         {
             serverMessage = handshake.receiveMessage();
-            if (serverMessage.getType() == HandshakeType.session_ticket)
+            if (serverMessage.getType() == HandshakeType.new_session_ticket)
             {
                 processNewSessionTicket(state, serverMessage.getBody());
             }
@@ -359,6 +362,8 @@ public class DTLSClientProtocol
         securityParameters.tlsUnique = securityParameters.getLocalVerifyData();
 
         state.clientContext.handshakeComplete(state.client, state.tlsSession);
+
+        recordLayer.initHeartbeat(state.heartbeat, HeartbeatMode.peer_allowed_to_send == state.heartbeatPolicy);
 
         return new DTLSTransport(recordLayer);
     }
@@ -437,6 +442,8 @@ public class DTLSClientProtocol
 
         securityParameters.clientSupportedGroups = TlsExtensionsUtils.getSupportedGroupsExtension(state.clientExtensions);
 
+        state.clientAgreements = TlsUtils.addEarlyKeySharesToClientHello(state.clientContext, state.client, state.clientExtensions);
+
         TlsExtensionsUtils.addExtendedMasterSecretExtension(state.clientExtensions);
 
         securityParameters.clientRandom = TlsProtocol.createRandomBlock(state.client.shouldUseGMTUnixTime(), state.clientContext);
@@ -469,25 +476,24 @@ public class DTLSClientProtocol
             state.offeredCipherSuites = Arrays.append(state.offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV);
         }
 
+        // Heartbeats
+        {
+            state.heartbeat = state.client.getHeartbeat();
+            state.heartbeatPolicy = state.client.getHeartbeatPolicy();
 
+            if (null != state.heartbeat || HeartbeatMode.peer_allowed_to_send == state.heartbeatPolicy)
+            {
+                TlsExtensionsUtils.addHeartbeatExtension(state.clientExtensions, new HeartbeatExtension(state.heartbeatPolicy));
+            }
+        }
+
+
+
+        ClientHello clientHello = new ClientHello(legacy_version, securityParameters.getClientRandom(), session_id,
+            TlsUtils.EMPTY_BYTES, state.offeredCipherSuites, state.clientExtensions);
 
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
-
-        TlsUtils.writeVersion(legacy_version, buf);
-
-        buf.write(securityParameters.getClientRandom());
-
-        TlsUtils.writeOpaque8(session_id, buf);
-
-        // Cookie
-        TlsUtils.writeOpaque8(TlsUtils.EMPTY_BYTES, buf);
-
-        TlsUtils.writeUint16ArrayWithUint16Length(state.offeredCipherSuites, buf);
-
-        TlsUtils.writeUint8ArrayWithUint8Length(new short[]{ CompressionMethod._null }, buf);
-
-        TlsProtocol.writeExtensions(buf, state.clientExtensions);
-
+        clientHello.encode(state.clientContext, buf);
         return buf.toByteArray();
     }
 
@@ -778,6 +784,23 @@ public class DTLSClientProtocol
          * messages are considered.
          */
         securityParameters.applicationProtocol = TlsExtensionsUtils.getALPNExtensionServer(state.serverExtensions);
+        securityParameters.applicationProtocolSet = true;
+
+        // Heartbeats
+        {
+            HeartbeatExtension heartbeatExtension = TlsExtensionsUtils.getHeartbeatExtension(state.serverExtensions);
+            if (null == heartbeatExtension)
+            {
+                state.heartbeat = null;
+                state.heartbeatPolicy = HeartbeatMode.peer_not_allowed_to_send;
+            }
+            else if (HeartbeatMode.peer_allowed_to_send != heartbeatExtension.getMode())
+            {
+                state.heartbeat = null;
+            }
+        }
+
+
 
         Hashtable sessionClientExtensions = state.clientExtensions, sessionServerExtensions = state.serverExtensions;
 
@@ -920,10 +943,13 @@ public class DTLSClientProtocol
         boolean resumedSession = false;
         boolean allowCertificateStatus = false;
         boolean expectSessionTicket = false;
+        Hashtable clientAgreements = null;
         TlsKeyExchange keyExchange = null;
         TlsAuthentication authentication = null;
         CertificateStatus certificateStatus = null;
         CertificateRequest certificateRequest = null;
         TlsCredentials clientCredentials = null;
+        TlsHeartbeat heartbeat = null;
+        short heartbeatPolicy = HeartbeatMode.peer_not_allowed_to_send;
     }
 }
