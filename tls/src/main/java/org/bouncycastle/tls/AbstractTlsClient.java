@@ -111,32 +111,7 @@ public abstract class AbstractTlsClient
         return null;
     }
 
-<<<<<<< HEAD
-    protected short[] getSupportedPointFormats()
-    {
-    	short[] supportedFormats = new short[]{ ECPointFormat.uncompressed, ECPointFormat.ansiX962_compressed_prime,
-            ECPointFormat.ansiX962_compressed_char2, };
-        
-        Vector<Short> clientECPointFormats = new Vector<Short>();
-        for (short format : supportedFormats) 
-        {
-            if(getCrypto().hasECPointFormat(format)) 
-            {
-                clientECPointFormats.addElement(format);
-            }
-        }
-        
-        short[] filteredClientECPointFormats = new short[clientECPointFormats.size()];
-        for (int i = 0; i < clientECPointFormats.size(); i++) 
-        {
-        	filteredClientECPointFormats[i] = clientECPointFormats.get(i);
-        }
-        
-        return filteredClientECPointFormats;
-    }
-=======
     protected abstract int[] getSupportedCipherSuites();
->>>>>>> r1rv61
 
     /**
      * The default {@link #getClientExtensions()} implementation calls this to determine which named
@@ -150,23 +125,6 @@ public abstract class AbstractTlsClient
      */
     protected Vector getSupportedGroups(Vector namedGroupRoles)
     {
-<<<<<<< HEAD
-    	Vector supportedGroups = new Vector();
-    	
-        /*
-         * NOTE[fips]: These curves are recommended for FIPS. If any changes are made to how
-         * this is configured, FIPS considerations need to be accounted for in BCJSSE.
-         */
-        int[] supportedCurves = NamedGroup.getSupportedCurves();
-        for (int curve : supportedCurves) 
-        {
-        	if((curve < 256 && offeringEC) || (curve >= 256 && offeringDH)) {
-        		if(getCrypto().hasNamedGroup(curve)) 
-        		{
-        			supportedGroups.addElement(curve);
-        		}
-        	}
-=======
         TlsCrypto crypto = getCrypto();
         Vector supportedGroups = new Vector();
 
@@ -178,15 +136,13 @@ public abstract class AbstractTlsClient
         if (namedGroupRoles.contains(Integers.valueOf(NamedGroupRole.ecdh))
             || namedGroupRoles.contains(Integers.valueOf(NamedGroupRole.ecdsa)))
         {
-            TlsUtils.addIfSupported(supportedGroups, crypto, new int[]{
-                NamedGroup.secp256r1, NamedGroup.secp384r1 });
+            TlsUtils.addIfSupported(supportedGroups, crypto, NamedGroup.getSupportedCurves());
         }
-
+        
         if (namedGroupRoles.contains(Integers.valueOf(NamedGroupRole.dh)))
         {
             TlsUtils.addIfSupported(supportedGroups, crypto, new int[]{
                 NamedGroup.ffdhe2048, NamedGroup.ffdhe3072, NamedGroup.ffdhe4096 });
->>>>>>> r1rv61
         }
 
         return supportedGroups;
@@ -272,17 +228,7 @@ public abstract class AbstractTlsClient
 
         Vector namedGroupRoles = getNamedGroupRoles();
 
-<<<<<<< HEAD
-        if (offeringEC)
-        {
-            this.clientECPointFormats = getSupportedPointFormats();
-            TlsECCUtils.addSupportedPointFormatsExtension(clientExtensions, this.clientECPointFormats);
-        }
-
-        Vector supportedGroups = getSupportedGroups(offeringDH, offeringEC);
-=======
         Vector supportedGroups = getSupportedGroups(namedGroupRoles);
->>>>>>> r1rv61
         if (supportedGroups != null && !supportedGroups.isEmpty())
         {
             this.supportedGroups = supportedGroups;
@@ -364,45 +310,10 @@ public abstract class AbstractTlsClient
         return null;
     }
 
-<<<<<<< HEAD
-    public TlsCompression getCompression()
-        throws IOException
-    {
-        switch (selectedCompressionMethod)
-        {
-        case CompressionMethod._null:
-            return new TlsNullCompression();
-
-        default:
-            /*
-             * Note: internal error here; the TlsProtocol implementation verifies that the
-             * server-selected compression method was in the list of client-offered compression
-             * methods, so if we now can't produce an implementation, we shouldn't have offered it!
-             */
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
-    }
-
-    public TlsCipher getCipher()
-        throws IOException
-    {
-        int encryptionAlgorithm = TlsUtils.getEncryptionAlgorithm(selectedCipherSuite);
-        int macAlgorithm = TlsUtils.getMACAlgorithm(selectedCipherSuite);
-
-        if (encryptionAlgorithm < 0 || macAlgorithm < 0)
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
-
-        return context.getSecurityParameters().getMasterSecret().createCipher(new TlsCryptoParameters(context), encryptionAlgorithm, macAlgorithm);
-    }
-    
     public boolean getNeedClientAuth() {
     	return false;
     }
 
-=======
->>>>>>> r1rv61
     public void notifyNewSessionTicket(NewSessionTicket newSessionTicket)
         throws IOException
     {

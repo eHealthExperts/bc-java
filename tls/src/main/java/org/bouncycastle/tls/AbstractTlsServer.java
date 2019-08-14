@@ -137,11 +137,7 @@ public abstract class AbstractTlsServer
         for (int i = 0; i < clientSupportedGroups.length; ++i)
         {
             int namedGroup = clientSupportedGroups[i];
-<<<<<<< HEAD
-            if (NamedGroup.getCurveBits(namedGroup) >= minimumCurveBits && getCrypto().hasNamedGroup(namedGroup))
-=======
             if (NamedGroup.getFiniteFieldBits(namedGroup) >= minimumFiniteFieldBits)
->>>>>>> r1rv61
             {
                 return namedGroup;
             }
@@ -160,41 +156,7 @@ public abstract class AbstractTlsServer
             :  -1;
     }
 
-<<<<<<< HEAD
-    protected TlsDHConfig selectDefaultDHConfig(int minimumFiniteFieldBits)
-    {
-        int namedGroup = minimumFiniteFieldBits <= 2048 ? NamedGroup.ffdhe2048
-                      :  minimumFiniteFieldBits <= 3072 ? NamedGroup.ffdhe3072
-                      :  minimumFiniteFieldBits <= 4096 ? NamedGroup.ffdhe4096
-                      :  minimumFiniteFieldBits <= 6144 ? NamedGroup.ffdhe6144
-                      :  minimumFiniteFieldBits <= 8192 ? NamedGroup.ffdhe8192
-                      :  -1;
-
-        return TlsDHUtils.createNamedDHConfig(namedGroup);
-    }
-
-    protected TlsDHConfig selectDHConfig() throws IOException
-    {
-        final TlsDHConfig defaultCryptoDHConfig = this.context.getCrypto().createDHConfig(this.selectedCipherSuite, this.clientSupportedGroups);
-        if (defaultCryptoDHConfig != null) 
-        {
-            return defaultCryptoDHConfig;
-        }
-        
-        int minimumFiniteFieldBits = TlsDHUtils.getMinimumFiniteFieldBits(selectedCipherSuite);
-
-        TlsDHConfig dhConfig = selectDHConfig(minimumFiniteFieldBits);
-        if (dhConfig == null)
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
-        return dhConfig;
-    }
-
-    protected TlsDHConfig selectDHConfig(int minimumFiniteFieldBits)
-=======
     protected int selectECDH(int minimumCurveBits)
->>>>>>> r1rv61
     {
         int[] clientSupportedGroups = context.getSecurityParametersHandshake().getClientSupportedGroups();
         if (clientSupportedGroups == null)
@@ -206,7 +168,7 @@ public abstract class AbstractTlsServer
         for (int i = 0; i < clientSupportedGroups.length; ++i)
         {
             int namedGroup = clientSupportedGroups[i];
-            if (NamedGroup.getCurveBits(namedGroup) >= minimumCurveBits)
+            if (NamedGroup.getCurveBits(namedGroup) >= minimumCurveBits && getCrypto().hasNamedGroup(namedGroup))
             {
                 return namedGroup;
             }
@@ -220,6 +182,7 @@ public abstract class AbstractTlsServer
         return minimumCurveBits <= 256 ? NamedGroup.secp256r1
             :  minimumCurveBits <= 384 ? NamedGroup.secp384r1
             :  minimumCurveBits <= 521 ? NamedGroup.secp521r1
+            :  minimumCurveBits <= 521 ? NamedGroup.sect571r1
             :  -1;
     }
 
@@ -489,6 +452,13 @@ public abstract class AbstractTlsServer
 
     public TlsDHConfig getDHConfig() throws IOException
     {
+        int[] clientSupportedGroups = context.getSecurityParametersHandshake().getClientSupportedGroups();
+        final TlsDHConfig defaultCryptoDHConfig = this.context.getCrypto().createDHConfig(this.selectedCipherSuite, clientSupportedGroups);
+        if (defaultCryptoDHConfig != null) 
+        {
+            return defaultCryptoDHConfig;
+        }
+        
         int minimumFiniteFieldBits = TlsDHUtils.getMinimumFiniteFieldBits(selectedCipherSuite);
 
         int namedGroup = selectDH(minimumFiniteFieldBits);
