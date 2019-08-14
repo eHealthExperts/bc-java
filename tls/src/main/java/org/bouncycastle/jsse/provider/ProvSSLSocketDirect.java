@@ -426,40 +426,11 @@ class ProvSSLSocketDirect
         return getPort();
     }
 
-<<<<<<< HEAD
-    
-    public boolean isServerTrusted(X509Certificate[] chain, String authType)
-    {
-        
-        X509TrustManager tm = contextData.getTrustManager();
-
-		if (tm != null)
-        {
-            try
-            {
-            	if (tm instanceof X509ExtendedTrustManager) 
-            	{
-            		((X509ExtendedTrustManager)tm).checkServerTrusted(
-            				chain.clone(),
-            				authType,
-	                        this);
-            	}
-            	else {
-            		tm.checkServerTrusted(chain.clone(), authType);
-            		// TODO[jsse] Consider HostnameVerifier functionality
-            	}
-                return true;
-            }
-            catch (CertificateException e)
-            {
-            }
-=======
     public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
     {
         if (null != handshakeSession && !handshakeSession.isValid())
         {
             connection.getSession().invalidate();
->>>>>>> r1rv61
         }
 
         this.handshakeSession = null;
@@ -469,7 +440,6 @@ class ProvSSLSocketDirect
 
     public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
     {
-<<<<<<< HEAD
         this.connection = connection;
         
         if (!listeners.isEmpty())
@@ -483,9 +453,7 @@ class ProvSSLSocketDirect
         		}
         	}
         }
-=======
         this.handshakeSession = handshakeSession;
->>>>>>> r1rv61
     }
 
     synchronized void handshakeIfNecessary(boolean resumable) throws IOException

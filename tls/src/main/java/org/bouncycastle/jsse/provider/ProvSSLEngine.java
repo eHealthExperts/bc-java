@@ -643,35 +643,9 @@ class ProvSSLEngine
 
     public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
     {
-<<<<<<< HEAD
-        
-        X509TrustManager tm = contextData.getTrustManager();
-
-		if (tm != null)
-        {
-            try
-            {
-            	if (tm instanceof X509ExtendedTrustManager) 
-            	{
-            		((X509ExtendedTrustManager)tm).checkServerTrusted(
-            				chain.clone(),
-            				authType,
-	                        this);
-            	}
-            	else {
-            		tm.checkServerTrusted(chain.clone(), authType);
-            		// TODO[jsse] Consider HostnameVerifier functionality
-            	}
-                return true;
-            }
-            catch (CertificateException e)
-            {
-            }
-=======
         if (null != handshakeSession && !handshakeSession.isValid())
         {
             connection.getSession().invalidate();
->>>>>>> r1rv61
         }
 
         this.handshakeSession = null;
