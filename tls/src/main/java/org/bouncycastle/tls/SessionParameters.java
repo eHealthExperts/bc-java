@@ -21,11 +21,8 @@ public final class SessionParameters
         private byte[] pskIdentity = null;
         private byte[] srpIdentity = null;
         private byte[] encodedServerExtensions = null;
-<<<<<<< HEAD
         private byte[] encodedClientExtensions = null;
-=======
         private boolean extendedMasterSecret = false;
->>>>>>> r1rv61
 
         public Builder()
         {
@@ -37,12 +34,8 @@ public final class SessionParameters
             validate(this.compressionAlgorithm >= 0, "compressionAlgorithm");
             validate(this.masterSecret != null, "masterSecret");
             return new SessionParameters(cipherSuite, compressionAlgorithm, localCertificate, masterSecret,
-<<<<<<< HEAD
-                negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions);
-=======
-                negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions,
+                negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions,
                 extendedMasterSecret);
->>>>>>> r1rv61
         }
 
         public Builder setCipherSuite(int cipherSuite)
@@ -156,19 +149,12 @@ public final class SessionParameters
     private byte[] pskIdentity = null;
     private byte[] srpIdentity = null;
     private byte[] encodedServerExtensions;
-<<<<<<< HEAD
     private byte[] encodedClientExtensions;
-
-    private SessionParameters(int cipherSuite, short compressionAlgorithm, Certificate localCertificate,
-        TlsSecret masterSecret, ProtocolVersion negotiatedVersion, Certificate peerCertificate, byte[] pskIdentity,
-        byte[] srpIdentity, byte[] encodedServerExtensions, byte[] encodedClientExtensions)
-=======
     private boolean extendedMasterSecret;
 
     private SessionParameters(int cipherSuite, short compressionAlgorithm, Certificate localCertificate,
         TlsSecret masterSecret, ProtocolVersion negotiatedVersion, Certificate peerCertificate, byte[] pskIdentity,
-        byte[] srpIdentity, byte[] encodedServerExtensions, boolean extendedMasterSecret)
->>>>>>> r1rv61
+        byte[] srpIdentity, byte[] encodedServerExtensions, byte[] encodedClientExtensions, boolean extendedMasterSecret)
     {
         this.cipherSuite = cipherSuite;
         this.compressionAlgorithm = compressionAlgorithm;
@@ -179,11 +165,8 @@ public final class SessionParameters
         this.pskIdentity = Arrays.clone(pskIdentity);
         this.srpIdentity = Arrays.clone(srpIdentity);
         this.encodedServerExtensions = encodedServerExtensions;
-<<<<<<< HEAD
         this.encodedClientExtensions = encodedClientExtensions;
-=======
         this.extendedMasterSecret = extendedMasterSecret;
->>>>>>> r1rv61
     }
 
     public void clear()
@@ -197,12 +180,8 @@ public final class SessionParameters
     public SessionParameters copy()
     {
         return new SessionParameters(cipherSuite, compressionAlgorithm, localCertificate, masterSecret,
-<<<<<<< HEAD
-            negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions);
-=======
-            negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions,
+            negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions,
             extendedMasterSecret);
->>>>>>> r1rv61
     }
 
     public int getCipherSuite()
