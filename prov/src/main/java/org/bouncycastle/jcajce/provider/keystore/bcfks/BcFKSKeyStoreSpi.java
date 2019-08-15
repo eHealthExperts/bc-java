@@ -94,7 +94,12 @@ import org.bouncycastle.crypto.util.PBKDFConfig;
 import org.bouncycastle.crypto.util.ScryptConfig;
 import org.bouncycastle.jcajce.BCFKSLoadStoreParameter;
 import org.bouncycastle.jcajce.BCFKSStoreParameter;
+import org.bouncycastle.jcajce.BCLoadStoreParameter;
 import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
+import org.bouncycastle.jcajce.util.BCJcaJceHelper;
+import org.bouncycastle.jcajce.util.DefaultJcaJceHelper;
+import org.bouncycastle.jcajce.util.JcaJceHelper;
+import org.bouncycastle.jce.interfaces.ECKey;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Strings;
 
@@ -404,7 +409,6 @@ class BcFKSKeyStoreSpi
                 byte[] encodedKey = key.getEncoded();
 
                 KeyDerivationFunc pbkdAlgId = generatePkbdAlgorithmIdentifier(PKCSObjectIdentifiers.id_PBKDF2, 256 / 8);
-
                 byte[] keyBytes = generateKey(pbkdAlgId, "SECRET_KEY_ENCRYPTION", ((password != null) ? password : new char[0]), 32);
 
                 String keyAlg = Strings.toUpperCase(key.getAlgorithm());
@@ -479,7 +483,7 @@ class BcFKSKeyStoreSpi
         Cipher c = helper.createCipher(algorithm);
 
         c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
-        
+
         return c;
     }
 
@@ -1048,7 +1052,6 @@ class BcFKSKeyStoreSpi
 
                 byte[] encOut = c.doFinal(storeData.getEncoded());
 
-                c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(keyBytes, "AES"));
                 AlgorithmParameters algorithmParameters = c.getParameters();
 
                 PBES2Parameters pbeParams = new PBES2Parameters(pbkdAlgId, new EncryptionScheme(NISTObjectIdentifiers.id_aes256_CCM, CCMParameters.getInstance(algorithmParameters.getEncoded())));

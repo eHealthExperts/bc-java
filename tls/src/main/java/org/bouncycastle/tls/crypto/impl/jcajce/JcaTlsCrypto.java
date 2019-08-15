@@ -429,31 +429,11 @@ public class JcaTlsCrypto
 
         synchronized (supportedGroups)
         {
-            String curveName = NamedGroup.getName(namedGroup);
-            if (curveName == null)
+            Boolean cached = (Boolean)supportedGroups.get(key);
+            if (cached != null)
             {
-                return false;
+                return cached.booleanValue();
             }
-            
-            int key = Integers.valueOf(namedGroup);
-            
-            synchronized (supportedGroups)
-            {
-                Boolean cached = (Boolean)supportedGroups.get(key);
-                if (cached != null)
-                {
-                    return cached.booleanValue();
-                }
-            }
-            
-            boolean result = isCurveSupported(curveName);
-            
-            synchronized (supportedGroups)
-            {
-                supportedGroups.put(key, Boolean.valueOf(result));
-            }
-            
-            return result;
         }
 
         boolean result = true;
@@ -492,6 +472,7 @@ public class JcaTlsCrypto
             supportedGroups.put(key, Boolean.valueOf(result));
         }
 
+        return result;
     }
     
     public boolean hasECPointFormat(short format) 

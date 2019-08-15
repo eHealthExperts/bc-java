@@ -146,7 +146,7 @@ class ProvTlsClient
     @Override
     public TlsDHGroupVerifier getDHGroupVerifier()
     {
-        return new ProvDHGroupVerifier();
+        return new ProvDHGroupVerifier(sslParameters.getAlgorithmConstraints());
     }
 
     public TlsAuthentication getAuthentication() throws IOException

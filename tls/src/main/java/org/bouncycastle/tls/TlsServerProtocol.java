@@ -529,11 +529,11 @@ public class TlsServerProtocol
             {
                 this.tlsSession = sessionToResume;
                 this.sessionParameters = sessionParameters;
-                this.securityParameters.masterSecret = getContext().getCrypto().adoptSecret(sessionParameters.getMasterSecret());
+                tlsServerContext.getSecurityParametersHandshake().masterSecret = getContext().getCrypto().adoptSecret(sessionParameters.getMasterSecret());
                 
                 if(!tlsSession.isResumable()) {
                 	resetCurrentSession();
-                	this.securityParameters.clear();
+                	tlsServerContext.getSecurityParametersHandshake().clear();
                 }
         	}
         }
