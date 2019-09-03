@@ -4,7 +4,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Vector;
 
 import org.bouncycastle.tls.crypto.TlsAgreement;
 import org.bouncycastle.tls.crypto.TlsCertificate;
@@ -13,7 +12,6 @@ import org.bouncycastle.tls.crypto.TlsDHConfig;
 import org.bouncycastle.tls.crypto.TlsECConfig;
 import org.bouncycastle.tls.crypto.TlsSecret;
 import org.bouncycastle.util.Arrays;
-import org.bouncycastle.util.io.Streams;
 
 /**
  * (D)TLS PSK key exchange (RFC 4279).
@@ -21,11 +19,23 @@ import org.bouncycastle.util.io.Streams;
 public class TlsPSKKeyExchange
     extends AbstractTlsKeyExchange
 {
+    private static int checkKeyExchange(int keyExchange)
+    {
+        switch (keyExchange)
+        {
+        case KeyExchangeAlgorithm.DHE_PSK:
+        case KeyExchangeAlgorithm.ECDHE_PSK:
+        case KeyExchangeAlgorithm.PSK:
+        case KeyExchangeAlgorithm.RSA_PSK:
+            return keyExchange;
+        default:
+            throw new IllegalArgumentException("unsupported key exchange algorithm");
+        }
+    }
+
     protected TlsPSKIdentity pskIdentity;
     protected TlsPSKIdentityManager pskIdentityManager;
-    protected TlsDHConfigVerifier dhConfigVerifier;
-    protected TlsECConfigVerifier ecConfigVerifier;
-    protected short[] clientECPointFormats, serverECPointFormats;
+    protected TlsDHGroupVerifier dhGroupVerifier;
 
     protected byte[] psk_identity_hint = null;
     protected byte[] psk = null;
@@ -38,48 +48,27 @@ public class TlsPSKKeyExchange
     protected TlsCertificate serverCertificate;
     protected TlsSecret preMasterSecret;
 
-    public TlsPSKKeyExchange(int keyExchange, Vector supportedSignatureAlgorithms, TlsPSKIdentity pskIdentity,
-        TlsDHConfigVerifier dhConfigVerifier, TlsECConfigVerifier ecConfigVerifier, short[] clientECPointFormats,
-        short[] serverECPointFormats)
+    public TlsPSKKeyExchange(int keyExchange, TlsPSKIdentity pskIdentity, TlsDHGroupVerifier dhGroupVerifier)
     {
-        this(keyExchange, supportedSignatureAlgorithms, pskIdentity, null, dhConfigVerifier, null, ecConfigVerifier,
-            null, clientECPointFormats, serverECPointFormats);
+        this(keyExchange, pskIdentity, null, dhGroupVerifier, null, null);
     }
 
-    public TlsPSKKeyExchange(int keyExchange, Vector supportedSignatureAlgorithms, TlsPSKIdentity pskIdentity,
-        TlsPSKIdentityManager pskIdentityManager, TlsDHConfig dhConfig, TlsECConfig ecConfig,
-        short[] serverECPointFormats)
+    public TlsPSKKeyExchange(int keyExchange, TlsPSKIdentityManager pskIdentityManager,
+        TlsDHConfig dhConfig, TlsECConfig ecConfig)
     {
-        this(keyExchange, supportedSignatureAlgorithms, pskIdentity, pskIdentityManager, null, dhConfig, null, ecConfig,
-            null, serverECPointFormats);
+        this(keyExchange, null, pskIdentityManager, null, dhConfig, ecConfig);
     }
 
-    private TlsPSKKeyExchange(int keyExchange, Vector supportedSignatureAlgorithms, TlsPSKIdentity pskIdentity,
-        TlsPSKIdentityManager pskIdentityManager, TlsDHConfigVerifier dhConfigVerifier, TlsDHConfig dhConfig,
-        TlsECConfigVerifier ecConfigVerifier, TlsECConfig ecConfig, short[] clientECPointFormats,
-        short[] serverECPointFormats)
+    private TlsPSKKeyExchange(int keyExchange, TlsPSKIdentity pskIdentity, TlsPSKIdentityManager pskIdentityManager,
+        TlsDHGroupVerifier dhGroupVerifier, TlsDHConfig dhConfig, TlsECConfig ecConfig)
     {
-        super(keyExchange, supportedSignatureAlgorithms);
-
-        switch (keyExchange)
-        {
-        case KeyExchangeAlgorithm.DHE_PSK:
-        case KeyExchangeAlgorithm.ECDHE_PSK:
-        case KeyExchangeAlgorithm.PSK:
-        case KeyExchangeAlgorithm.RSA_PSK:
-            break;
-        default:
-            throw new IllegalArgumentException("unsupported key exchange algorithm");
-        }
+        super(checkKeyExchange(keyExchange));
 
         this.pskIdentity = pskIdentity;
         this.pskIdentityManager = pskIdentityManager;
-        this.dhConfigVerifier = dhConfigVerifier;
+        this.dhGroupVerifier = dhGroupVerifier;
         this.dhConfig = dhConfig;
-        this.ecConfigVerifier = ecConfigVerifier;
         this.ecConfig = ecConfig;
-        this.clientECPointFormats = clientECPointFormats;
-        this.serverECPointFormats = serverECPointFormats;
     }
 
     public void skipServerCredentials() throws IOException
@@ -96,12 +85,8 @@ public class TlsPSKKeyExchange
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
-        if (!(serverCredentials instanceof TlsCredentialedDecryptor))
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
 
-        this.serverCredentials = (TlsCredentialedDecryptor)serverCredentials;
+        this.serverCredentials = TlsUtils.requireDecryptorCredentials(serverCredentials);
     }
 
     public void processServerCertificate(Certificate serverCertificate) throws IOException
@@ -110,12 +95,6 @@ public class TlsPSKKeyExchange
         {
             throw new TlsFatalAlert(AlertDescription.unexpected_message);
         }
-        if (serverCertificate.isEmpty())
-        {
-            throw new TlsFatalAlert(AlertDescription.bad_certificate);
-        }
-
-        checkServerCertSigAlg(serverCertificate);
 
         this.serverCertificate = serverCertificate.getCertificateAt(0).useInRole(ConnectionEnd.server, keyExchange);
     }
@@ -188,9 +167,9 @@ public class TlsPSKKeyExchange
 
         if (this.keyExchange == KeyExchangeAlgorithm.DHE_PSK)
         {
-            this.dhConfig = TlsDHUtils.receiveDHConfig(dhConfigVerifier, input);
+            this.dhConfig = TlsDHUtils.receiveDHConfig(context, dhGroupVerifier, input);
 
-            byte[] y = TlsUtils.readOpaque16(input);
+            byte[] y = TlsUtils.readOpaque16(input, 1);
 
             this.agreement = context.getCrypto().createDHDomain(dhConfig).createDH();
 
@@ -198,13 +177,13 @@ public class TlsPSKKeyExchange
         }
         else if (this.keyExchange == KeyExchangeAlgorithm.ECDHE_PSK)
         {
-            this.ecConfig = TlsECCUtils.receiveECConfig(ecConfigVerifier, serverECPointFormats, input);
+            this.ecConfig = TlsECCUtils.receiveECDHConfig(context, input);
 
-            byte[] point = TlsUtils.readOpaque8(input);
+            byte[] point = TlsUtils.readOpaque8(input, 1);
 
             this.agreement = context.getCrypto().createECDomain(ecConfig).createECDH();
 
-            processEphemeralECDH(clientECPointFormats, point);
+            processEphemeralECDH(point);
         }
     }
 
@@ -238,7 +217,7 @@ public class TlsPSKKeyExchange
 
         TlsUtils.writeOpaque16(psk_identity, output);
 
-        context.getSecurityParameters().pskIdentity = Arrays.clone(psk_identity);
+        context.getSecurityParametersHandshake().pskIdentity = Arrays.clone(psk_identity);
 
         if (this.keyExchange == KeyExchangeAlgorithm.DHE_PSK)
         {
@@ -264,19 +243,19 @@ public class TlsPSKKeyExchange
             throw new TlsFatalAlert(AlertDescription.unknown_psk_identity);
         }
 
-        context.getSecurityParameters().pskIdentity = psk_identity;
+        context.getSecurityParametersHandshake().pskIdentity = psk_identity;
 
         if (this.keyExchange == KeyExchangeAlgorithm.DHE_PSK)
         {
-            byte[] y = TlsUtils.readOpaque16(input);
+            byte[] y = TlsUtils.readOpaque16(input, 1);
 
             processEphemeralDH(y);
         }
         else if (this.keyExchange == KeyExchangeAlgorithm.ECDHE_PSK)
         {
-            byte[] point = TlsUtils.readOpaque8(input);
+            byte[] point = TlsUtils.readOpaque8(input, 1);
 
-            processEphemeralECDH(serverECPointFormats, point);
+            processEphemeralECDH(point);
         }
         else if (this.keyExchange == KeyExchangeAlgorithm.RSA_PSK)
         {
@@ -344,9 +323,9 @@ public class TlsPSKKeyExchange
         this.agreement.receivePeerValue(y);
     }
 
-    protected void processEphemeralECDH(short[] localECPointFormats, byte[] point) throws IOException
+    protected void processEphemeralECDH(byte[] point) throws IOException
     {
-        TlsECCUtils.checkPointEncoding(localECPointFormats, ecConfig.getNamedGroup(), point);
+        TlsECCUtils.checkPointEncoding(ecConfig.getNamedGroup(), point);
 
         this.agreement.receivePeerValue(point);
     }

@@ -6,13 +6,13 @@ import java.security.Provider;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.cms.PasswordRecipientInfoGenerator;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.operator.GenericKey;
 
 public class JcePasswordRecipientInfoGenerator
@@ -55,7 +55,7 @@ public class JcePasswordRecipientInfoGenerator
         {
             IvParameterSpec ivSpec = new IvParameterSpec(ASN1OctetString.getInstance(keyEncryptionAlgorithm.getParameters()).getOctets());
 
-            keyEncryptionCipher.init(Cipher.WRAP_MODE, new SecretKeySpec(derivedKey, keyEncryptionCipher.getAlgorithm()), ivSpec);
+            keyEncryptionCipher.init(Cipher.WRAP_MODE, new DestroyableSecretKeySpec(derivedKey, keyEncryptionCipher.getAlgorithm()), ivSpec);
 
             return keyEncryptionCipher.wrap(contentEncryptionKeySpec);
         }

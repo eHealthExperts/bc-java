@@ -47,12 +47,16 @@ public class EC5Util
             }
         }
 
-        X9ECParameters c25519 = CustomNamedCurves.getByName("Curve25519");
+        X9ECParameters x9_25519 = CustomNamedCurves.getByName("Curve25519");
+        ECCurve c_25519 = x9_25519.getCurve();
 
         customCurves.put(new ECCurve.Fp(
-            c25519.getCurve().getField().getCharacteristic(),
-            c25519.getCurve().getA().toBigInteger(),
-            c25519.getCurve().getB().toBigInteger()), c25519.getCurve());
+            c_25519.getField().getCharacteristic(),
+            c_25519.getA().toBigInteger(),
+            c_25519.getB().toBigInteger(),
+            c_25519.getOrder(),
+            c_25519.getCofactor()
+            ), c_25519);
     }
 
     public static ECCurve getCurve(
@@ -189,6 +193,16 @@ public class EC5Util
             domainParameters.getH().intValue());
     }
 
+    public static ECParameterSpec convertToSpec(
+        ECDomainParameters domainParameters)
+    {
+        return new ECParameterSpec(
+            convertCurve(domainParameters.getCurve(), null),  // JDK 1.5 has trouble with this if it's not null...
+            EC5Util.convertPoint(domainParameters.getG()),
+            domainParameters.getN(),
+            domainParameters.getH().intValue());
+    }
+
     public static EllipticCurve convertCurve(
         ECCurve curve, 
         byte[]  seed)
@@ -272,12 +286,25 @@ public class EC5Util
     {
         ECCurve curve = convertCurve(ecSpec.getCurve());
 
-        return new org.bouncycastle.jce.spec.ECParameterSpec(
-            curve,
-            convertPoint(curve, ecSpec.getGenerator(), withCompression),
-            ecSpec.getOrder(),
-            BigInteger.valueOf(ecSpec.getCofactor()),
-            ecSpec.getCurve().getSeed());
+        if (ecSpec instanceof ECNamedCurveSpec)
+        {
+            return new org.bouncycastle.jce.spec.ECNamedCurveParameterSpec(
+                ((ECNamedCurveSpec)ecSpec).getName(),
+                curve,
+                convertPoint(curve, ecSpec.getGenerator(), withCompression),
+                ecSpec.getOrder(),
+                BigInteger.valueOf(ecSpec.getCofactor()),
+                ecSpec.getCurve().getSeed());
+        }
+        else
+        {
+            return new org.bouncycastle.jce.spec.ECParameterSpec(
+                curve,
+                convertPoint(curve, ecSpec.getGenerator(), withCompression),
+                ecSpec.getOrder(),
+                BigInteger.valueOf(ecSpec.getCofactor()),
+                ecSpec.getCurve().getSeed());
+        }
     }
 
     public static org.bouncycastle.math.ec.ECPoint convertPoint(

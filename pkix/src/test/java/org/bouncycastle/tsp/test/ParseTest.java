@@ -6,7 +6,6 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.cmp.PKIFailureInfo;
 import org.bouncycastle.asn1.cmp.PKIStatus;
@@ -19,6 +18,8 @@ import org.bouncycastle.tsp.TimeStampResponse;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Store;
 import org.bouncycastle.util.encoders.Base64;
+
+import junit.framework.TestCase;
 
 /**
  * Test Cases

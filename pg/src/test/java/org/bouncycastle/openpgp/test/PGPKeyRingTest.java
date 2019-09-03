@@ -1,6 +1,7 @@
 package org.bouncycastle.openpgp.test;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.KeyPair;
@@ -11,13 +12,19 @@ import java.util.Iterator;
 
 import javax.crypto.Cipher;
 
+import org.bouncycastle.bcpg.ArmoredInputStream;
 import org.bouncycastle.bcpg.BCPGInputStream;
+import org.bouncycastle.bcpg.CompressionAlgorithmTags;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.bcpg.Packet;
+import org.bouncycastle.bcpg.PublicKeyAlgorithmTags;
 import org.bouncycastle.bcpg.SecretKeyPacket;
 import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags;
 import org.bouncycastle.bcpg.TrustPacket;
+import org.bouncycastle.bcpg.sig.Features;
+import org.bouncycastle.bcpg.sig.KeyFlags;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jce.spec.ECNamedCurveGenParameterSpec;
 import org.bouncycastle.jce.spec.ElGamalParameterSpec;
 import org.bouncycastle.openpgp.PGPEncryptedData;
 import org.bouncycastle.openpgp.PGPException;
@@ -30,11 +37,14 @@ import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.PGPSecretKey;
 import org.bouncycastle.openpgp.PGPSecretKeyRing;
 import org.bouncycastle.openpgp.PGPSignature;
+import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator;
 import org.bouncycastle.openpgp.jcajce.JcaPGPPublicKeyRing;
 import org.bouncycastle.openpgp.jcajce.JcaPGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.jcajce.JcaPGPSecretKeyRingCollection;
+import org.bouncycastle.openpgp.operator.PGPContentSignerBuilder;
 import org.bouncycastle.openpgp.operator.PGPDigestCalculator;
 import org.bouncycastle.openpgp.operator.PGPDigestCalculatorProvider;
+import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentSignerBuilder;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentVerifierBuilderProvider;
@@ -1422,6 +1432,35 @@ public class PGPKeyRingTest
       + "bGHyFtdfwyJEzzR8YMcgAnrD8TI+SvErFEH+0vzV+JA1gjYd2l3/ijDj82rn"
       + "WDoIM5gfjeZgwht1vl6+7J+h20yjFrBdf7gJj9OcIGmwlpQ56qzbT4U++mw3"
       + "pW2tN2VuYtreceEoI4B6yUGMEhI9t/asLgn7wEAU2lpuE7ACAAM=");
+
+    private static final byte[] curve25519Pub =    Base64.decode(
+        "mDMEXEzydhYJKwYBBAHaRw8BAQdAwHPDYhq7hIsCT0jHNxGh4Mbao9kDkcHZilME" +
+        "jfgnnG60N1Rlc3QgS2V5IChEbyBub3QgdXNlIGZvciByZWFsLikgPHRlc3RAd29v" +
+        "ZHMtZ2VibGVyLmNvbT6IlgQTFggAPhYhBIuq+f4gKmIa9ZKEqJdUhr00IJstBQJc" +
+        "TPJ2AhsDBQkB4TOABQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEJdUhr00IJst" +
+        "dHAA/RDOjus5OZL2m9Q9dxOVnWNguT7Cr5cWdJxUeKAWE2c6AQCcQZWA4SmV1dkJ" +
+        "U0XKmLeu3xWDpqrydT4+vQXb/Qm9B7g4BFxM8nYSCisGAQQBl1UBBQEBB0AY3XTS" +
+        "6S1pwFNc1QhNpEKTStG+LAJpiHPK9QyXBbW9dQMBCAeIfgQYFggAJhYhBIuq+f4g" +
+        "KmIa9ZKEqJdUhr00IJstBQJcTPJ2AhsMBQkB4TOAAAoJEJdUhr00IJstmAsBAMRJ" +
+        "pvh8iegwrJDMoQc53ZqDRsbieElV6ofB80a+jkzZAQCgpAaY4hZc8GUan2JIqkg0" +
+        "gs23h4au7H79KqXYG4a+Bg==");
+
+    private static final byte[] curve25519Priv = Base64.decode(
+    "lIYEXEzydhYJKwYBBAHaRw8BAQdAwHPDYhq7hIsCT0jHNxGh4Mbao9kDkcHZilME" +
+        "jfgnnG7+BwMCgEr7OFDl3dTpT73rmw6vIwiTGqjx+Xbe8cq4l24q2AOtzO+UR97q" +
+        "7ypL41jtt7BY7uoxhF+NCKzYEtRoqyaM0lfjDlOVRJP6SYRixK2UHLQ3VGVzdCBL" +
+        "ZXkgKERvIG5vdCB1c2UgZm9yIHJlYWwuKSA8dGVzdEB3b29kcy1nZWJsZXIuY29t" +
+        "PoiWBBMWCAA+FiEEi6r5/iAqYhr1koSol1SGvTQgmy0FAlxM8nYCGwMFCQHhM4AF" +
+        "CwkIBwIGFQoJCAsCBBYCAwECHgECF4AACgkQl1SGvTQgmy10cAD9EM6O6zk5kvab" +
+        "1D13E5WdY2C5PsKvlxZ0nFR4oBYTZzoBAJxBlYDhKZXV2QlTRcqYt67fFYOmqvJ1" +
+        "Pj69Bdv9Cb0HnIsEXEzydhIKKwYBBAGXVQEFAQEHQBjddNLpLWnAU1zVCE2kQpNK" +
+        "0b4sAmmIc8r1DJcFtb11AwEIB/4HAwItKjH+kGqkMelkEdIRxSLFeCsB/A64n+os" +
+        "X9nWVYsrixEWT5JcRWBniI1PKt9Cm15Yt8KQSAFDJIj5tnEm28x5RM0CzFHQ9Ej2" +
+        "8Q2Lt0RoiH4EGBYIACYWIQSLqvn+ICpiGvWShKiXVIa9NCCbLQUCXEzydgIbDAUJ" +
+        "AeEzgAAKCRCXVIa9NCCbLZgLAQDESab4fInoMKyQzKEHOd2ag0bG4nhJVeqHwfNG" +
+        "vo5M2QEAoKQGmOIWXPBlGp9iSKpINILNt4eGrux+/Sql2BuGvgY=");
+
+    private static final char[] curve25519Pwd = "foobar".toCharArray();
 
     public void test1()
         throws Exception
@@ -3077,6 +3116,183 @@ public class PGPKeyRingTest
         secRing.getEncoded();
     }
 
+    public void testNullEncryption()
+        throws Exception
+    {
+        char[] passPhrase = "fred".toCharArray();
+        KeyPairGenerator bareGenerator = KeyPairGenerator.getInstance("RSA", new BouncyCastleProvider());
+        bareGenerator.initialize(2048);
+        KeyPair rsaPair = bareGenerator.generateKeyPair();
+
+        PGPDigestCalculator calculator = new JcaPGPDigestCalculatorProviderBuilder()
+                    .setProvider(new BouncyCastleProvider())
+                    .build()
+                    .get(HashAlgorithmTags.SHA1);
+
+        PGPKeyPair pgpPair = new JcaPGPKeyPair(PGPPublicKey.RSA_GENERAL, rsaPair, new Date());
+
+        PGPSignatureSubpacketGenerator subpackets = new PGPSignatureSubpacketGenerator();
+
+        // Key flags
+        subpackets.setKeyFlags(true,
+                KeyFlags.CERTIFY_OTHER
+                            | KeyFlags.SIGN_DATA
+                            | KeyFlags.ENCRYPT_COMMS
+                            | KeyFlags.ENCRYPT_STORAGE
+                            | KeyFlags.AUTHENTICATION);
+
+       // Encryption Algorithms
+       subpackets.setPreferredSymmetricAlgorithms(true, new int[]{
+                    SymmetricKeyAlgorithmTags.AES_256,
+           SymmetricKeyAlgorithmTags.AES_192,
+           SymmetricKeyAlgorithmTags.AES_128,
+           SymmetricKeyAlgorithmTags.TRIPLE_DES
+        });
+
+        // Hash Algorithms
+        subpackets.setPreferredHashAlgorithms(true, new int[] {
+                    HashAlgorithmTags.SHA512,
+            HashAlgorithmTags.SHA384,
+            HashAlgorithmTags.SHA256,
+            HashAlgorithmTags.SHA224,
+            HashAlgorithmTags.SHA1
+        });
+
+        // Compression Algorithms
+        subpackets.setPreferredCompressionAlgorithms(true, new int[] {
+                    CompressionAlgorithmTags.ZLIB,
+            CompressionAlgorithmTags.BZIP2,
+            CompressionAlgorithmTags.ZIP
+        });
+
+        // Modification Detection
+        subpackets.setFeature(true, Features.FEATURE_MODIFICATION_DETECTION);
+
+        PGPContentSignerBuilder signer = new JcaPGPContentSignerBuilder(
+                    pgpPair.getPublicKey().getAlgorithm(), HashAlgorithmTags.SHA256);
+
+        PGPKeyRingGenerator ringGenerator = new PGPKeyRingGenerator(PGPSignature.POSITIVE_CERTIFICATION, pgpPair,
+                    "xmpp:juliet@capulet.lit", calculator, subpackets.generate(), null, signer, null);
+        int length1 = ringGenerator.generateSecretKeyRing().getEncoded().length;
+        ringGenerator = new PGPKeyRingGenerator(PGPSignature.POSITIVE_CERTIFICATION, pgpPair,
+                    "xmpp:juliet@capulet.lit", null, subpackets.generate(), null, signer, null);
+        int length2 = ringGenerator.generateSecretKeyRing().getEncoded().length;
+
+        isEquals("key ring length mismatch", length1, length2);
+    }
+
+    private void testEdDsaRing()
+        throws Exception
+    {
+        ArmoredInputStream aIn = new ArmoredInputStream(this.getClass().getResourceAsStream("eddsa-pub-keyring.asc"));
+
+        // make sure we can parse it without falling over.
+        PGPPublicKeyRing rng = new PGPPublicKeyRing(aIn, new JcaKeyFingerprintCalculator());
+    }
+
+    private void testCurve25519Ring()
+        throws Exception
+    {
+        // make sure we can parse it without falling over.
+        PGPPublicKeyRing rng = new PGPPublicKeyRing(new ByteArrayInputStream(curve25519Pub), new JcaKeyFingerprintCalculator());
+
+        PGPSecretKeyRing priv = new PGPSecretKeyRing(new ByteArrayInputStream(curve25519Priv), new JcaKeyFingerprintCalculator());
+    }
+
+    public void testShouldProduceSubkeys()
+        throws Exception
+    {
+        KeyPairGenerator generator;
+        KeyPair pair;
+
+        // Generate master key
+
+        generator = KeyPairGenerator.getInstance("ECDSA", BouncyCastleProvider.PROVIDER_NAME);
+        generator.initialize(new ECNamedCurveGenParameterSpec("P-256"));
+
+        pair = generator.generateKeyPair();
+        PGPKeyPair pgpMasterKey = new JcaPGPKeyPair(PublicKeyAlgorithmTags.ECDSA, pair, new Date());
+
+        PGPSignatureSubpacketGenerator subPackets = new PGPSignatureSubpacketGenerator();
+        subPackets.setKeyFlags(false, KeyFlags.AUTHENTICATION & KeyFlags.CERTIFY_OTHER & KeyFlags.SIGN_DATA);
+        subPackets.setPreferredSymmetricAlgorithms(false, new int[]{
+            SymmetricKeyAlgorithmTags.AES_256,
+            SymmetricKeyAlgorithmTags.AES_192,
+            SymmetricKeyAlgorithmTags.AES_128});
+        subPackets.setPreferredHashAlgorithms(false, new int[]{
+            HashAlgorithmTags.SHA512,
+            HashAlgorithmTags.SHA384,
+            HashAlgorithmTags.SHA256,
+            HashAlgorithmTags.SHA224});
+        subPackets.setPreferredCompressionAlgorithms(false, new int[]{
+            CompressionAlgorithmTags.ZLIB,
+            CompressionAlgorithmTags.BZIP2,
+            CompressionAlgorithmTags.ZIP,
+            CompressionAlgorithmTags.UNCOMPRESSED});
+        subPackets.setFeature(false, Features.FEATURE_MODIFICATION_DETECTION);
+
+        // Generate sub key
+
+        generator = KeyPairGenerator.getInstance("ECDH", BouncyCastleProvider.PROVIDER_NAME);
+        generator.initialize(new ECNamedCurveGenParameterSpec("P-256"));
+
+        pair = generator.generateKeyPair();
+        PGPKeyPair pgpSubKey = new JcaPGPKeyPair(PublicKeyAlgorithmTags.ECDH, pair, new Date());
+
+        // Assemble key
+
+        PGPDigestCalculator calculator = new JcaPGPDigestCalculatorProviderBuilder()
+            .setProvider(BouncyCastleProvider.PROVIDER_NAME)
+            .build()
+            .get(HashAlgorithmTags.SHA1);
+
+        PGPContentSignerBuilder signerBuilder = new JcaPGPContentSignerBuilder(
+            pgpMasterKey.getPublicKey().getAlgorithm(), HashAlgorithmTags.SHA512)
+            .setProvider(BouncyCastleProvider.PROVIDER_NAME);
+
+        PGPKeyRingGenerator pgpGenerator = new PGPKeyRingGenerator(PGPSignature.POSITIVE_CERTIFICATION,
+            pgpMasterKey, "alice@wonderland.lit", calculator, subPackets.generate(), null,
+            signerBuilder, null);
+
+        // Add sub key
+
+        subPackets.setKeyFlags(false, KeyFlags.ENCRYPT_STORAGE & KeyFlags.ENCRYPT_COMMS);
+
+        pgpGenerator.addSubKey(pgpSubKey, subPackets.generate(), null);
+
+        // Generate SecretKeyRing
+
+        PGPSecretKeyRing secretKeys = pgpGenerator.generateSecretKeyRing();
+
+        PGPPublicKeyRing publicKeys = pgpGenerator.generatePublicKeyRing();
+
+        checkPublicKeyRing(secretKeys, publicKeys.getEncoded());
+        // Extract the public keys
+        ByteArrayOutputStream bOut = new ByteArrayOutputStream(2048);
+        Iterator<PGPPublicKey> iterator = secretKeys.getPublicKeys();
+        while (iterator.hasNext())
+        {
+            bOut.write(((PGPPublicKey)iterator.next()).getEncoded());
+        }
+
+        checkPublicKeyRing(secretKeys, bOut.toByteArray());
+
+        isTrue(Arrays.areEqual(publicKeys.getEncoded(), bOut.toByteArray()));
+    }
+
+    private void checkPublicKeyRing(PGPSecretKeyRing secretKeys, byte[] encRing)
+        throws IOException
+    {
+        Iterator<PGPPublicKey> iterator;PGPPublicKeyRing publicKeys = new PGPPublicKeyRing(encRing, new BcKeyFingerprintCalculator());
+
+        // Check, if all public keys made it to the new public key ring
+        iterator = secretKeys.getPublicKeys();
+        while (iterator.hasNext())
+        {
+            isTrue(  publicKeys.getPublicKey( ((PGPPublicKey)iterator.next()).getKeyID()) != null);
+        }
+    }
+
     public void performTest()
         throws Exception
     {
@@ -3106,6 +3322,10 @@ public class PGPKeyRingTest
             testBadUserID();
             testNoExportPrivateKey();
             shouldStripPreserveTrustPackets();
+            testNullEncryption();
+            testEdDsaRing();
+            testCurve25519Ring();
+            testShouldProduceSubkeys();
         }
         catch (PGPException e)
         {

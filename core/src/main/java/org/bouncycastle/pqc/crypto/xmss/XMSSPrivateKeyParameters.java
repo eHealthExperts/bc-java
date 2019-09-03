@@ -2,7 +2,6 @@ package org.bouncycastle.pqc.crypto.xmss;
 
 import java.io.IOException;
 
-import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Pack;
 
@@ -10,7 +9,7 @@ import org.bouncycastle.util.Pack;
  * XMSS Private Key.
  */
 public final class XMSSPrivateKeyParameters
-    extends AsymmetricKeyParameter
+    extends XMSSKeyParameters
     implements XMSSStoreableObjectInterface
 {
 
@@ -42,7 +41,7 @@ public final class XMSSPrivateKeyParameters
 
     private XMSSPrivateKeyParameters(Builder builder)
     {
-        super(true);
+        super(true, builder.params.getDigest().getAlgorithmName());
         params = builder.params;
         if (params == null)
         {
@@ -86,26 +85,23 @@ public final class XMSSPrivateKeyParameters
             position += rootSize;
 			/* import BDS state */
             byte[] bdsStateBinary = XMSSUtil.extractBytesAtOffset(privateKey, position, privateKey.length - position);
-            BDS bdsImport = null;
             try
             {
-                bdsImport = (BDS)XMSSUtil.deserialize(bdsStateBinary);
+                BDS bdsImport = (BDS)XMSSUtil.deserialize(bdsStateBinary, BDS.class);
+                if (bdsImport.getIndex() != index)
+                {
+                    throw new IllegalStateException("serialized BDS has wrong index");
+                }
+                bdsState = bdsImport.withWOTSDigest(DigestUtil.getDigestOID(builder.xmss.getDigest().getAlgorithmName()));
             }
             catch (IOException e)
             {
-                e.printStackTrace();
+                throw new IllegalArgumentException(e.getMessage(), e);
             }
             catch (ClassNotFoundException e)
             {
-                e.printStackTrace();
+                throw new IllegalArgumentException(e.getMessage(), e);
             }
-            bdsImport.setXMSS(builder.xmss);
-            bdsImport.validate();
-            if (bdsImport.getIndex() != index)
-            {
-                throw new IllegalStateException("serialized BDS has wrong index");
-            }
-            bdsState = bdsImport;
         }
         else
         {
@@ -179,6 +175,11 @@ public final class XMSSPrivateKeyParameters
                 }
             }
         }
+    }
+
+    public long getUsagesRemaining()
+    {
+        return (1L << this.getParameters().getHeight()) - this.getIndex();
     }
 
     public static class Builder

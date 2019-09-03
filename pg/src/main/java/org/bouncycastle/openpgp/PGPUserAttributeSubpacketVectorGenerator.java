@@ -1,10 +1,10 @@
 package org.bouncycastle.openpgp;
 
-import org.bouncycastle.bcpg.UserAttributeSubpacket;
-import org.bouncycastle.bcpg.attr.ImageAttribute;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import org.bouncycastle.bcpg.UserAttributeSubpacket;
+import org.bouncycastle.bcpg.attr.ImageAttribute;
 
 public class PGPUserAttributeSubpacketVectorGenerator
 {

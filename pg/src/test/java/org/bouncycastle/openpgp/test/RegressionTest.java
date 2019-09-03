@@ -7,7 +7,7 @@ import org.bouncycastle.util.test.TestResult;
 
 public class RegressionTest
 {
-    public static Test[]    tests = {
+    public static Test[] tests = {
         new BcPGPKeyRingTest(),
         new PGPKeyRingTest(),
         new BcPGPRSATest(),
@@ -28,17 +28,20 @@ public class RegressionTest
         new PGPECDSATest(),
         new PGPECDHTest(),
         new PGPECMessageTest(),
-        new PGPParsingTest()
+        new PGPParsingTest(),
+        new SExprTest(),
+        new ArmoredInputStreamTest(),
+        new PGPUtilTest()
     };
 
     public static void main(
-        String[]    args)
+        String[] args)
     {
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 
         for (int i = 0; i != tests.length; i++)
         {
-            TestResult  result = tests[i].perform();
+            TestResult result = tests[i].perform();
             System.out.println(result);
             if (result.getException() != null)
             {

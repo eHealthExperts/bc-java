@@ -2,11 +2,12 @@ package org.bouncycastle.jce.provider.test.nist;
 
 import java.security.Security;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import junit.extensions.TestSetup;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 public class AllTests
     extends TestCase
@@ -21,6 +22,7 @@ public class AllTests
         TestSuite suite = new TestSuite("CertPath Tests");
         
         suite.addTestSuite(NistCertPathTest.class);
+        suite.addTestSuite(NistCertPathTest2.class);
         suite.addTestSuite(NistCertPathReviewerTest.class);
 
         return new BCTestSetup(suite);

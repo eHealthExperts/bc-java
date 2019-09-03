@@ -215,6 +215,16 @@ public class AlertDescription
     public static final short unknown_psk_identity = 115;
 
     /*
+     * RFC 7301
+     */
+
+    /**
+     * In the event that the server supports no protocols that the client advertises, then the
+     * server SHALL respond with a fatal "no_application_protocol" alert.
+     */
+    public static final short no_application_protocol = 120;
+
+    /*
      * RFC 7507
      */
 
@@ -224,6 +234,21 @@ public class AlertDescription
      * the server MUST respond with a fatal inappropriate_fallback alert [..].
      */
     public static final short inappropriate_fallback = 86;
+
+    /*
+     * RFC 8446
+     */
+
+    /**
+     * Sent by endpoints that receive a handshake message not containing an extension that is
+     * mandatory to send for the offered TLS version or other negotiated parameters.
+     */
+    public static final short missing_extension = 109;
+
+    /**
+     * Sent by servers when a client certificate is desired but none was provided by the client.
+     */
+    public static final short certificate_required = 116;
 
     public static String getName(short alertDescription)
     {
@@ -289,8 +314,14 @@ public class AlertDescription
             return "bad_certificate_hash_value";
         case unknown_psk_identity:
             return "unknown_psk_identity";
+        case no_application_protocol:
+            return "no_application_protocol";
         case inappropriate_fallback:
             return "inappropriate_fallback";
+        case missing_extension:
+            return "missing_extension";
+        case certificate_required:
+            return "certificate_required";
         default:
             return "UNKNOWN";
         }

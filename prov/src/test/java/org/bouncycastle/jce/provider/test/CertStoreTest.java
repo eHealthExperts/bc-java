@@ -1,8 +1,5 @@
 package org.bouncycastle.jce.provider.test;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.util.test.SimpleTest;
-
 import java.io.ByteArrayInputStream;
 import java.security.Security;
 import java.security.cert.CertStore;
@@ -16,6 +13,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.test.SimpleTest;
 
 public class CertStoreTest
     extends SimpleTest

@@ -1,8 +1,8 @@
 package org.bouncycastle.cms;
 
-import org.bouncycastle.asn1.cms.AttributeTable;
-
 import java.util.Map;
+
+import org.bouncycastle.asn1.cms.AttributeTable;
 
 /**
  * Basic generator that just returns a preconstructed attribute table

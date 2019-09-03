@@ -17,6 +17,7 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.crypto.CipherParameters;
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.crypto.KeyGenerationParameters;
 import org.bouncycastle.crypto.PasswordConverter;
 import org.bouncycastle.crypto.engines.DESEngine;
@@ -32,6 +33,7 @@ import org.bouncycastle.crypto.params.DESParameters;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.bouncycastle.jcajce.PBKDF1Key;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.provider.config.ConfigurableProvider;
 import org.bouncycastle.jcajce.provider.symmetric.util.BCPBEKey;
 import org.bouncycastle.jcajce.provider.symmetric.util.BaseAlgorithmParameterGenerator;
@@ -171,7 +173,7 @@ public final class DES
 
             if (random == null)
             {
-                random = new SecureRandom();
+                random = CryptoServicesRegistrar.getSecureRandom();
             }
 
             random.nextBytes(iv);
@@ -218,11 +220,11 @@ public final class DES
         {
             if (uninitialised)
             {
-                engine.init(new KeyGenerationParameters(new SecureRandom(), defaultKeySize));
+                engine.init(new KeyGenerationParameters(CryptoServicesRegistrar.getSecureRandom(), defaultKeySize));
                 uninitialised = false;
             }
 
-            return new SecretKeySpec(engine.generateKey(), algName);
+            return new DestroyableSecretKeySpec(engine.generateKey(), algName);
         }
     }
 
@@ -250,7 +252,7 @@ public final class DES
 
             if (SecretKeySpec.class.isAssignableFrom(keySpec))
             {
-                return new SecretKeySpec(key.getEncoded(), algName);
+                return new DestroyableSecretKeySpec(key.getEncoded(), algName);
             }
             else if (DESKeySpec.class.isAssignableFrom(keySpec))
             {
@@ -276,7 +278,7 @@ public final class DES
             if (keySpec instanceof DESKeySpec)
             {
                 DESKeySpec desKeySpec = (DESKeySpec)keySpec;
-                return new SecretKeySpec(desKeySpec.getKey(), "DES");
+                return new DestroyableSecretKeySpec(desKeySpec.getKey(), "DES");
             }
 
             return super.engineGenerateSecret(keySpec);

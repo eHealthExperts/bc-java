@@ -2,7 +2,6 @@ package org.bouncycastle.bcpg;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
 
 /**
  * Basic type for a symmetric encrypted session key packet

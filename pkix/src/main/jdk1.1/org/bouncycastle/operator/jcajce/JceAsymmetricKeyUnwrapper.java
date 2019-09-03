@@ -138,7 +138,7 @@ public class JceAsymmetricKeyUnwrapper
             if (sKey == null)
             {
                 keyCipher.init(Cipher.DECRYPT_MODE, privKey);
-                sKey = new SecretKeySpec(keyCipher.doFinal(encryptedKey), encryptedKeyAlgorithm.getAlgorithm().getId());
+                sKey = new DestroyableSecretKeySpec(keyCipher.doFinal(encryptedKey), encryptedKeyAlgorithm.getAlgorithm().getId());
             }
 
             return new JceGenericKey(encryptedKeyAlgorithm, sKey);

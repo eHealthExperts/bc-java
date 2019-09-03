@@ -9,7 +9,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -39,6 +38,8 @@ import org.bouncycastle.operator.bc.BcRSAContentVerifierProviderBuilder;
 import org.bouncycastle.util.CollectionStore;
 import org.bouncycastle.util.Store;
 import org.bouncycastle.util.encoders.Base64;
+
+import junit.framework.TestCase;
 
 public class BcAttrCertTest
     extends TestCase

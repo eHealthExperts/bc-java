@@ -3,9 +3,10 @@ package org.bouncycastle.dvcs.test;
 
 import java.security.Security;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import junit.extensions.TestSetup;
 import junit.framework.Test;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 class DVCSTestSetup
     extends TestSetup

@@ -1,9 +1,9 @@
 package org.bouncycastle.jce;
 
-import org.bouncycastle.x509.X509StoreParameters;
-
 import java.security.cert.CertStoreParameters;
 import java.security.cert.LDAPCertStoreParameters;
+
+import org.bouncycastle.x509.X509StoreParameters;
 
 /**
  * An expanded set of parameters for an LDAPCertStore

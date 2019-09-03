@@ -32,9 +32,19 @@ public class TlsImplUtils
         return isTLSv12(cryptoParams.getServerVersion());
     }
 
+    public static boolean isTLSv13(ProtocolVersion version)
+    {
+        return ProtocolVersion.TLSv13.isEqualOrEarlierVersionOf(version.getEquivalentTLSVersion());
+    }
+
+    public static boolean isTLSv13(TlsCryptoParameters cryptoParams)
+    {
+        return isTLSv13(cryptoParams.getServerVersion());
+    }
+
     public static byte[] calculateKeyBlock(TlsCryptoParameters cryptoParams, int length)
     {
-        SecurityParameters securityParameters = cryptoParams.getSecurityParameters();
+        SecurityParameters securityParameters = cryptoParams.getSecurityParametersHandshake();
         TlsSecret master_secret = securityParameters.getMasterSecret();
         byte[] seed = Arrays.concatenate(securityParameters.getServerRandom(), securityParameters.getClientRandom());
         return PRF(cryptoParams, master_secret, ExporterLabel.key_expansion, seed, length).extract();
@@ -42,7 +52,7 @@ public class TlsImplUtils
 
     public static TlsSecret PRF(TlsCryptoParameters cryptoParams, TlsSecret secret, String asciiLabel, byte[] seed, int length)
     {
-        int prfAlgorithm = cryptoParams.getSecurityParameters().getPrfAlgorithm();
+        int prfAlgorithm = cryptoParams.getSecurityParametersHandshake().getPrfAlgorithm();
 
         return secret.deriveUsingPRF(prfAlgorithm, asciiLabel, seed, length);
     }

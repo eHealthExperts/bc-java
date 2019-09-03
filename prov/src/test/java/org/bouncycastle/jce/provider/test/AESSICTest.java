@@ -5,8 +5,8 @@ import java.security.Security;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.spec.RepeatedSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
@@ -71,7 +71,7 @@ public class AESSICTest
         //
         for (int i = 0; i != keys.length; i++)
         {
-            Key sk = new SecretKeySpec(keys[i], "AES");
+            Key sk = new DestroyableSecretKeySpec(keys[i], "AES");
             c.init(
                 Cipher.ENCRYPT_MODE, sk,
             new IvParameterSpec(Hex.decode("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")));
@@ -104,7 +104,7 @@ public class AESSICTest
         //
         c = Cipher.getInstance("AES/CTR/NoPadding", "BC");
 
-        Key sk = new SecretKeySpec(Hex.decode("2B7E151628AED2A6ABF7158809CF4F3C"), "AES");
+        Key sk = new DestroyableSecretKeySpec(Hex.decode("2B7E151628AED2A6ABF7158809CF4F3C"), "AES");
 
         c.init(
             Cipher.ENCRYPT_MODE, sk,
@@ -122,7 +122,7 @@ public class AESSICTest
         //
         c = Cipher.getInstance("AES/CTR/NoPadding", "BC");
 
-        sk = new SecretKeySpec(Hex.decode("2B7E151628AED2A6ABF7158809CF4F3C"), "AES");
+        sk = new DestroyableSecretKeySpec(Hex.decode("2B7E151628AED2A6ABF7158809CF4F3C"), "AES");
 
         c.init(
             Cipher.ENCRYPT_MODE, sk,

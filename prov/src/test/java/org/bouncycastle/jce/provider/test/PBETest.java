@@ -31,6 +31,7 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.bouncycastle.jcajce.PKCS12Key;
 import org.bouncycastle.jcajce.PKCS12KeyWithParameters;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.provider.symmetric.util.BCPBEKey;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
@@ -92,7 +93,7 @@ public class PBETest
 
             ParametersWithIV params = (ParametersWithIV)pGen.generateDerivedParameters(keySize, ivSize);
 
-            SecretKeySpec   encKey = new SecretKeySpec(((KeyParameter)params.getParameters()).getKey(), baseAlgorithm);
+            DestroyableSecretKeySpec   encKey = new DestroyableSecretKeySpec(((KeyParameter)params.getParameters()).getKey(), baseAlgorithm);
 
             Cipher          c;
 
@@ -174,7 +175,7 @@ public class PBETest
 
             ParametersWithIV params = (ParametersWithIV)pGen.generateDerivedParameters(keySize, ivSize);
 
-            SecretKeySpec   encKey = new SecretKeySpec(((KeyParameter)params.getParameters()).getKey(), baseAlgorithm);
+            DestroyableSecretKeySpec   encKey = new DestroyableSecretKeySpec(((KeyParameter)params.getParameters()).getKey(), baseAlgorithm);
 
             Cipher          c;
 
@@ -534,7 +535,7 @@ public class PBETest
         Cipher  cEnc = Cipher.getInstance("DES/CBC/PKCS7Padding", "BC");
 
         cEnc.init(Cipher.ENCRYPT_MODE,
-            new SecretKeySpec(Hex.decode("30e69252758e5346"), "DES"),
+            new DestroyableSecretKeySpec(Hex.decode("30e69252758e5346"), "DES"),
             new IvParameterSpec(Hex.decode("7c1c1ab9c454a688")));
 
         byte[]  out = cEnc.doFinal(input);
@@ -575,7 +576,7 @@ public class PBETest
         cEnc = Cipher.getInstance("DESede/CBC/PKCS7Padding", "BC");
 
         cEnc.init(Cipher.ENCRYPT_MODE,
-            new SecretKeySpec(Hex.decode("732f2d33c801732b7206756cbd44f9c1c103ddd97c7cbe8e"), "DES"),
+            new DestroyableSecretKeySpec(Hex.decode("732f2d33c801732b7206756cbd44f9c1c103ddd97c7cbe8e"), "DES"),
             new IvParameterSpec(Hex.decode("b07bf522c8d608b8")));
 
         out = cEnc.doFinal(input);
@@ -600,7 +601,7 @@ public class PBETest
         cEnc = Cipher.getInstance("RC2/CBC/PKCS7Padding", "BC");
 
         cEnc.init(Cipher.ENCRYPT_MODE,
-            new SecretKeySpec(Hex.decode("732f2d33c8"), "RC2"),
+            new DestroyableSecretKeySpec(Hex.decode("732f2d33c8"), "RC2"),
             new IvParameterSpec(Hex.decode("b07bf522c8d608b8")));
 
         out = cEnc.doFinal(input);
@@ -625,7 +626,7 @@ public class PBETest
         cEnc = Cipher.getInstance("RC4", "BC");
 
         cEnc.init(Cipher.ENCRYPT_MODE,
-            new SecretKeySpec(Hex.decode("732f2d33c801732b7206756cbd44f9c1"), "RC4"));
+            new DestroyableSecretKeySpec(Hex.decode("732f2d33c801732b7206756cbd44f9c1"), "RC4"));
 
         out = cEnc.doFinal(input);
 
@@ -718,7 +719,7 @@ public class PBETest
 
         Cipher c2 = Cipher.getInstance("AES/CBC/PKCS7Padding", "BC");
 
-        c2.init(Cipher.DECRYPT_MODE, new SecretKeySpec(bcpbeKey.getEncoded(), "AES"), new IvParameterSpec(((ParametersWithIV)bcpbeKey.getParam()).getIV()));
+        c2.init(Cipher.DECRYPT_MODE, new DestroyableSecretKeySpec(bcpbeKey.getEncoded(), "AES"), new IvParameterSpec(((ParametersWithIV)bcpbeKey.getParam()).getIV()));
 
         if (!Arrays.areEqual(Hex.decode("deadbeef"), c2.doFinal(c1.doFinal(Hex.decode("deadbeef")))))
         {

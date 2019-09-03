@@ -10,9 +10,9 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.crypto.generators.Poly1305KeyGenerator;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
@@ -50,7 +50,7 @@ public class Poly1305Test
             "211195296d9afc7b35a1223a79487c87",
             "f328857a1b653684e73760c804c55b1d",
             "21cd8adb23ca84eb4dbb12780595bf28",
-            "211195296d9afc7b35a1223a79487c87",
+            "c218102702d8a2ee5c9ef9000e91454d",
             "9bb04be6a1c314a9054ae3c94d3c941b",
             "db86de7b1fcae429753d68b1263d7ca0",
             "11918174f33a2f278fb86554da094112"};
@@ -121,7 +121,7 @@ public class Poly1305Test
         }
 
         Mac mac = Mac.getInstance(name);
-        mac.init(new SecretKeySpec(MASTER_KEY, name));
+        mac.init(new DestroyableSecretKeySpec(MASTER_KEY, name));
         mac.update(new byte[128]);
         byte[] bytes = mac.doFinal();
 
@@ -152,7 +152,7 @@ public class Poly1305Test
                 try
                 {
                     Mac mac = Mac.getInstance(name);
-                    mac.init(new SecretKeySpec(MASTER_KEY, name), new IvParameterSpec(new byte[16]));
+                    mac.init(new DestroyableSecretKeySpec(MASTER_KEY, name), new IvParameterSpec(new byte[16]));
                     mac.update(new byte[128]);
                     byte[] bytes = mac.doFinal();
 

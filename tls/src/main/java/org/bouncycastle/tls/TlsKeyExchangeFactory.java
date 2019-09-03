@@ -1,52 +1,47 @@
 package org.bouncycastle.tls;
 
 import java.io.IOException;
-import java.util.Vector;
 
 import org.bouncycastle.tls.crypto.TlsDHConfig;
 import org.bouncycastle.tls.crypto.TlsECConfig;
 
+/**
+ * Interface for a key exchange factory offering a variety of specific algorithms.
+ */
 public interface TlsKeyExchangeFactory
 {
-    TlsKeyExchange createDHKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfigVerifier dhConfigVerifier) throws IOException;
+    TlsKeyExchange createDHKeyExchange(int keyExchange) throws IOException;
 
-    TlsKeyExchange createDHKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms, TlsDHConfig dhConfig)
+    TlsKeyExchange createDHanonKeyExchangeClient(int keyExchange, TlsDHGroupVerifier dhGroupVerifier)
         throws IOException;
 
-    TlsKeyExchange createDHEKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfigVerifier dhConfigVerifier) throws IOException;
+    TlsKeyExchange createDHanonKeyExchangeServer(int keyExchange, TlsDHConfig dhConfig) throws IOException;
 
-    TlsKeyExchange createDHEKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfig dhConfig) throws IOException;
+    TlsKeyExchange createDHEKeyExchangeClient(int keyExchange, TlsDHGroupVerifier dhGroupVerifier) throws IOException;
 
-    TlsKeyExchange createECDHKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfigVerifier ecConfigVerifier, short[] clientECPointFormats, short[] serverECPointFormats)
+    TlsKeyExchange createDHEKeyExchangeServer(int keyExchange, TlsDHConfig dhConfig) throws IOException;
+
+    TlsKeyExchange createECDHKeyExchange(int keyExchange) throws IOException;
+
+    TlsKeyExchange createECDHanonKeyExchangeClient(int keyExchange) throws IOException;
+
+    TlsKeyExchange createECDHanonKeyExchangeServer(int keyExchange, TlsECConfig ecConfig) throws IOException;
+
+    TlsKeyExchange createECDHEKeyExchangeClient(int keyExchange) throws IOException;
+
+    TlsKeyExchange createECDHEKeyExchangeServer(int keyExchange, TlsECConfig ecConfig) throws IOException;
+
+    TlsKeyExchange createPSKKeyExchangeClient(int keyExchange, TlsPSKIdentity pskIdentity,
+        TlsDHGroupVerifier dhGroupVerifier) throws IOException;
+
+    TlsKeyExchange createPSKKeyExchangeServer(int keyExchange, TlsPSKIdentityManager pskIdentityManager,
+        TlsDHConfig dhConfig, TlsECConfig ecConfig) throws IOException;
+
+    TlsKeyExchange createRSAKeyExchange(int keyExchange) throws IOException;
+
+    TlsKeyExchange createSRPKeyExchangeClient(int keyExchange, TlsSRPIdentity srpIdentity,
+        TlsSRPConfigVerifier srpConfigVerifier) throws IOException;
+
+    TlsKeyExchange createSRPKeyExchangeServer(int keyExchange, TlsSRPLoginParameters loginParameters)
         throws IOException;
-
-    TlsKeyExchange createECDHKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfig ecConfig, short[] serverECPointFormats) throws IOException;
-
-    TlsKeyExchange createECDHEKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfigVerifier ecConfigVerifier, short[] clientECPointFormats, short[] serverECPointFormats)
-        throws IOException;
-
-    TlsKeyExchange createECDHEKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfig ecConfig, short[] serverECPointFormats) throws IOException;
-
-    TlsKeyExchange createPSKKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsPSKIdentity pskIdentity, TlsDHConfigVerifier dhConfigVerifier, TlsECConfigVerifier ecConfigVerifier,
-        short[] clientECPointFormats, short[] serverECPointFormats) throws IOException;
-
-    TlsKeyExchange createPSKKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsPSKIdentityManager pskIdentityManager, TlsDHConfig dhConfig, TlsECConfig ecConfig,
-        short[] serverECPointFormats) throws IOException;
-
-    TlsKeyExchange createRSAKeyExchange(Vector supportedSignatureAlgorithms) throws IOException;
-
-    TlsKeyExchange createSRPKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsSRPConfigVerifier srpConfigVerifier, byte[] identity, byte[] password) throws IOException;
-
-    TlsKeyExchange createSRPKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms, byte[] identity,
-        TlsSRPLoginParameters loginParameters) throws IOException;
 }

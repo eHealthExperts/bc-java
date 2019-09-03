@@ -13,6 +13,7 @@ import org.bouncycastle.tls.CertificateRequest;
 import org.bouncycastle.tls.ChannelBinding;
 import org.bouncycastle.tls.ClientCertificateType;
 import org.bouncycastle.tls.DefaultTlsServer;
+import org.bouncycastle.tls.ProtocolName;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.TlsCredentialedDecryptor;
@@ -29,6 +30,14 @@ class MockTlsServer
     MockTlsServer()
     {
         super(new BcTlsCrypto(new SecureRandom()));
+    }
+
+    protected Vector getProtocolNames()
+    {
+        Vector protocolNames = new Vector();
+        protocolNames.addElement(ProtocolName.HTTP_2_TLS);
+        protocolNames.addElement(ProtocolName.HTTP_1_1);
+        return protocolNames;
     }
 
     public void notifyAlertRaised(short alertLevel, short alertDescription, String message, Throwable cause)
@@ -68,7 +77,7 @@ class MockTlsServer
             ClientCertificateType.dss_sign, ClientCertificateType.ecdsa_sign };
 
         Vector serverSigAlgs = null;
-        if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(serverVersion))
+        if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(context.getServerVersion()))
         {
             serverSigAlgs = TlsUtils.getDefaultSupportedSignatureAlgorithms(context);
         }
@@ -100,7 +109,10 @@ class MockTlsServer
 
         boolean isEmpty = (clientCertificate == null || clientCertificate.isEmpty());
         if (!isEmpty && !TlsTestUtils.isCertificateOneOf(context.getCrypto(), chain[0],
-            new String[]{ "x509-client-dsa.pem", "x509-client-ecdsa.pem", "x509-client-rsa.pem"}))
+            new String[]
+            { "x509-client-dsa.pem", "x509-client-ecdh.pem", "x509-client-ecdsa.pem", "x509-client-ed25519.pem",
+                "x509-client-rsa_pss_256.pem", "x509-client-rsa_pss_384.pem", "x509-client-rsa_pss_512.pem",
+                "x509-client-rsa.pem" }))
         {
             throw new TlsFatalAlert(AlertDescription.bad_certificate);
         }
@@ -110,8 +122,17 @@ class MockTlsServer
     {
         super.notifyHandshakeComplete();
 
+        ProtocolName protocolName = context.getSecurityParametersConnection().getApplicationProtocol();
+        if (protocolName != null)
+        {
+            System.out.println("Server ALPN: " + protocolName.getUtf8Decoding());
+        }
+
+        byte[] tlsServerEndPoint = context.exportChannelBinding(ChannelBinding.tls_server_end_point);
+        System.out.println("Server 'tls-server-end-point': " + hex(tlsServerEndPoint));
+
         byte[] tlsUnique = context.exportChannelBinding(ChannelBinding.tls_unique);
-        System.out.println("'tls-unique': " + Hex.toHexString(tlsUnique));
+        System.out.println("Server 'tls-unique': " + hex(tlsUnique));
     }
 
     protected TlsCredentialedDecryptor getRSAEncryptionCredentials()
@@ -123,7 +144,12 @@ class MockTlsServer
 
     protected TlsCredentialedSigner getRSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentials(context, supportedSignatureAlgorithms, SignatureAlgorithm.rsa,
-            "x509-server-rsa-sign.pem", "x509-server-key-rsa-sign.pem");
+        Vector clientSigAlgs = context.getSecurityParametersHandshake().getClientSigAlgs();
+        return TlsTestUtils.loadSignerCredentialsServer(context, clientSigAlgs, SignatureAlgorithm.rsa);
+    }
+
+    protected String hex(byte[] data)
+    {
+        return data == null ? "(null)" : Hex.toHexString(data);
     }
 }

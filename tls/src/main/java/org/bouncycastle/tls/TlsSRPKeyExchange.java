@@ -4,13 +4,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
-import java.util.Vector;
 
+import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.TlsSRP6Client;
 import org.bouncycastle.tls.crypto.TlsSRP6Server;
 import org.bouncycastle.tls.crypto.TlsSRPConfig;
 import org.bouncycastle.tls.crypto.TlsSecret;
-import org.bouncycastle.tls.crypto.TlsVerifier;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.BigIntegers;
 import org.bouncycastle.util.io.TeeInputStream;
@@ -34,39 +33,31 @@ public class TlsSRPKeyExchange
         }
     }
 
+    protected TlsSRPIdentity srpIdentity;
     protected TlsSRPConfigVerifier srpConfigVerifier;
-    protected byte[] identity;
-    protected byte[] password;
-
-    protected TlsSRPConfig srpConfig = null;
-    protected TlsSRP6Client srpClient = null;
-    protected TlsSRP6Server srpServer = null;
-    protected BigInteger srpPeerCredentials = null;
-    protected BigInteger srpVerifier = null;
+    protected TlsCertificate serverCertificate = null;
     protected byte[] srpSalt = null;
+    protected TlsSRP6Client srpClient = null;
 
+    protected TlsSRPLoginParameters srpLoginParameters;
     protected TlsCredentialedSigner serverCredentials = null;
-    protected TlsVerifier verifier = null;
+    protected TlsSRP6Server srpServer = null;
 
-    public TlsSRPKeyExchange(int keyExchange, Vector supportedSignatureAlgorithms, TlsSRPConfigVerifier srpConfigVerifier,
-        byte[] identity, byte[] password)
+    protected BigInteger srpPeerCredentials = null;
+
+    public TlsSRPKeyExchange(int keyExchange, TlsSRPIdentity srpIdentity, TlsSRPConfigVerifier srpConfigVerifier)
     {
-        super(checkKeyExchange(keyExchange), supportedSignatureAlgorithms);
+        super(checkKeyExchange(keyExchange));
 
+        this.srpIdentity = srpIdentity;
         this.srpConfigVerifier = srpConfigVerifier;
-        this.identity = identity;
-        this.password = password;
     }
 
-    public TlsSRPKeyExchange(int keyExchange, Vector supportedSignatureAlgorithms, byte[] identity,
-        TlsSRPLoginParameters loginParameters)
+    public TlsSRPKeyExchange(int keyExchange, TlsSRPLoginParameters srpLoginParameters)
     {
-        super(checkKeyExchange(keyExchange), supportedSignatureAlgorithms);
+        super(checkKeyExchange(keyExchange));
 
-        this.identity = identity;
-        this.srpConfig = loginParameters.getConfig();
-        this.srpVerifier = loginParameters.getVerifier();
-        this.srpSalt = loginParameters.getSalt();
+        this.srpLoginParameters = srpLoginParameters;
     }
 
     public void skipServerCredentials() throws IOException
@@ -83,12 +74,8 @@ public class TlsSRPKeyExchange
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
-        if (!(serverCredentials instanceof TlsCredentialedSigner))
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
 
-        this.serverCredentials = (TlsCredentialedSigner)serverCredentials;
+        this.serverCredentials = TlsUtils.requireSignerCredentials(serverCredentials);
     }
 
     public void processServerCertificate(Certificate serverCertificate) throws IOException
@@ -97,15 +84,8 @@ public class TlsSRPKeyExchange
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
-        if (serverCertificate.isEmpty())
-        {
-            throw new TlsFatalAlert(AlertDescription.bad_certificate);
-        }
 
-        checkServerCertSigAlg(serverCertificate);
-
-        this.verifier = serverCertificate.getCertificateAt(0)
-            .createVerifier(TlsUtils.getSignatureAlgorithm(keyExchange));
+        this.serverCertificate = serverCertificate.getCertificateAt(0);
     }
 
     public boolean requiresServerKeyExchange()
@@ -115,51 +95,49 @@ public class TlsSRPKeyExchange
 
     public byte[] generateServerKeyExchange() throws IOException
     {
-        srpServer = context.getCrypto().createSRP6Server(srpConfig, srpVerifier);
+        TlsSRPConfig config = srpLoginParameters.getConfig();
+
+        srpServer = context.getCrypto().createSRP6Server(config, srpLoginParameters.getVerifier());
 
         BigInteger B = srpServer.generateServerCredentials();
 
-        BigInteger[] ng = srpConfig.getExplicitNG();
-        ServerSRPParams srpParams = new ServerSRPParams(ng[0], ng[1], srpSalt, B);
+        BigInteger[] ng = config.getExplicitNG();
+        ServerSRPParams srpParams = new ServerSRPParams(ng[0], ng[1], srpLoginParameters.getSalt(), B);
 
-        DigestInputBuffer buf = new DigestInputBuffer();
+        DigestInputBuffer digestBuffer = new DigestInputBuffer();
 
-        srpParams.encode(buf);
+        srpParams.encode(digestBuffer);
 
         if (serverCredentials != null)
         {
-            DigitallySigned signedParams = TlsUtils.generateServerKeyExchangeSignature(context, serverCredentials, buf);
-
-            signedParams.encode(buf);
+            TlsUtils.generateServerKeyExchangeSignature(context, serverCredentials, digestBuffer);
         }
 
-        return buf.toByteArray();
+        return digestBuffer.toByteArray();
     }
 
     public void processServerKeyExchange(InputStream input) throws IOException
     {
-        DigestInputBuffer buf = null;
+        DigestInputBuffer digestBuffer = null;
         InputStream teeIn = input;
 
         if (keyExchange != KeyExchangeAlgorithm.SRP)
         {
-            buf = new DigestInputBuffer();
-            teeIn = new TeeInputStream(input, buf);
+            digestBuffer = new DigestInputBuffer();
+            teeIn = new TeeInputStream(input, digestBuffer);
         }
 
         ServerSRPParams srpParams = ServerSRPParams.parse(teeIn);
 
-        if (buf != null)
+        if (digestBuffer != null)
         {
-            DigitallySigned signedParams = parseSignature(input);
-
-            TlsUtils.verifyServerKeyExchangeSignature(context, verifier, buf, signedParams);
+            TlsUtils.verifyServerKeyExchangeSignature(context, input, serverCertificate, digestBuffer);
         }
 
-        this.srpConfig = new TlsSRPConfig();
-        srpConfig.setExplicitNG(new BigInteger[]{ srpParams.getN(), srpParams.getG() });
+        TlsSRPConfig config = new TlsSRPConfig();
+        config.setExplicitNG(new BigInteger[]{ srpParams.getN(), srpParams.getG() });
 
-        if (!srpConfigVerifier.accept(srpConfig))
+        if (!srpConfigVerifier.accept(config))
         {
             throw new TlsFatalAlert(AlertDescription.insufficient_security);
         }
@@ -171,7 +149,7 @@ public class TlsSRPKeyExchange
          * B % N = 0.
          */
         this.srpPeerCredentials = validatePublicValue(srpParams.getN(), srpParams.getB());
-        this.srpClient = context.getCrypto().createSRP6Client(srpConfig);
+        this.srpClient = context.getCrypto().createSRP6Client(config);
     }
 
     public void processClientCredentials(TlsCredentials clientCredentials) throws IOException
@@ -181,10 +159,13 @@ public class TlsSRPKeyExchange
 
     public void generateClientKeyExchange(OutputStream output) throws IOException
     {
+        byte[] identity = srpIdentity.getSRPIdentity();
+        byte[] password = srpIdentity.getSRPPassword();
+
         BigInteger A = srpClient.generateClientCredentials(srpSalt, identity, password);
         TlsSRPUtils.writeSRPParameter(A, output);
 
-        context.getSecurityParameters().srpIdentity = Arrays.clone(identity);
+        context.getSecurityParametersHandshake().srpIdentity = Arrays.clone(identity);
     }
 
     public void processClientKeyExchange(InputStream input) throws IOException
@@ -193,8 +174,9 @@ public class TlsSRPKeyExchange
          * RFC 5054 2.5.4: The server MUST abort the handshake with an "illegal_parameter" alert if
          * A % N = 0.
          */
-        this.srpPeerCredentials = validatePublicValue(srpConfig.getExplicitNG()[0], TlsSRPUtils.readSRPParameter(input));
-        context.getSecurityParameters().srpIdentity = Arrays.clone(identity);
+        this.srpPeerCredentials = validatePublicValue(srpLoginParameters.getConfig().getExplicitNG()[0],
+            TlsSRPUtils.readSRPParameter(input));
+        context.getSecurityParametersHandshake().srpIdentity = Arrays.clone(srpLoginParameters.getIdentity());
     }
 
     public TlsSecret generatePreMasterSecret() throws IOException

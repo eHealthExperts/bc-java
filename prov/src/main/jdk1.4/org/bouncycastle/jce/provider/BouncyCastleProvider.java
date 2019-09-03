@@ -49,7 +49,7 @@ import org.bouncycastle.pqc.jcajce.provider.sphincs.Sphincs256KeyFactorySpi;
 public final class BouncyCastleProvider extends Provider
     implements ConfigurableProvider
 {
-    private static String info = "BouncyCastle Security Provider v1.59";
+    private static String info = "BouncyCastle Security Provider v1.62";
 
     public static final String PROVIDER_NAME = "BC";
 
@@ -94,7 +94,7 @@ public final class BouncyCastleProvider extends Provider
 
     private static final String[] ASYMMETRIC_CIPHERS =
     {
-        "DSA", "DH", "EC", "RSA", "GOST", "ECGOST", "ElGamal", "DSTU4145", "GM"
+        "DSA", "DH", "EC", "RSA", "GOST", "ECGOST", "ElGamal", "DSTU4145", "GM", "EdEC"
     };
 
     /*
@@ -132,7 +132,7 @@ public final class BouncyCastleProvider extends Provider
      */
     public BouncyCastleProvider()
     {
-        super(PROVIDER_NAME, 1.59, info);
+        super(PROVIDER_NAME, 1.62, info);
 
         AccessController.doPrivileged(new PrivilegedAction()
         {

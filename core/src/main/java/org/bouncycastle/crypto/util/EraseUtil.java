@@ -61,30 +61,6 @@ public class EraseUtil {
             }
         }
     }
-    
-    public static void clearSecretKeySpec(final SecretKeySpec secretKeySpec) 
-    {
-        if (secretKeySpec != null) 
-        {
-            Field declaredField = null;
-            try {
-
-                declaredField = SecretKeySpec.class.getDeclaredField("key");
-                final boolean accessible = declaredField.isAccessible();
-
-                declaredField.setAccessible(true);
-
-                final byte[] array = (byte[]) declaredField.get(secretKeySpec);
-                clearByteArray(array);
-                declaredField.setAccessible(accessible);
-
-            } 
-            catch (Exception e) 
-            {
-                LOG.log(Level.WARNING, "Could not erase SecretKeySpec", e);
-            }
-        }
-    }
 
     public static void clearECFieldElement(final ECFieldElement ecField) {
         if (ecField != null) 

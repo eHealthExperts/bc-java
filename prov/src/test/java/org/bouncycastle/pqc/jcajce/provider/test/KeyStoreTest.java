@@ -18,7 +18,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1Integer;
@@ -44,6 +43,8 @@ import org.bouncycastle.pqc.jcajce.spec.McElieceKeyGenParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.SPHINCS256KeyGenParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.XMSSMTParameterSpec;
 
+import junit.framework.TestCase;
+
 public class KeyStoreTest
     extends TestCase
 {
@@ -55,8 +56,8 @@ public class KeyStoreTest
     static
     {
         algIds.put("SHA512WITHSPHINCS256", new AlgorithmIdentifier(BCObjectIdentifiers.sphincs256_with_SHA512));
-        algIds.put("SHA256WITHXMSSMT", new AlgorithmIdentifier(BCObjectIdentifiers.xmss_mt_with_SHA256));
-        algIds.put("SHA512WITHXMSSMT", new AlgorithmIdentifier(BCObjectIdentifiers.xmss_mt_with_SHA512));
+        algIds.put("SHA256WITHXMSSMT", new AlgorithmIdentifier(BCObjectIdentifiers.xmss_mt_SHA256ph));
+        algIds.put("SHA512WITHXMSSMT", new AlgorithmIdentifier(BCObjectIdentifiers.xmss_mt_SHA512ph));
     }
 
     public void setUp()

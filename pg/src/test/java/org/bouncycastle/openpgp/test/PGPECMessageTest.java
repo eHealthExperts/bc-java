@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.security.Security;
 
 import org.bouncycastle.bcpg.HashAlgorithmTags;
+import org.bouncycastle.gpg.SExprParser;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPCompressedData;
 import org.bouncycastle.openpgp.PGPEncryptedDataList;
@@ -25,6 +26,7 @@ import org.bouncycastle.openpgp.operator.bc.BcPublicKeyDataDecryptorFactory;
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentSignerBuilder;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentVerifierBuilderProvider;
+import org.bouncycastle.openpgp.operator.jcajce.JcaPGPDigestCalculatorProviderBuilder;
 import org.bouncycastle.openpgp.operator.jcajce.JcePBEProtectionRemoverFactory;
 import org.bouncycastle.openpgp.operator.jcajce.JcePublicKeyDataDecryptorFactoryBuilder;
 import org.bouncycastle.util.encoders.Base64;
@@ -87,7 +89,8 @@ public class PGPECMessageTest
     private void testMasterKey()
         throws Exception
     {
-        PGPSecretKey key = PGPSecretKey.parseSecretKeyFromSExpr(new ByteArrayInputStream(sExprKeyMaster), new JcePBEProtectionRemoverFactory("test".toCharArray()), new JcaKeyFingerprintCalculator());
+        SExprParser parser = new SExprParser(null);
+        PGPSecretKey key = parser.parseSecretKey(new ByteArrayInputStream(sExprKeyMaster), new JcePBEProtectionRemoverFactory("test".toCharArray()), new JcaKeyFingerprintCalculator());
 
         PGPSignatureGenerator signGen = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(PGPPublicKey.ECDSA, HashAlgorithmTags.SHA256).setProvider("BC"));
 
@@ -112,6 +115,7 @@ public class PGPECMessageTest
     private void testEncMessage()
         throws Exception
     {
+        SExprParser parser = new SExprParser(null);
         PGPObjectFactory pgpFact = new JcaPGPObjectFactory(encMessage);
 
         PGPEncryptedDataList encList = (PGPEncryptedDataList)pgpFact.nextObject();
@@ -120,7 +124,7 @@ public class PGPECMessageTest
 
         PGPPublicKey publicKey = new JcaPGPPublicKeyRing(testPubKey).getPublicKey(encP.getKeyID());
 
-        PGPSecretKey secretKey = PGPSecretKey.parseSecretKeyFromSExpr(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
+        PGPSecretKey secretKey = parser.parseSecretKey(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
 
         InputStream clear = encP.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(secretKey.extractPrivateKey(null)));
 
@@ -151,7 +155,8 @@ public class PGPECMessageTest
 
         PGPPublicKey publicKey = publicKeyRing.getPublicKey(encP.getKeyID());
 
-        PGPSecretKey secretKey = PGPSecretKey.parseSecretKeyFromSExpr(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
+        SExprParser sExprParser = new SExprParser(new JcaPGPDigestCalculatorProviderBuilder().setProvider("BC").build());
+        PGPSecretKey secretKey = sExprParser.parseSecretKey(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
 
         InputStream clear = encP.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(secretKey.extractPrivateKey(null)));
 
@@ -201,7 +206,8 @@ public class PGPECMessageTest
 
         PGPPublicKey publicKey = new JcaPGPPublicKeyRing(testPubKey).getPublicKey(encP.getKeyID());
 
-        PGPSecretKey secretKey = PGPSecretKey.parseSecretKeyFromSExpr(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
+        SExprParser sExprParser = new SExprParser(new JcaPGPDigestCalculatorProviderBuilder().setProvider("BC").build());
+        PGPSecretKey secretKey = sExprParser.parseSecretKey(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
 
         InputStream clear = encP.getDataStream(new BcPublicKeyDataDecryptorFactory(secretKey.extractPrivateKey(null)));
 
@@ -222,6 +228,7 @@ public class PGPECMessageTest
     private void testBCSignedEncMessage()
         throws Exception
     {
+        SExprParser parser = new SExprParser(null);
         PGPObjectFactory pgpFact = new JcaPGPObjectFactory(signedEncMessage);
 
         PGPEncryptedDataList encList = (PGPEncryptedDataList)pgpFact.nextObject();
@@ -232,7 +239,7 @@ public class PGPECMessageTest
 
         PGPPublicKey publicKey = publicKeyRing.getPublicKey(encP.getKeyID());
 
-        PGPSecretKey secretKey = PGPSecretKey.parseSecretKeyFromSExpr(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
+        PGPSecretKey secretKey = parser.parseSecretKey(new ByteArrayInputStream(sExprKeySub), new JcePBEProtectionRemoverFactory("test".toCharArray()), publicKey);
 
         InputStream clear = encP.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(secretKey.extractPrivateKey(null)));
 

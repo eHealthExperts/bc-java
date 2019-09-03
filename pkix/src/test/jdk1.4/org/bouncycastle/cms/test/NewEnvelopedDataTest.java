@@ -839,7 +839,7 @@ public class NewEnvelopedDataTest
         throws Exception
     {
         byte[]    data = "WallaWallaWashington".getBytes();
-        SecretKey kek  = new SecretKeySpec(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 }, "AES");
+        SecretKey kek  = new DestroyableSecretKeySpec(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 }, "AES");
 
         CMSEnvelopedData ed = new CMSEnvelopedData(oldKEK);
 

@@ -5,8 +5,8 @@ import java.security.Security;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
@@ -75,7 +75,7 @@ public class MacTest
     public void performTest()
         throws Exception
     {
-        SecretKey           key = new SecretKeySpec(keyBytes, "DES");
+        SecretKey           key = new DestroyableSecretKeySpec(keyBytes, "DES");
         byte[]              out;
         Mac                 mac;
 
@@ -128,7 +128,7 @@ public class MacTest
         //
         // ISO9797 algorithm 3 using DESEDE
         //
-        key = new SecretKeySpec(keyBytesISO9797, "DESEDE");
+        key = new DestroyableSecretKeySpec(keyBytesISO9797, "DESEDE");
         
         mac = Mac.getInstance("ISO9797ALG3", "BC");
 
@@ -146,7 +146,7 @@ public class MacTest
         //
         // 64bit DESede Mac
         //
-        key = new SecretKeySpec(keyBytesISO9797, "DESEDE");
+        key = new DestroyableSecretKeySpec(keyBytesISO9797, "DESEDE");
         
         mac = Mac.getInstance("DESEDE64", "BC");
 
@@ -161,13 +161,13 @@ public class MacTest
             fail("Failed - expected " + new String(Hex.encode(outputDesEDE64)) + " got " + new String(Hex.encode(out)));
         }
 
-        aliasTest(new SecretKeySpec(keyBytesISO9797, "DESede"), "DESedeMac64withISO7816-4Padding",
+        aliasTest(new DestroyableSecretKeySpec(keyBytesISO9797, "DESede"), "DESedeMac64withISO7816-4Padding",
             new String[] { "DESEDE64WITHISO7816-4PADDING", "DESEDEISO9797ALG1MACWITHISO7816-4PADDING", "DESEDEISO9797ALG1WITHISO7816-4PADDING" });
 
-        aliasTest(new SecretKeySpec(keyBytesISO9797, "DESede"), "ISO9797ALG3WITHISO7816-4PADDING",
+        aliasTest(new DestroyableSecretKeySpec(keyBytesISO9797, "DESede"), "ISO9797ALG3WITHISO7816-4PADDING",
             new String[] { "ISO9797ALG3MACWITHISO7816-4PADDING" });
 
-        aliasTest(new SecretKeySpec(keyBytes, "DES"), "DES64",
+        aliasTest(new DestroyableSecretKeySpec(keyBytes, "DES"), "DES64",
             new String[] { "DESMAC64" });
     }
 

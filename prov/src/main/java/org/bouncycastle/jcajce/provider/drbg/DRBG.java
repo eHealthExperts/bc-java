@@ -1,10 +1,14 @@
 package org.bouncycastle.jcajce.provider.drbg;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.Provider;
 import java.security.SecureRandom;
 import java.security.SecureRandomSpi;
+import java.security.Security;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,8 +42,6 @@ public class DRBG
             {"org.conscrypt.OpenSSLProvider", "org.conscrypt.OpenSSLRandom"},
         };
 
-    private static final Object[] initialEntropySourceAndSpi = findSource();
-
     // Cascade through providers looking for match.
     private final static Object[] findSource()
     {
@@ -64,7 +66,7 @@ public class DRBG
     private static class CoreSecureRandom
         extends SecureRandom
     {
-        CoreSecureRandom()
+        CoreSecureRandom(Object[] initialEntropySourceAndSpi)
         {
             super((SecureRandomSpi)initialEntropySourceAndSpi[1], (Provider)initialEntropySourceAndSpi[0]);
         }
@@ -116,13 +118,22 @@ public class DRBG
 
     private static SecureRandom createCoreSecureRandom()
     {
-        if (initialEntropySourceAndSpi != null)
+        if (Security.getProperty("securerandom.source") == null)
         {
-            return new CoreSecureRandom();
+            return new CoreSecureRandom(findSource());
         }
         else
         {
-            return new SecureRandom();  // we're desperate, it's worth a try.
+            try
+            {
+                String source = Security.getProperty("securerandom.source");
+
+                return new URLSeededSecureRandom(new URL(source));
+            }
+            catch (Exception e)
+            {
+                return new SecureRandom();  // we're desperate, it's worth a try.
+            }
         }
     }
 
@@ -252,6 +263,92 @@ public class DRBG
             Pack.longToLittleEndian(Thread.currentThread().getId()), Pack.longToLittleEndian(System.currentTimeMillis()));
     }
 
+    private static class HybridRandomProvider
+        extends Provider
+    {
+        protected HybridRandomProvider()
+        {
+            super("BCHEP", 1.0, "Bouncy Castle Hybrid Entropy Provider");
+        }
+    }
+
+    private static class URLSeededSecureRandom
+        extends SecureRandom
+    {
+        private final InputStream seedStream;
+
+        URLSeededSecureRandom(final URL url)
+        {
+            super(null, new HybridRandomProvider());
+
+            this.seedStream = AccessController.doPrivileged(new PrivilegedAction<InputStream>()
+            {
+                public InputStream run()
+                {
+                    try
+                    {
+                        return url.openStream();
+                    }
+                    catch (IOException e)
+                    {
+                        throw new InternalError("unable to open random source");
+                    }
+                }
+            });
+        }
+
+        public void setSeed(byte[] seed)
+        {
+            // ignore
+        }
+
+        public void setSeed(long seed)
+        {
+            // ignore
+        }
+
+        public byte[] generateSeed(int numBytes)
+        {
+            synchronized (this)
+            {
+                byte[] data = new byte[numBytes];
+
+                int off = 0;
+                int len;
+
+                while (off != data.length && (len = privilegedRead(data, off, data.length - off)) > -1)
+                {
+                    off += len;
+                }
+
+                if (off != data.length)
+                {
+                    throw new InternalError("unable to fully read random source");
+                }
+
+                return data;
+            }
+        }
+
+        private int privilegedRead(final byte[] data, final int off, final int len)
+        {
+            return AccessController.doPrivileged(new PrivilegedAction<Integer>()
+            {
+                public Integer run()
+                {
+                    try
+                    {
+                        return seedStream.read(data, off, len);
+                    }
+                    catch (IOException e)
+                    {
+                        throw new InternalError("unable to read random source");
+                    }
+                }
+            });
+        }
+    }
+
     private static class HybridSecureRandom
         extends SecureRandom
     {
@@ -263,7 +360,7 @@ public class DRBG
 
         HybridSecureRandom()
         {
-            super(null, null);
+            super(null, new HybridRandomProvider());
             drbg = new SP800SecureRandomBuilder(new EntropySourceProvider()
                 {
                     public EntropySource get(final int bitsRequired)

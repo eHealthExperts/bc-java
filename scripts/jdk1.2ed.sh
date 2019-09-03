@@ -58,3 +58,21 @@ w
 q
 %
 
+ed org/bouncycastle/crypto/CryptoServicesRegistrar.java <<%
+g/private final String/s/final//
+g/private final Class/s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/params/Argon2Parameters.java <<%
+g/private final/s/final//
+w
+q
+%
+
+ed org/bouncycastle/cert/crmf/bc/BcCRMFEncryptorBuilder.java <<%
+g/private final/s/final//
+w
+q
+%

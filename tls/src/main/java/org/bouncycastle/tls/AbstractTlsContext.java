@@ -1,7 +1,10 @@
 package org.bouncycastle.tls;
 
+import java.io.IOException;
+
 import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.tls.crypto.TlsNonceGenerator;
+import org.bouncycastle.tls.crypto.TlsSecret;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Pack;
 import org.bouncycastle.util.Times;
@@ -16,30 +19,68 @@ abstract class AbstractTlsContext
         return ++counter;
     }
 
-    private static TlsNonceGenerator createNonceGenerator(TlsCrypto crypto, SecurityParameters securityParameters)
+    private static TlsNonceGenerator createNonceGenerator(TlsCrypto crypto, int connectionEnd)
     {
         byte[] additionalSeedMaterial = new byte[16];
         Pack.longToBigEndian(nextCounterValue(), additionalSeedMaterial, 0);
         Pack.longToBigEndian(Times.nanoTime(), additionalSeedMaterial, 8);
-        additionalSeedMaterial[0] = (byte)securityParameters.entity;
+        additionalSeedMaterial[0] = (byte)connectionEnd;
 
         return crypto.createNonceGenerator(additionalSeedMaterial);
     }
 
     private TlsCrypto crypto;
+    private int connectionEnd;
     private TlsNonceGenerator nonceGenerator;
-    private SecurityParameters securityParameters;
+    private SecurityParameters securityParametersHandshake = null;
+    private SecurityParameters securityParametersConnection = null;
 
+    private ProtocolVersion[] clientSupportedVersions = null;
     private ProtocolVersion clientVersion = null;
-    private ProtocolVersion serverVersion = null;
     private TlsSession session = null;
     private Object userObject = null;
 
-    AbstractTlsContext(TlsCrypto crypto, SecurityParameters securityParameters)
+    AbstractTlsContext(TlsCrypto crypto, int connectionEnd)
     {
         this.crypto = crypto;
-        this.nonceGenerator = createNonceGenerator(crypto, securityParameters);
-        this.securityParameters = securityParameters;
+        this.connectionEnd = connectionEnd;
+        this.nonceGenerator = createNonceGenerator(crypto, connectionEnd);
+    }
+
+    synchronized void handshakeBeginning(TlsPeer peer) throws IOException
+    {
+        if (null != securityParametersHandshake)
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        securityParametersHandshake = new SecurityParameters();
+        securityParametersHandshake.entity = connectionEnd;
+
+        if (null != securityParametersConnection)
+        {
+            securityParametersHandshake.renegotiating = true;
+            securityParametersHandshake.secureRenegotiation = securityParametersConnection.isSecureRenegotiation();
+            securityParametersHandshake.negotiatedVersion = securityParametersConnection.getNegotiatedVersion();
+        }
+
+        peer.notifyHandshakeBeginning();
+    }
+
+    synchronized void handshakeComplete(TlsPeer peer, TlsSession session) throws IOException
+    {
+        if (null == securityParametersHandshake)
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        this.session = session;
+
+        securityParametersConnection = securityParametersHandshake;
+
+        peer.notifyHandshakeComplete();
+
+        securityParametersHandshake = null;
     }
 
     public TlsCrypto getCrypto()
@@ -52,9 +93,31 @@ abstract class AbstractTlsContext
         return nonceGenerator;
     }
 
-    public SecurityParameters getSecurityParameters()
+    public synchronized SecurityParameters getSecurityParameters()
     {
-        return securityParameters;
+        return null != securityParametersHandshake
+            ?   securityParametersHandshake
+            :   securityParametersConnection;
+    }
+
+    public synchronized SecurityParameters getSecurityParametersConnection()
+    {
+        return securityParametersConnection;
+    }
+
+    public synchronized SecurityParameters getSecurityParametersHandshake()
+    {
+        return securityParametersHandshake;
+    }
+
+    public ProtocolVersion[] getClientSupportedVersions()
+    {
+        return clientSupportedVersions;
+    }
+
+    public void setClientSupportedVersions(ProtocolVersion[] clientSupportedVersions)
+    {
+        this.clientSupportedVersions = clientSupportedVersions;
     }
 
     public ProtocolVersion getClientVersion()
@@ -69,12 +132,7 @@ abstract class AbstractTlsContext
 
     public ProtocolVersion getServerVersion()
     {
-        return serverVersion;
-    }
-
-    void setServerVersion(ProtocolVersion serverVersion)
-    {
-        this.serverVersion = serverVersion;
+        return getSecurityParameters().getNegotiatedVersion();
     }
 
     public TlsSession getResumableSession()
@@ -92,11 +150,6 @@ abstract class AbstractTlsContext
         return session;
     }
 
-    void setSession(TlsSession session)
-    {
-        this.session = session;
-    }
-
     public Object getUserObject()
     {
         return userObject;
@@ -109,42 +162,76 @@ abstract class AbstractTlsContext
 
     public byte[] exportChannelBinding(int channelBinding)
     {
-        switch (channelBinding)
+        SecurityParameters sp = getSecurityParametersConnection();
+        if (null == sp)
         {
-        case ChannelBinding.tls_unique:
-        {
-            byte[] tlsUnique = getSecurityParameters().getTLSUnique();
-            if (tlsUnique == null)
-            {
-                throw new IllegalStateException("'tls-unique' channel binding unavailable before handshake completion");
-            }
-            return Arrays.clone(tlsUnique);
+            throw new IllegalStateException("Export of channel bindings unavailable before handshake completion");
         }
 
+        switch (channelBinding)
+        {
         case ChannelBinding.tls_server_end_point:
+        {
+            byte[] tlsServerEndPoint = sp.getTLSServerEndPoint();
+
+            return tlsServerEndPoint.length < 1 ? null : Arrays.clone(tlsServerEndPoint);
+        }
+
+        case ChannelBinding.tls_unique:
+        {
+            return Arrays.clone(sp.getTLSUnique());
+        }
+
         case ChannelBinding.tls_unique_for_telnet:
         default:
             throw new UnsupportedOperationException();
         }
     }
 
-    public byte[] exportKeyingMaterial(String asciiLabel, byte[] context_value, int length)
+    public byte[] exportEarlyKeyingMaterial(String asciiLabel, byte[] context_value, int length)
     {
-        /*
-         * TODO[session-hash]
-         * 
-         * draft-ietf-tls-session-hash-04 5.4. If a client or server chooses to continue with a full
-         * handshake without the extended master secret extension, [..] the client or server MUST
-         * NOT export any key material based on the new master secret for any subsequent
-         * application-level authentication. In particular, it MUST disable [RFC5705] [..].
-         */
-
         if (context_value != null && !TlsUtils.isValidUint16(context_value.length))
         {
             throw new IllegalArgumentException("'context_value' must have length less than 2^16 (or be null)");
         }
 
-        SecurityParameters sp = getSecurityParameters();
+        // TODO[tls13]
+        TlsSecret exporter_secret = null; // early_exporter_master_secret
+
+        return exportKeyingMaterial13(exporter_secret, asciiLabel, context_value, length);
+    }
+
+    public byte[] exportKeyingMaterial(String asciiLabel, byte[] context_value, int length)
+    {
+        if (context_value != null && !TlsUtils.isValidUint16(context_value.length))
+        {
+            throw new IllegalArgumentException("'context_value' must have length less than 2^16 (or be null)");
+        }
+
+        if (TlsUtils.isTLSv13(this))
+        {
+            // TODO[tls13]
+            TlsSecret exporter_secret = null; // exporter_master_secret
+
+            return exportKeyingMaterial13(exporter_secret, asciiLabel, context_value, length);
+        }
+
+        SecurityParameters sp = getSecurityParametersConnection();
+        if (null == sp)
+        {
+            throw new IllegalStateException("Export of key material unavailable before handshake completion");
+        }
+        if (!sp.isExtendedMasterSecret())
+        {
+            /*
+             * RFC 7627 5.4. If a client or server chooses to continue with a full handshake without
+             * the extended master secret extension, [..] the client or server MUST NOT export any
+             * key material based on the new master secret for any subsequent application-level
+             * authentication. In particular, it MUST disable [RFC5705] [..].
+             */
+            throw new IllegalStateException("cannot export keying material without extended_master_secret");
+        }
+
         byte[] cr = sp.getClientRandom(), sr = sp.getServerRandom();
 
         int seedLength = cr.length + sr.length;
@@ -174,5 +261,19 @@ abstract class AbstractTlsContext
         }
 
         return TlsUtils.PRF(this, sp.getMasterSecret(), asciiLabel, seed, length).extract();
+    }
+
+    protected byte[] exportKeyingMaterial13(TlsSecret exporter_secret, String asciiLabel, byte[] context_value, int length)
+    {
+        if (context_value == null)
+        {
+            context_value = TlsUtils.EMPTY_BYTES;
+        }
+
+        /*
+         *  TODO[tls13]
+         *  HKDF-Expand-Label(Derive-Secret(Secret, label, ""), "exporter", Hash(context_value), key_length)
+         */
+        throw new UnsupportedOperationException();
     }
 }

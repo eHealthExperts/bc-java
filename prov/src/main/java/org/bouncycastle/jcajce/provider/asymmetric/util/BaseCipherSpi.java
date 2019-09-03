@@ -1,5 +1,6 @@
 package org.bouncycastle.jcajce.provider.asymmetric.util;
 
+import java.io.ByteArrayOutputStream;
 import java.security.AlgorithmParameters;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -20,14 +21,15 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.RC2ParameterSpec;
 import javax.crypto.spec.RC5ParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.Wrapper;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.util.BCJcaJceHelper;
 import org.bouncycastle.jcajce.util.JcaJceHelper;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.Arrays;
 
 public abstract class BaseCipherSpi
     extends CipherSpi
@@ -169,7 +171,7 @@ public abstract class BaseCipherSpi
 
         if (wrappedKeyType == Cipher.SECRET_KEY)
         {
-            return new SecretKeySpec(encoded, wrappedKeyAlgorithm);
+            return new DestroyableSecretKeySpec(encoded, wrappedKeyAlgorithm);
         }
         else if (wrappedKeyAlgorithm.equals("") && wrappedKeyType == Cipher.PRIVATE_KEY)
         {
@@ -226,6 +228,25 @@ public abstract class BaseCipherSpi
             }
 
             throw new InvalidKeyException("Unknown key type " + wrappedKeyType);
+        }
+    }
+
+    protected static final class ErasableOutputStream
+        extends ByteArrayOutputStream
+    {
+        public ErasableOutputStream()
+        {
+        }
+
+        public byte[] getBuf()
+        {
+            return buf;
+        }
+
+        public void erase()
+        {
+            Arrays.fill(this.buf, (byte)0);
+            reset();
         }
     }
 }

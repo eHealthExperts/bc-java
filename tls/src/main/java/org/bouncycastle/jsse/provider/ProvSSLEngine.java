@@ -2,10 +2,13 @@ package org.bouncycastle.jsse.provider;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.Principal;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
@@ -13,11 +16,15 @@ import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
+
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.bouncycastle.jsse.BCApplicationProtocolSelector;
+import org.bouncycastle.jsse.BCExtendedSSLSession;
 import org.bouncycastle.jsse.BCSSLConnection;
 import org.bouncycastle.jsse.BCSSLEngine;
+import org.bouncycastle.jsse.BCSSLParameters;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.RecordFormat;
 import org.bouncycastle.tls.RecordPreview;
@@ -36,6 +43,8 @@ class ProvSSLEngine
     extends SSLEngine
     implements BCSSLEngine, ProvTlsManager
 {
+    private static final Logger LOG = Logger.getLogger(ProvSSLEngine.class.getName());
+
     protected final ProvSSLContextSpi context;
     protected final ContextData contextData;
     protected final ProvSSLParameters sslParameters;
@@ -43,12 +52,13 @@ class ProvSSLEngine
     protected boolean enableSessionCreation = true;
     protected boolean useClientMode = false;
 
+    protected boolean closedEarly = false;
     protected boolean initialHandshakeBegun = false;
     protected HandshakeStatus handshakeStatus = HandshakeStatus.NOT_HANDSHAKING; 
     protected TlsProtocol protocol = null;
     protected ProvTlsPeer protocolPeer = null;
-    protected BCSSLConnection connection = null;
-    protected SSLSession handshakeSession = null;
+    protected ProvSSLConnection connection = null;
+    protected ProvSSLSessionHandshake handshakeSession = null;
 
     protected SSLException deferredException = null;
 
@@ -84,15 +94,16 @@ class ProvSSLEngine
     public synchronized void beginHandshake()
         throws SSLException
     {
+        if (closedEarly)
+        {
+            throw new SSLException("Connection is already closed");
+        }
         if (initialHandshakeBegun)
         {
             throw new UnsupportedOperationException("Renegotiation not supported");
         }
 
         this.initialHandshakeBegun = true;
-
-        // TODO[jsse] Check for session to re-use and apply to handshake
-        // TODO[jsse] Allocate this.handshakeSession and update it during handshake
 
         try
         {
@@ -129,33 +140,103 @@ class ProvSSLEngine
         }
     }
 
+    public void checkClientTrusted(X509Certificate[] chain, String authType) throws IOException
+    {
+        try
+        {
+            contextData.getX509TrustManager().checkClientTrusted(chain, authType, this);
+        }
+        catch (CertificateException e)
+        {
+            throw new TlsFatalAlert(AlertDescription.certificate_unknown, e);
+        }
+    }
+
+    public void checkServerTrusted(X509Certificate[] chain, String authType) throws IOException
+    {
+        try
+        {
+            contextData.getX509TrustManager().checkServerTrusted(chain, authType, this);
+        }
+        catch (CertificateException e)
+        {
+            throw new TlsFatalAlert(AlertDescription.certificate_unknown, e);
+        }
+    }
+
+    public String chooseClientAlias(String[] keyType, Principal[] issuers)
+    {
+        return contextData.getX509KeyManager().chooseEngineClientAlias(keyType, issuers, this);
+    }
+
+    public String chooseServerAlias(String keyType, Principal[] issuers)
+    {
+        return contextData.getX509KeyManager().chooseEngineServerAlias(keyType, issuers, this);
+    }
+
     @Override
     public synchronized void closeInbound()
         throws SSLException
     {
-        // TODO How to behave when protocol is still null?
-        try
+        if (closedEarly)
         {
-            protocol.closeInput();
+            // SSLEngine already closed before any handshake attempted
         }
-        catch (IOException e)
+        else if (null == protocol)
         {
-            throw new SSLException(e);
+            this.closedEarly = true;
+        }
+        else
+        {
+            try
+            {
+                protocol.closeInput();
+            }
+            catch (IOException e)
+            {
+                throw new SSLException(e);
+            }
         }
     }
 
     @Override
     public synchronized void closeOutbound()
     {
-        // TODO How to behave when protocol is still null?
-        try
+        if (closedEarly)
         {
-            protocol.close();
+            // SSLEngine already closed before any handshake attempted
         }
-        catch (IOException e)
+        else if (null == protocol)
         {
-           // TODO[logging] 
+            this.closedEarly = true;
         }
+        else
+        {
+            try
+            {
+                protocol.close();
+            }
+            catch (IOException e)
+            {
+                LOG.log(Level.WARNING, "Failed to close outbound", e);
+            }
+        }
+    }
+
+    // An SSLEngine method from JDK 9, but also a BCSSLEngine method
+    public synchronized String getApplicationProtocol()
+    {
+        return null == connection ? null : connection.getApplicationProtocol();
+    }
+
+    public synchronized BCApplicationProtocolSelector<SSLEngine> getBCHandshakeApplicationProtocolSelector()
+    {
+        return sslParameters.getEngineAPSelector();
+    }
+
+    public synchronized BCExtendedSSLSession getBCHandshakeSession()
+    {
+        return handshakeSession;
     }
 
     public synchronized BCSSLConnection getConnection()
@@ -187,12 +268,16 @@ class ProvSSLEngine
         return enableSessionCreation;
     }
 
+    // An SSLEngine method from JDK 9, but also a BCSSLEngine method
+    public synchronized String getHandshakeApplicationProtocol()
+    {
+        return null == handshakeSession ? null : handshakeSession.getApplicationProtocol();
+    }
+
     @Override
     public synchronized SSLSession getHandshakeSession()
     {
-        // TODO[jsse] this.handshakeSession needs to be reset (to null) whenever not handshaking
-
-        return handshakeSession;
+        return null == handshakeSession ? null : handshakeSession.getExportSSLSession();
     }
 
     @Override
@@ -207,10 +292,17 @@ class ProvSSLEngine
         return sslParameters.getNeedClientAuth();
     }
 
+    public synchronized BCSSLParameters getParameters()
+    {
+        return SSLParametersUtil.getParameters(sslParameters);
+    }
+
     @Override
     public synchronized SSLSession getSession()
     {
-        return connection == null ? ProvSSLSessionImpl.NULL_SESSION.getExportSession() : connection.getSession();
+        ProvSSLSession sslSession = (null == connection) ? ProvSSLSession.NULL_SESSION : connection.getSession();
+
+        return sslSession.getExportSSLSession();
     }
 
     @Override
@@ -246,34 +338,29 @@ class ProvSSLEngine
     @Override
     public synchronized boolean isInboundDone()
     {
-        return protocol != null && protocol.isClosed();
+        return closedEarly || (null != protocol && protocol.isClosed());
     }
 
     @Override
     public synchronized boolean isOutboundDone()
     {
-        return protocol != null && protocol.isClosed() && protocol.getAvailableOutputBytes() < 1;
+        return closedEarly || (null != protocol && protocol.isClosed() && protocol.getAvailableOutputBytes() < 1);
+    }
+
+    public synchronized void setBCHandshakeApplicationProtocolSelector(BCApplicationProtocolSelector<SSLEngine> selector)
+    {
+        sslParameters.setEngineAPSelector(selector);
     }
 
     @Override
     public synchronized void setEnabledCipherSuites(String[] suites)
     {
-        if (!context.isSupportedCipherSuites(suites))
-        {
-            throw new IllegalArgumentException("'suites' cannot be null, or contain unsupported cipher suites");
-        }
-
         sslParameters.setCipherSuites(suites);
     }
 
     @Override
     public synchronized void setEnabledProtocols(String[] protocols)
     {
-        if (!context.isSupportedProtocols(protocols))
-        {
-            throw new IllegalArgumentException("'protocols' cannot be null, or contain unsupported protocols");
-        }
-
         sslParameters.setProtocols(protocols);
     }
 
@@ -289,6 +376,11 @@ class ProvSSLEngine
         sslParameters.setNeedClientAuth(need);
     }
 
+    public synchronized void setParameters(BCSSLParameters parameters)
+    {
+        SSLParametersUtil.setParameters(this.sslParameters, parameters);
+    }
+
     @Override
     public synchronized void setSSLParameters(SSLParameters sslParameters)
     {
@@ -296,21 +388,19 @@ class ProvSSLEngine
     }
 
     @Override
-    public synchronized void setUseClientMode(boolean mode)
+    public synchronized void setUseClientMode(boolean useClientMode)
     {
-        if (this.useClientMode == mode)
-        {
-            return;
-        }
-
         if (initialHandshakeBegun)
         {
             throw new IllegalArgumentException("Mode cannot be changed after the initial handshake has begun");
         }
 
-        this.useClientMode = mode;
+        if (this.useClientMode != useClientMode)
+        {
+            context.updateDefaultProtocols(sslParameters, !useClientMode);
 
-        context.updateDefaultProtocols(sslParameters, !useClientMode);
+            this.useClientMode = useClientMode;
+        }
     }
 
     @Override
@@ -586,62 +676,35 @@ class ProvSSLEngine
         return super.getPeerHost();
     }
 
+    public String getPeerHostSNI()
+    {
+        return super.getPeerHost();
+    }
+
     public int getPeerPort()
     {
         return super.getPeerPort();
     }
 
-    public boolean isClientTrusted(X509Certificate[] chain, String authType)
-    {
-        // TODO[jsse] Consider X509ExtendedTrustManager and/or HostnameVerifier functionality
-
-        X509TrustManager tm = contextData.getTrustManager();
-        if (tm != null)
-        {
-            try
-            {
-                tm.checkClientTrusted(chain, authType);
-                return true;
-            }
-            catch (CertificateException e)
-            {
-            }
-        }
-        return false;
-    }
-
-    public boolean isServerTrusted(X509Certificate[] chain, String authType)
-    {
-        
-        X509TrustManager tm = contextData.getTrustManager();
-
-		if (tm != null)
-        {
-            try
-            {
-            	if (tm instanceof X509ExtendedTrustManager) 
-            	{
-            		((X509ExtendedTrustManager)tm).checkServerTrusted(
-            				chain.clone(),
-            				authType,
-	                        this);
-            	}
-            	else {
-            		tm.checkServerTrusted(chain.clone(), authType);
-            		// TODO[jsse] Consider HostnameVerifier functionality
-            	}
-                return true;
-            }
-            catch (CertificateException e)
-            {
-            }
-        }
-        return false;
-    }
-
     public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
     {
+        if (null != handshakeSession && !handshakeSession.isValid())
+        {
+            connection.getSession().invalidate();
+        }
+
+        this.handshakeSession = null;
         this.connection = connection;
+    }
+
+    public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
+    {
+        this.handshakeSession = handshakeSession;
+    }
+
+    public synchronized String selectApplicationProtocol(List<String> protocols)
+    {
+        return sslParameters.getEngineAPSelector().select(this, protocols);
     }
 
     private RecordPreview getRecordPreview(ByteBuffer src)

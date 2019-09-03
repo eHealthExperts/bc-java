@@ -1,19 +1,20 @@
 package org.bouncycastle.jce.provider.test;
 
-import org.bouncycastle.asn1.ntt.NTTObjectIdentifiers;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.util.encoders.Hex;
-
-import javax.crypto.Cipher;
-import javax.crypto.CipherInputStream;
-import javax.crypto.CipherOutputStream;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.security.Key;
 import java.security.Security;
+
+import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
+
+import org.bouncycastle.asn1.ntt.NTTObjectIdentifiers;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.encoders.Hex;
 
 /**
  * basic test class for Camellia
@@ -56,7 +57,7 @@ public class CamelliaTest
         ByteArrayInputStream bIn;
         ByteArrayOutputStream bOut;
 
-        key = new SecretKeySpec(keyBytes, "Camellia");
+        key = new DestroyableSecretKeySpec(keyBytes, "Camellia");
 
         in = Cipher.getInstance("Camellia/ECB/NoPadding", "BC");
         out = Cipher.getInstance("Camellia/ECB/NoPadding", "BC");

@@ -2,15 +2,59 @@ package org.bouncycastle.tls;
 
 import java.io.IOException;
 
-import org.bouncycastle.tls.crypto.TlsCipher;
 import org.bouncycastle.tls.crypto.TlsCrypto;
 
 /**
- * Base interface for a TLS endpoint.
+ * Base interface for a (D)TLS endpoint.
  */
 public interface TlsPeer
 {
     TlsCrypto getCrypto();
+
+    /**
+     * <p>
+     * NOTE: Currently only respected by DTLS protocols.
+     * </p>
+     * <p>
+     * Specify the timeout, in milliseconds, to use for the complete handshake process. Negative
+     * values are not allowed. A timeout of zero means an infinite timeout (i.e. the handshake will
+     * never time out).
+     * </p>
+     * 
+     * @return the handshake timeout, in milliseconds.
+     */
+    int getHandshakeTimeoutMillis();
+
+    /**
+     * Notifies the peer that a new handshake is about to begin.
+     */
+    void notifyHandshakeBeginning() throws IOException;
+
+    ProtocolVersion[] getSupportedVersions();
+
+    /**
+     * This implementation supports RFC 7627 and will always negotiate the extended_master_secret
+     * extension where possible. When connecting to a peer that does not offer/accept this
+     * extension, it is recommended to abort the handshake. This option is provided for
+     * interoperability with legacy peers, although some TLS features will be disabled in that case
+     * (see RFC 7627 5.4).
+     * 
+     * @return <code>true</code> if the handshake should be aborted when the peer does not negotiate
+     *         the extended_master_secret extension, or <code>false</code> to support legacy
+     *         interoperability.
+     */
+    boolean requiresExtendedMasterSecret();
+
+    /**
+     * Controls whether the protocol will check the 'signatureAlgorithm' of received certificates as
+     * specified in RFC 5246 7.4.2, 7.4.4, 7.4.6 and similar rules for earlier TLS versions. We
+     * recommend to enable these checks, but this option is provided for cases where the default
+     * checks are for some reason too strict.
+     * 
+     * @return <code>true</code> if the 'signatureAlgorithm' of received certificates should be
+     *         checked, or <code>false</code> to skip those checks.
+     */
+    boolean shouldCheckSigAlgOfPeerCerts();
 
     /**
      * See RFC 5246 6.2.3.2. Controls whether block cipher encryption may randomly add extra padding
@@ -37,9 +81,7 @@ public interface TlsPeer
 
     void notifySecureRenegotiation(boolean secureNegotiation) throws IOException;
 
-    TlsCompression getCompression() throws IOException;
-
-    TlsCipher getCipher() throws IOException;
+    TlsKeyExchangeFactory getKeyExchangeFactory() throws IOException;
 
     boolean getNeedClientAuth();
     
@@ -65,4 +107,40 @@ public interface TlsPeer
      * Notifies the peer that the handshake has been successfully completed.
      */
     void notifyHandshakeComplete() throws IOException;
+
+    /**
+     * Return a {@link TlsHeartbeat} instance that will control the generation of heartbeats locally
+     * (if permitted by the remote peer), or null to not generate heartbeats. Heartbeats are
+     * described in RFC 6520.
+     * 
+     * @return an instance of {@link TlsHeartbeat}.
+     * @see DefaultTlsHeartbeat
+     */
+    TlsHeartbeat getHeartbeat();
+
+    /**
+     * <p>
+     * Return the heartbeat mode applicable to the remote peer. Heartbeats are described in RFC
+     * 6520.
+     * </p>
+     * <p>
+     * See enumeration class {@link HeartbeatMode} for appropriate return values.
+     * </p>
+     * 
+     * @return the {@link HeartbeatMode} value.
+     */
+    short getHeartbeatPolicy();
+
+    /**
+     * WARNING: EXPERIMENTAL FEATURE
+     * 
+     * Return this peer's policy on renegotiation requests from the remote peer. This will be called
+     * only outside of ongoing handshakes, either when a remote server has sent a hello_request, or
+     * a remote client has sent a new ClientHello, and only when the requirements for secure
+     * renegotiation (including those of RFC 5746) have been met.
+     * 
+     * @return The {@link RenegotiationPolicy} constant corresponding to the desired policy.
+     * @see RenegotiationPolicy
+     */
+    int getRenegotiationPolicy();
 }

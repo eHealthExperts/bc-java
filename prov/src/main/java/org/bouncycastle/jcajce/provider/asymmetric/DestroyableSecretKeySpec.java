@@ -202,7 +202,9 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
 
         final byte[] thatKey = ((SecretKey) obj).getEncoded();
 
-        return java.util.Arrays.equals(this.key, thatKey);
+        boolean result = java.util.Arrays.equals(this.key, thatKey);
+        EraseUtil.clearByteArray(thatKey);
+        return result;
     }
 
     public void destroy() throws DestroyFailedException {

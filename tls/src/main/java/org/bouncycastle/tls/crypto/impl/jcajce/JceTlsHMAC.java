@@ -1,14 +1,18 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.security.InvalidKeyException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Hashtable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.crypto.Mac;
+import javax.security.auth.DestroyFailedException;
+import javax.crypto.ShortBufferException;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.bouncycastle.crypto.util.EraseUtil;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.tls.crypto.TlsHMAC;
+import org.bouncycastle.util.Integers;
 
 /**
  * Wrapper class for a JCE MAC based on HMAC to provide the necessary operations for TLS.
@@ -16,15 +20,18 @@ import org.bouncycastle.tls.crypto.TlsHMAC;
 public class JceTlsHMAC
     implements TlsHMAC
 {
-    private static final Map<String, Integer> internalBlockSizes = new HashMap<String, Integer>();
+	
+	private static Logger LOG = Logger.getLogger(JceTlsHMAC.class.getName());
+	
+    private static final Hashtable internalBlockSizes = new Hashtable();
 
     static
     {
-        internalBlockSizes.put("HmacMD5", 64);
-        internalBlockSizes.put("HmacSHA1", 64);
-        internalBlockSizes.put("HmacSHA256", 64);
-        internalBlockSizes.put("HmacSHA384", 128);
-        internalBlockSizes.put("HmacSHA512", 128);
+        internalBlockSizes.put("HmacMD5", Integers.valueOf(64));
+        internalBlockSizes.put("HmacSHA1", Integers.valueOf(64));
+        internalBlockSizes.put("HmacSHA256", Integers.valueOf(64));
+        internalBlockSizes.put("HmacSHA384", Integers.valueOf(128));
+        internalBlockSizes.put("HmacSHA512", Integers.valueOf(128));
     }
 
     private final Mac hmac;
@@ -49,7 +56,7 @@ public class JceTlsHMAC
             throw new IllegalArgumentException("HMAC " + algorithm + " unknown");
         }
 
-        return internalBlockSizes.get(algorithm);
+        return ((Integer)internalBlockSizes.get(algorithm)).intValue();
     }
 
     /**
@@ -63,20 +70,25 @@ public class JceTlsHMAC
     {
         this.hmac = hmac;
         this.algorithm = algorithm;
-        this.internalBlockSize = internalBlockSize;
+        this.internalBlockSize = Integers.valueOf(internalBlockSize);
     }
 
     public void setKey(byte[] key, int keyOff, int keyLen)
     {
         try
         {
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key, keyOff, keyLen, algorithm);
+        	DestroyableSecretKeySpec secretKeySpec = new DestroyableSecretKeySpec(key, keyOff, keyLen, algorithm);
 			hmac.init(secretKeySpec);
-			EraseUtil.clearSecretKeySpec(secretKeySpec);
+		    try {
+		    	secretKeySpec.destroy();
+            } catch (DestroyFailedException e) {
+                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
+            }
+			
         }
         catch (InvalidKeyException e)
         {
-            e.printStackTrace();
+            throw new IllegalArgumentException(e.getMessage());
         }
     }
 
@@ -90,9 +102,21 @@ public class JceTlsHMAC
         return hmac.doFinal();
     }
 
+    public void calculateMAC(byte[] output, int outOff)
+    {
+        try
+        {
+            hmac.doFinal(output, outOff);
+        }
+        catch (ShortBufferException e)
+        {
+            throw new IllegalArgumentException(e.getMessage());
+        }
+    }
+
     public int getInternalBlockSize()
     {
-        return internalBlockSize;
+        return internalBlockSize.intValue();
     }
 
     public int getMacLength()

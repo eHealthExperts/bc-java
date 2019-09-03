@@ -248,7 +248,7 @@ public abstract class ASN1OctetString
 
     public String toString()
     {
-      return "#"+ Strings.fromByteArray(Hex.encode(string));
+      return "#" + Strings.fromByteArray(Hex.encode(string));
     }
     
     @Override

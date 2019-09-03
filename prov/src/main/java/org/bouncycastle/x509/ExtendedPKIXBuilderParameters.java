@@ -1,7 +1,5 @@
 package org.bouncycastle.x509;
 
-import org.bouncycastle.util.Selector;
-
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidParameterException;
 import java.security.cert.PKIXBuilderParameters;
@@ -11,6 +9,8 @@ import java.security.cert.X509CertSelector;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+
+import org.bouncycastle.util.Selector;
 
 /**
  * This class contains extended parameters for PKIX certification path builders.

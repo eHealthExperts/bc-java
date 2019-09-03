@@ -2,14 +2,16 @@ package org.bouncycastle.tls;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Vector;
+import java.io.OutputStream;
 
+import org.bouncycastle.tls.crypto.TlsAgreement;
+import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.TlsDHConfig;
-import org.bouncycastle.tls.crypto.TlsVerifier;
+import org.bouncycastle.tls.crypto.TlsSecret;
 import org.bouncycastle.util.io.TeeInputStream;
 
 public class TlsDHEKeyExchange
-    extends TlsDHKeyExchange
+    extends AbstractTlsKeyExchange
 {
     private static int checkKeyExchange(int keyExchange)
     {
@@ -23,80 +25,82 @@ public class TlsDHEKeyExchange
         }
     }
 
-    protected TlsCredentialedSigner serverCredentials = null;
-    protected TlsVerifier verifier = null;
+    protected TlsDHGroupVerifier dhGroupVerifier;
+    protected TlsDHConfig dhConfig;
 
-    public TlsDHEKeyExchange(int keyExchange, Vector supportedSignatureAlgorithms, TlsDHConfigVerifier dhConfigVerifier)
+    protected TlsCredentialedSigner serverCredentials = null;
+    protected TlsCertificate serverCertificate = null;
+    protected TlsAgreement agreement;
+
+    public TlsDHEKeyExchange(int keyExchange, TlsDHGroupVerifier dhGroupVerifier)
     {
-        super(checkKeyExchange(keyExchange), supportedSignatureAlgorithms, dhConfigVerifier);
+        this(keyExchange, dhGroupVerifier, null);
     }
 
-    public TlsDHEKeyExchange(int keyExchange, Vector supportedSignatureAlgorithms, TlsDHConfig dhConfig)
+    public TlsDHEKeyExchange(int keyExchange, TlsDHConfig dhConfig)
     {
-        super(checkKeyExchange(keyExchange), supportedSignatureAlgorithms, dhConfig);
+        this(keyExchange, null, dhConfig);
+    }
+
+    private TlsDHEKeyExchange(int keyExchange, TlsDHGroupVerifier dhGroupVerifier, TlsDHConfig dhConfig)
+    {
+        super(checkKeyExchange(keyExchange));
+
+        this.dhGroupVerifier = dhGroupVerifier;
+        this.dhConfig = dhConfig;
+    }
+
+    public void skipServerCredentials() throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
     public void processServerCredentials(TlsCredentials serverCredentials) throws IOException
     {
-        if (!(serverCredentials instanceof TlsCredentialedSigner))
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
-
-        this.serverCredentials = (TlsCredentialedSigner)serverCredentials;
+        this.serverCredentials = TlsUtils.requireSignerCredentials(serverCredentials);
     }
 
     public void processServerCertificate(Certificate serverCertificate) throws IOException
     {
-        if (serverCertificate.isEmpty())
-        {
-            throw new TlsFatalAlert(AlertDescription.bad_certificate);
-        }
+        this.serverCertificate = serverCertificate.getCertificateAt(0);
+    }
 
-        checkServerCertSigAlg(serverCertificate);
-
-        this.verifier = serverCertificate.getCertificateAt(0)
-            .createVerifier(TlsUtils.getSignatureAlgorithm(keyExchange));
+    public boolean requiresServerKeyExchange()
+    {
+        return true;
     }
 
     public byte[] generateServerKeyExchange() throws IOException
     {
-        if (this.dhConfig == null)
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
+        DigestInputBuffer digestBuffer = new DigestInputBuffer();
 
-        DigestInputBuffer buf = new DigestInputBuffer();
-
-        TlsDHUtils.writeDHConfig(dhConfig, buf);
+        TlsDHUtils.writeDHConfig(dhConfig, digestBuffer);
 
         this.agreement = context.getCrypto().createDHDomain(dhConfig).createDH();
 
-        generateEphemeral(buf);
+        byte[] y = agreement.generateEphemeral();
 
-        DigitallySigned signedParams = TlsUtils.generateServerKeyExchangeSignature(context, serverCredentials, buf);
+        TlsUtils.writeOpaque16(y, digestBuffer);
 
-        signedParams.encode(buf);
+        TlsUtils.generateServerKeyExchangeSignature(context, serverCredentials, digestBuffer);
 
-        return buf.toByteArray();
+        return digestBuffer.toByteArray();
     }
 
     public void processServerKeyExchange(InputStream input) throws IOException
     {
-        DigestInputBuffer buf = new DigestInputBuffer();
-        InputStream teeIn = new TeeInputStream(input, buf);
+        DigestInputBuffer digestBuffer = new DigestInputBuffer();
+        InputStream teeIn = new TeeInputStream(input, digestBuffer);
 
-        this.dhConfig = TlsDHUtils.receiveDHConfig(dhConfigVerifier, teeIn);
+        this.dhConfig = TlsDHUtils.receiveDHConfig(context, dhGroupVerifier, teeIn);
 
-        byte[] y = TlsUtils.readOpaque16(teeIn);
+        byte[] y = TlsUtils.readOpaque16(teeIn, 1);
 
-        DigitallySigned signedParams = parseSignature(input);
-
-        TlsUtils.verifyServerKeyExchangeSignature(context, verifier, buf, signedParams);
+        TlsUtils.verifyServerKeyExchangeSignature(context, input, serverCertificate, digestBuffer);
 
         this.agreement = context.getCrypto().createDHDomain(dhConfig).createDH();
 
-        processEphemeral(y);
+        agreement.receivePeerValue(y);
     }
 
     public short[] getClientCertificateTypes()
@@ -107,13 +111,23 @@ public class TlsDHEKeyExchange
 
     public void processClientCredentials(TlsCredentials clientCredentials) throws IOException
     {
-        if (clientCredentials instanceof TlsCredentialedSigner)
-        {
-            // OK
-        }
-        else
-        {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
+        TlsUtils.requireSignerCredentials(clientCredentials);
+    }
+
+    public void generateClientKeyExchange(OutputStream output) throws IOException
+    {
+        byte[] y = agreement.generateEphemeral();
+
+        TlsUtils.writeOpaque16(y, output);
+    }
+
+    public void processClientKeyExchange(InputStream input) throws IOException
+    {
+        agreement.receivePeerValue(TlsUtils.readOpaque16(input, 1));
+    }
+
+    public TlsSecret generatePreMasterSecret() throws IOException
+    {
+        return agreement.calculateSecret();
     }
 }

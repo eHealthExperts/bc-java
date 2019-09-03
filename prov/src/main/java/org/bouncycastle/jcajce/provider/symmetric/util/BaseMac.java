@@ -8,6 +8,8 @@ import java.security.spec.AlgorithmParameterSpec;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.crypto.MacSpi;
 import javax.crypto.SecretKey;
@@ -15,6 +17,7 @@ import javax.crypto.interfaces.PBEKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.RC2ParameterSpec;
+import javax.security.auth.DestroyFailedException;
 
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.Mac;
@@ -32,6 +35,8 @@ import org.bouncycastle.jcajce.spec.SkeinParameterSpec;
 public class BaseMac
     extends MacSpi implements PBE
 {
+	 private static Logger LOG = Logger.getLogger(BaseMac.class.getName());
+	
     private static final Class gcmSpecClass = ClassUtil.loadClass(BaseMac.class, "javax.crypto.spec.GCMParameterSpec");
 
     private Mac macEngine;
@@ -202,6 +207,13 @@ public class BaseMac
         else if (params == null)
         {
         	byte[] encoded = key.getEncoded();
+        	if (param instanceof KeyParameter) {
+        		try {
+					((KeyParameter)param).destroy();
+				}  catch (DestroyFailedException e) {
+	                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
+	            }
+        	}
             param = new KeyParameter(encoded);
             EraseUtil.clearByteArray(encoded);
         }

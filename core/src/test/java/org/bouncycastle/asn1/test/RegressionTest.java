@@ -72,7 +72,14 @@ public class RegressionTest
         new GeneralNameTest(),
         new ObjectIdentifierTest(),
         new RFC4519Test(),
-        new PolicyConstraintsTest()
+        new PolicyConstraintsTest(),
+        new PollReqContentTest(),
+        new DhSigStaticTest(),
+        new PKIPublicationInfoTest(),
+        new CertifiedKeyPairTest(),
+        new PrivateKeyInfoTest(),
+        new LocaleTest(),
+        new LinkedCertificateTest()
     };
 
     public static void main(

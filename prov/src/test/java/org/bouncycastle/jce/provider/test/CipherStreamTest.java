@@ -2,6 +2,7 @@ package org.bouncycastle.jce.provider.test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.security.AlgorithmParameters;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.PrivateKey;
@@ -17,7 +18,9 @@ import javax.crypto.ShortBufferException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
 import org.bouncycastle.util.test.TestFailedException;
@@ -193,6 +196,13 @@ public class CipherStreamTest
         {
             fail("" + name + " failed short buffer decryption - " + e.toString());
         }
+
+        // mode test
+        if (name.indexOf('/') < 0)
+        {
+            Cipher.getInstance(name + "/NONE/NoPadding");
+            Cipher.getInstance(name + "/ECB/NoPadding");    // very old school
+        }
     }
 
 
@@ -217,7 +227,7 @@ public class CipherStreamTest
     private void testAlgorithm(String name, byte[] keyBytes, byte[] iv, byte[] plainText, byte[] cipherText)
         throws Exception
     {
-        SecretKey key = new SecretKeySpec(keyBytes, name);
+        SecretKey key = new DestroyableSecretKeySpec(keyBytes, name);
         Cipher    in = Cipher.getInstance(name, "BC");
         Cipher    out = Cipher.getInstance(name, "BC");
 
@@ -232,6 +242,19 @@ public class CipherStreamTest
             out.init(Cipher.DECRYPT_MODE, key);
         }
 
+        if (iv != null)
+        {
+            isTrue(Arrays.areEqual(iv, in.getIV()));
+            isTrue(Arrays.areEqual(iv, out.getIV()));
+       
+            AlgorithmParameters algParams = in.getParameters();
+
+            isTrue(Arrays.areEqual(iv, ((IvParameterSpec)algParams.getParameterSpec(IvParameterSpec.class)).getIV()));
+
+            algParams = out.getParameters();
+            isTrue(Arrays.areEqual(iv, ((IvParameterSpec)algParams.getParameterSpec(IvParameterSpec.class)).getIV()));
+        }
+        
         byte[] enc = in.doFinal(plainText);
         if (!areEqual(enc, cipherText))
         {
@@ -268,7 +291,7 @@ public class CipherStreamTest
                     (byte)137, (byte)138, (byte)140, (byte)143 };
 
             byte[] keyBytes;
-            if (name.equals("HC256") || name.equals("XSalsa20") || name.equals("ChaCha7539"))
+            if (name.equals("HC256") || name.equals("XSalsa20") || name.equals("ChaCha7539") || name.equals("ChaCha20"))
             {
                 keyBytes = key256;
             }
@@ -277,7 +300,7 @@ public class CipherStreamTest
                 keyBytes = key128;
             }
 
-            SecretKeySpec cipherKey = new SecretKeySpec(keyBytes, name);
+            DestroyableSecretKeySpec cipherKey = new DestroyableSecretKeySpec(keyBytes, name);
             Cipher ecipher = Cipher.getInstance(name, "BC");
             ecipher.init(Cipher.ENCRYPT_MODE, cipherKey);
 
@@ -389,6 +412,9 @@ public class CipherStreamTest
         runTest("ChaCha7539");
         testException("ChaCha7539");
         testAlgorithm("ChaCha7539", CHA7539K, CHA7539IV, CHA7539IN, CHA7539OUT);
+        runTest("ChaCha20");
+        testException("ChaCha20");
+        testAlgorithm("ChaCha20", CHA7539K, CHA7539IV, CHA7539IN, CHA7539OUT);
         runTest("HC128");
         testException("HC128");
         testAlgorithm("HC128", HCK128A, HCIV, HCIN, HC128A);

@@ -5,8 +5,8 @@ import java.security.Security;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.test.SimpleTest;
@@ -37,7 +37,7 @@ public class ThreefishTest
     {
         // padding test at 128 pad bytes.
 
-        final SecretKey secretKey = new SecretKeySpec(SECRET_KEY_1024, "Threefish-1024");
+        final SecretKey secretKey = new DestroyableSecretKeySpec(SECRET_KEY_1024, "Threefish-1024");
 
         Cipher cipher = Cipher.getInstance("Threefish-1024/CBC/ISO10126Padding", "BC");
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, new IvParameterSpec(new byte[128]));

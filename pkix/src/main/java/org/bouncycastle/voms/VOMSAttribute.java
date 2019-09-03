@@ -1,7 +1,7 @@
 package org.bouncycastle.voms;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;

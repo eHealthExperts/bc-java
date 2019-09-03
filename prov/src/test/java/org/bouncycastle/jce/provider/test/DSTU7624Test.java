@@ -15,10 +15,10 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ua.UAObjectIdentifiers;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 
@@ -47,7 +47,7 @@ public class DSTU7624Test
         ByteArrayInputStream bIn;
         ByteArrayOutputStream bOut;
 
-        key = new SecretKeySpec(keyBytes, name);
+        key = new DestroyableSecretKeySpec(keyBytes, name);
 
         in = Cipher.getInstance(name + "/ECB/NoPadding", "BC");
         out = Cipher.getInstance(name + "/ECB/NoPadding", "BC");
@@ -254,7 +254,7 @@ public class DSTU7624Test
         c1.init(Cipher.WRAP_MODE, k);
         c2.init(Cipher.UNWRAP_MODE, k);
 
-        Key wKey = c2.unwrap(c1.wrap(new SecretKeySpec(data, algorithm)), algorithm, Cipher.SECRET_KEY);
+        Key wKey = c2.unwrap(c1.wrap(new DestroyableSecretKeySpec(data, algorithm)), algorithm, Cipher.SECRET_KEY);
 
         if (!areEqual(data, wKey.getEncoded()))
         {

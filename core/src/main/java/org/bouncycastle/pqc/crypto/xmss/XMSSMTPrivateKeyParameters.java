@@ -2,14 +2,13 @@ package org.bouncycastle.pqc.crypto.xmss;
 
 import java.io.IOException;
 
-import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.util.Arrays;
 
 /**
  * XMSS^MT Private Key.
  */
 public final class XMSSMTPrivateKeyParameters
-    extends AsymmetricKeyParameter
+    extends XMSSMTKeyParameters
     implements XMSSStoreableObjectInterface
 {
 
@@ -23,7 +22,7 @@ public final class XMSSMTPrivateKeyParameters
 
     private XMSSMTPrivateKeyParameters(Builder builder)
     {
-        super(true);
+        super(true, builder.params.getDigest().getAlgorithmName());
         params = builder.params;
         if (params == null)
         {
@@ -68,21 +67,20 @@ public final class XMSSMTPrivateKeyParameters
 			/* import BDS state */
             byte[] bdsStateBinary = XMSSUtil.extractBytesAtOffset(privateKey, position, privateKey.length - position);
 
-            BDSStateMap bdsImport = null;
             try
             {
-                bdsImport = (BDSStateMap)XMSSUtil.deserialize(bdsStateBinary);
+                BDSStateMap bdsImport = (BDSStateMap)XMSSUtil.deserialize(bdsStateBinary, BDSStateMap.class);
+
+                bdsState = bdsImport.withWOTSDigest(DigestUtil.getDigestOID(builder.xmss.getDigest().getAlgorithmName()));
             }
             catch (IOException e)
             {
-                e.printStackTrace();
+                throw new IllegalArgumentException(e.getMessage(), e);
             }
             catch (ClassNotFoundException e)
             {
-                e.printStackTrace();
+                throw new IllegalArgumentException(e.getMessage(), e);
             }
-            bdsImport.setXMSS(builder.xmss);
-            bdsState = bdsImport;
         }
         else
         {
@@ -260,22 +258,24 @@ public final class XMSSMTPrivateKeyParameters
 		/* copy root */
         XMSSUtil.copyBytesAtOffset(out, root, position);
 		/* concatenate bdsState */
-        byte[] bdsStateOut = null;
         try
         {
-            bdsStateOut = XMSSUtil.serialize(bdsState);
+            return Arrays.concatenate(out, XMSSUtil.serialize(bdsState));
         }
         catch (IOException e)
         {
-            e.printStackTrace();
-            throw new RuntimeException("error serializing bds state");
+            throw new IllegalStateException("error serializing bds state: " + e.getMessage(), e);
         }
-        return Arrays.concatenate(out, bdsStateOut);
     }
 
     public long getIndex()
     {
         return index;
+    }
+
+    public long getUsagesRemaining()
+    {
+        return (1L << this.getParameters().getHeight()) - this.getIndex();
     }
 
     public byte[] getSecretKeySeed()

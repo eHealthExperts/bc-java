@@ -2309,7 +2309,7 @@ public class TestEnroll
 
 ////        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
 ////
-////        c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(new byte[16], "AES"), new GCMParameterSpec(32, new byte[16]));
+////        c.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(new byte[16], "AES"), new GCMParameterSpec(32, new byte[16]));
 //        Security.addProvider(new BouncyCastleProvider());
 //        for (Iterator it = Security.getProvider("BC").getServices().iterator(); it.hasNext();)
 //        {

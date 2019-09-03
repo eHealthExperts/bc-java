@@ -1,6 +1,7 @@
 package org.bouncycastle.tls;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -73,22 +74,28 @@ public class TlsServerProtocol
 
         LOG.debug("Receives a TLS handshake in the role of server.");
         this.tlsServer = tlsServer;
-
-        this.securityParameters = new SecurityParameters();
-        this.securityParameters.entity = ConnectionEnd.server;
-
-        this.tlsServerContext = new TlsServerContextImpl(tlsServer.getCrypto(), securityParameters);
-
-        this.securityParameters.serverRandom = createRandomBlock(tlsServer.shouldUseGMTUnixTime(), tlsServerContext);
-        this.securityParameters.extendedPadding = tlsServer.shouldUseExtendedPadding();
+        this.tlsServerContext = new TlsServerContextImpl(tlsServer.getCrypto());
 
         this.tlsServer.init(tlsServerContext);
         this.recordStream.init(tlsServerContext);
 
-        this.recordStream.setRestrictReadVersion(false);
+        beginHandshake(false);
 
-        blockForHandshake();
+        if (blocking)
+        {
+            blockForHandshake();
+        }
     }
+
+//    public boolean renegotiate() throws IOException
+//    {
+//        boolean allowed = super.renegotiate();
+//        if (allowed)
+//        {
+//            sendHelloRequestMessage();
+//        }
+//        return allowed;
+//    }
 
     protected void cleanupHandshake()
     {
@@ -140,16 +147,27 @@ public class TlsServerProtocol
         {
             switch (this.connection_state)
             {
+            case CS_END:
+            {
+                if (!handleRenegotiation())
+                {
+                    break;
+                }
+
+                // NB: Fall through to next case label
+            }
             case CS_START:
             {
             	resetCurrentSession();
+                SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
+
                 receiveClientHelloMessage(buf);
                 this.connection_state = CS_CLIENT_HELLO;
             	LOG.trace("New connection state CS_CLIENT_HELLO");
 
                 if(sessionParameters != null && tlsServer.getNeedClientAuth()) 
                 {
-                	if(sessionParameters.getPeerCertificate() != null) 
+                	if(sessionParameters.getPeerCertificate() == null) 
                 	{
                 		resetCurrentSession();
                 	}
@@ -159,6 +177,9 @@ public class TlsServerProtocol
                 if(!this.resumedSession) 
                 {
                     this.tlsSession = TlsUtils.importSession(TlsUtils.generateSessionID(tlsServerContext.getCrypto().getSecureRandom()), null);
+                    securityParameters.sessionID = TlsUtils.EMPTY_BYTES;
+
+                    this.tlsSession = TlsUtils.importSession(securityParameters.getSessionID(), null);
                     this.sessionParameters = null;
                 }
 
@@ -169,7 +190,7 @@ public class TlsServerProtocol
                 recordStream.notifyHelloComplete();
                 
                 if(this.resumedSession) {
-                	recordStream.setPendingConnectionState(getPeer().getCompression(), getPeer().getCipher());
+                	recordStream.setPendingConnectionState(TlsUtils.initCipher(getContext()));
                 	
                     sendChangeCipherSpecMessage();
                     sendFinishedMessage();
@@ -186,31 +207,34 @@ public class TlsServerProtocol
                 this.connection_state = CS_SERVER_SUPPLEMENTAL_DATA;
             	LOG.trace("New connection state CS_SERVER_SUPPLEMENTAL_DATA");
 
-                this.keyExchange = tlsServer.getKeyExchange();
-                this.keyExchange.init(getContext());
+                this.keyExchange = TlsUtils.initKeyExchangeServer(tlsServerContext, tlsServer);
 
                 this.serverCredentials = validateCredentials(tlsServer.getCredentials());
 
-                Certificate serverCertificate = null;
-
-                if (this.serverCredentials == null)
+                // Server certificate
                 {
-                    this.keyExchange.skipServerCredentials();
-                }
-                else
-                {
-                    this.keyExchange.processServerCredentials(this.serverCredentials);
+                    Certificate serverCertificate = null;
 
-                    serverCertificate = this.serverCredentials.getCertificate();
-                    sendCertificateMessage(serverCertificate);
-                }
-                this.connection_state = CS_SERVER_CERTIFICATE;
-            	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
+                    ByteArrayOutputStream endPointHash = new ByteArrayOutputStream();
+                    if (null == this.serverCredentials)
+                    {
+                        this.keyExchange.skipServerCredentials();
+                    }
+                    else
+                    {
+                        this.keyExchange.processServerCredentials(this.serverCredentials);
+                        serverCertificate = this.serverCredentials.getCertificate();
+                        sendCertificateMessage(serverCertificate, endPointHash);
+                    }
+                    securityParameters.tlsServerEndPoint = endPointHash.toByteArray();
+                    this.connection_state = CS_SERVER_CERTIFICATE;
+                    LOG.trace("New connection state CS_SERVER_CERTIFICATE");
 
-                // TODO[RFC 3546] Check whether empty certificates is possible, allowed, or excludes CertificateStatus
-                if (serverCertificate == null || serverCertificate.isEmpty())
-                {
-                    this.allowCertificateStatus = false;
+                    // TODO[RFC 3546] Check whether empty certificates is possible, allowed, or excludes CertificateStatus
+                    if (null == serverCertificate || serverCertificate.isEmpty())
+                    {
+                        this.allowCertificateStatus = false;
+                    }
                 }
 
                 if (this.allowCertificateStatus)
@@ -261,11 +285,6 @@ public class TlsServerProtocol
                 boolean forceBuffering = false;
                 TlsUtils.sealHandshakeHash(getContext(), this.recordStream.getHandshakeHash(), forceBuffering);
 
-                break;
-            }
-            case CS_END:
-            {
-                refuseRenegotiation();
                 break;
             }
             default:
@@ -431,7 +450,7 @@ public class TlsServerProtocol
         case HandshakeType.server_key_exchange:
         case HandshakeType.certificate_request:
         case HandshakeType.server_hello_done:
-        case HandshakeType.session_ticket:
+        case HandshakeType.new_session_ticket:
         default:
             throw new TlsFatalAlert(AlertDescription.unexpected_message);
         }
@@ -454,50 +473,15 @@ public class TlsServerProtocol
     protected void notifyClientCertificate(Certificate clientCertificate)
         throws IOException
     {
-        if (certificateRequest == null)
-        {
-            throw new IllegalStateException();
-        }
-
-        if (peerCertificate != null)
-        {
-            throw new TlsFatalAlert(AlertDescription.unexpected_message);
-        }
-
-        this.peerCertificate = clientCertificate;
-
-        if (clientCertificate.isEmpty())
-        {
-            this.keyExchange.skipClientCredentials();
-        }
-        else
-        {
-
-            /*
-             * TODO RFC 5246 7.4.6. If the certificate_authorities list in the certificate request
-             * message was non-empty, one of the certificates in the certificate chain SHOULD be
-             * issued by one of the listed CAs.
-             */
-
-            this.keyExchange.processClientCertificate(clientCertificate);
-        }
-
-        /*
-         * RFC 5246 7.4.6. If the client does not send any certificates, the server MAY at its
-         * discretion either continue the handshake without client authentication, or respond with a
-         * fatal handshake_failure alert. Also, if some aspect of the certificate chain was
-         * unacceptable (e.g., it was not signed by a known, trusted CA), the server MAY at its
-         * discretion either continue the handshake (considering the client unauthenticated) or send
-         * a fatal alert.
-         */
-        this.tlsServer.notifyClientCertificate(clientCertificate);
+        TlsUtils.processClientCertificate(tlsServerContext, clientCertificate, certificateRequest, keyExchange,
+            tlsServer);
     }
 
     protected void receiveCertificateMessage(ByteArrayInputStream buf)
         throws IOException
     {
     	LOG.debug("Receive CertificateMessage");
-    	Certificate clientCertificate = Certificate.parse(getContext(), buf);
+        Certificate clientCertificate = Certificate.parse(getContext(), buf, null);
 
         assertEmpty(buf);
 
@@ -513,39 +497,29 @@ public class TlsServerProtocol
             throw new IllegalStateException();
         }
 
-        TlsContext context = getContext();
-        DigitallySigned clientCertificateVerify = DigitallySigned.parse(context, buf);
+        DigitallySigned clientCertificateVerify = DigitallySigned.parse(tlsServerContext, buf);
 
         assertEmpty(buf);
 
-        TlsUtils.verifyCertificateVerify(context, certificateRequest, peerCertificate, clientCertificateVerify,
-            prepareFinishHash);
+        TlsUtils.verifyCertificateVerify(tlsServerContext, certificateRequest, clientCertificateVerify, prepareFinishHash);
     }
 
     protected void receiveClientHelloMessage(ByteArrayInputStream buf)
         throws IOException
     {
-    	LOG.debug("Receive ClientHelloMessage");
-        ProtocolVersion client_version = TlsUtils.readVersion(buf);
-        recordStream.setWriteVersion(client_version);
+        LOG.debug("Receive ClientHelloMessage");
+        // TODO[tls13] For subsequent ClientHello messages (of a TLSv13 handshake) don't do this!
+        recordStream.setWriteVersion(ProtocolVersion.TLSv10);
 
+        ClientHello clientHello = ClientHello.parse(buf, null);
+        ProtocolVersion client_version = clientHello.getClientVersion();
         LOG.debug("ClientVersion [{}]", client_version);
-        if (client_version.isDTLS())
-        {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-        }
-
-        byte[] client_random = TlsUtils.readFully(32, buf);
-
+        
         /*
          * TODO RFC 5077 3.4. If a ticket is presented by the client, the server MUST NOT attempt to
          * use the Session ID in the ClientHello for stateful session resumption.
          */
-        byte[] sessionID = TlsUtils.readOpaque8(buf);
-        if (sessionID.length > 32)
-        {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-        }
+        byte[] sessionID = clientHello.getSessionID();
 
         
         TlsSession sessionToResume = tlsServer.getSessionToResume(sessionID);
@@ -556,23 +530,18 @@ public class TlsServerProtocol
             {
                 this.tlsSession = sessionToResume;
                 this.sessionParameters = sessionParameters;
-                this.securityParameters.masterSecret = getContext().getCrypto().adoptSecret(sessionParameters.getMasterSecret());
+                tlsServerContext.getSecurityParametersHandshake().masterSecret = getContext().getCrypto().adoptSecret(sessionParameters.getMasterSecret());
                 
                 if(!tlsSession.isResumable()) {
                 	resetCurrentSession();
-                	this.securityParameters.clear();
+                	tlsServerContext.getSecurityParametersHandshake().clear();
                 }
         	}
         }
-        
-        int cipher_suites_length = TlsUtils.readUint16(buf);
-        if (cipher_suites_length < 2 || (cipher_suites_length & 1) != 0)
-        {
-            throw new TlsFatalAlert(AlertDescription.decode_error);
-        }
-        this.offeredCipherSuites = TlsUtils.readUint16Array(cipher_suites_length / 2, buf);
+
+        this.offeredCipherSuites = clientHello.getCipherSuites();
         LOG.debug("Offered CipherSuites [{}]", offeredCipherSuites);
-        
+
         /*
          * RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
          * resumption request), this vector MUST include at least the cipher_suite from that
@@ -582,68 +551,132 @@ public class TlsServerProtocol
         {
             if (!Arrays.contains(this.offeredCipherSuites, sessionParameters.getCipherSuite()))
             {
-            	resetCurrentSession();
+                resetCurrentSession();
             }
         }
-        
-        int compression_methods_length = TlsUtils.readUint8(buf);
-        if (compression_methods_length < 1)
-        {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-        }
-        this.offeredCompressionMethods = TlsUtils.readUint8Array(compression_methods_length, buf);
-        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
 
-        LOG.debug("Offered CompressionMethods [{}]", offeredCompressionMethods);
-      
-        /*
-         * RFC 5246 7.4.1.2. If the session_id field is not empty (implying a session
-         * resumption request), it MUST include the compression_method from that session.
-         */
-        if (sessionID.length > 0 && this.sessionParameters != null)
-        {
-            if (!Arrays.contains(this.offeredCompressionMethods, sessionParameters.getCompressionAlgorithm()))
-            {
-            	resetCurrentSession();
-            }
-        }
-        
         /*
          * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
          * extensions appearing in the client hello, and send a server hello containing no
          * extensions.
          */
-        this.clientExtensions = readExtensions(buf);
+        this.clientExtensions = clientHello.getExtensions();
 
-        /*
-         * TODO[session-hash]
-         * 
-         * draft-ietf-tls-session-hash-04 4. Clients and servers SHOULD NOT accept handshakes
-         * that do not use the extended master secret [..]. (and see 5.2, 5.3)
-         */
-        this.securityParameters.extendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(clientExtensions);
 
-        getContextAdmin().setClientVersion(client_version);
+ 
+        SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
-        tlsServer.notifyClientVersion(client_version);
-        tlsServer.notifyFallback(Arrays.contains(offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV));
+        tlsServerContext.setClientSupportedVersions(
+            TlsExtensionsUtils.getSupportedVersionsExtensionClient(clientExtensions));
+        if (null == tlsServerContext.getClientSupportedVersions())
+        {
+            if (client_version.isLaterVersionOf(ProtocolVersion.TLSv12))
+            {
+                client_version = ProtocolVersion.TLSv12;
+            }
 
-        securityParameters.clientRandom = client_random;
+            tlsServerContext.setClientSupportedVersions(client_version.downTo(ProtocolVersion.TLSv10));
+        }
+        else
+        {
+            client_version = ProtocolVersion.getLatestTLS(tlsServerContext.getClientSupportedVersions());
+        }
+
+        if (null == client_version || !ProtocolVersion.TLSv10.isEqualOrEarlierVersionOf(client_version))
+        {
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+
+        if (securityParameters.isRenegotiating())
+        {
+            // Check that this is either the originally offered version or the negotiated version
+            if (!client_version.equals(tlsServerContext.getClientVersion())
+                && !client_version.equals(tlsServerContext.getServerVersion()))
+            {
+                throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+            }
+        }
+        else
+        {
+            tlsServerContext.setClientVersion(client_version);
+        }
+
+        tlsServer.notifyClientVersion(tlsServerContext.getClientVersion());
+
+        securityParameters.clientRandom = clientHello.getRandom();
 
         if (sessionID.length > 0 && this.sessionParameters != null)
         {
+            tlsServer.notifyFallback(sessionParameters.getCipherSuite() == CipherSuite.TLS_FALLBACK_SCSV);
         	tlsServer.notifyOfferedCipherSuites(new int[] {sessionParameters.getCipherSuite()});
-        	tlsServer.notifyOfferedCompressionMethods(new short[] {sessionParameters.getCompressionAlgorithm()});
         }
         else {
+            tlsServer.notifyFallback(Arrays.contains(offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV));
         	tlsServer.notifyOfferedCipherSuites(offeredCipherSuites);
-        	tlsServer.notifyOfferedCompressionMethods(offeredCompressionMethods);
         }
 
         /*
-         * RFC 5746 3.6. Server Behavior: Initial Handshake
+         * RFC 7627 4. Clients and servers SHOULD NOT accept handshakes that do not use the extended
+         * master secret [..]. (and see 5.2, 5.3)
          */
+        securityParameters.extendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(clientExtensions);
+        if (!securityParameters.isExtendedMasterSecret() && tlsServer.requiresExtendedMasterSecret())
         {
+            throw new TlsFatalAlert(AlertDescription.handshake_failure);
+        }
+
+        byte[] renegExtData = TlsUtils.getExtensionData(clientExtensions, EXT_RenegotiationInfo);
+
+        if (securityParameters.isRenegotiating())
+        {
+            /*
+             * RFC 5746 3.7. Server Behavior: Secure Renegotiation
+             * 
+             * This text applies if the connection's "secure_renegotiation" flag is set to TRUE.
+             */
+            if (!securityParameters.isSecureRenegotiation())
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+
+            /*
+             * When a ClientHello is received, the server MUST verify that it does not contain the
+             * TLS_EMPTY_RENEGOTIATION_INFO_SCSV SCSV. If the SCSV is present, the server MUST abort
+             * the handshake.
+             */
+            if (Arrays.contains(offeredCipherSuites, CipherSuite.TLS_EMPTY_RENEGOTIATION_INFO_SCSV))
+            {
+                throw new TlsFatalAlert(AlertDescription.handshake_failure);
+            }
+
+            /*
+             * The server MUST verify that the "renegotiation_info" extension is present; if it is
+             * not, the server MUST abort the handshake.
+             */
+            if (null == renegExtData)
+            {
+                throw new TlsFatalAlert(AlertDescription.handshake_failure);
+            }
+
+            /*
+             * The server MUST verify that the value of the "renegotiated_connection" field is equal
+             * to the saved client_verify_data value; if it is not, the server MUST abort the
+             * handshake.
+             */
+            SecurityParameters saved = tlsServerContext.getSecurityParametersConnection();
+            byte[] reneg_conn_info = saved.getPeerVerifyData();
+
+            if (!Arrays.constantTimeAreEqual(renegExtData, createRenegotiationInfo(reneg_conn_info)))
+            {
+                throw new TlsFatalAlert(AlertDescription.handshake_failure);
+            }
+        }
+        else
+        {
+            /*
+             * RFC 5746 3.6. Server Behavior: Initial Handshake
+             */
+
             /*
              * RFC 5746 3.4. The client MUST include either an empty "renegotiation_info" extension,
              * or the TLS_EMPTY_RENEGOTIATION_INFO_SCSV signaling cipher suite value in the
@@ -657,14 +690,13 @@ public class TlsServerProtocol
              */
             if (Arrays.contains(offeredCipherSuites, CipherSuite.TLS_EMPTY_RENEGOTIATION_INFO_SCSV))
             {
-                this.secure_renegotiation = true;
+                securityParameters.secureRenegotiation = true;
             }
 
             /*
              * The server MUST check if the "renegotiation_info" extension is included in the
              * ClientHello.
              */
-            byte[] renegExtData = TlsUtils.getExtensionData(clientExtensions, EXT_RenegotiationInfo);
             if (renegExtData != null)
             {
                 /*
@@ -672,7 +704,7 @@ public class TlsServerProtocol
                  * server MUST then verify that the length of the "renegotiated_connection"
                  * field is zero, and if it is not, MUST abort the handshake.
                  */
-                this.secure_renegotiation = true;
+                securityParameters.secureRenegotiation = true;
 
                 if (!Arrays.constantTimeAreEqual(renegExtData, createRenegotiationInfo(TlsUtils.EMPTY_BYTES)))
                 {
@@ -681,7 +713,7 @@ public class TlsServerProtocol
             }
         }
 
-        tlsServer.notifySecureRenegotiation(this.secure_renegotiation);
+        tlsServer.notifySecureRenegotiation(securityParameters.isSecureRenegotiation());
 
         if (clientExtensions != null)
         {
@@ -694,7 +726,7 @@ public class TlsServerProtocol
              */
             if (sessionID.length > 0 && this.sessionParameters != null)
             {
-            	ServerNameList oldServerNameList = TlsExtensionsUtils.getServerNameExtension(sessionParameters.readServerExtensions());
+            	ServerNameList oldServerNameList = TlsExtensionsUtils.getServerNameExtension(sessionParameters.readClientExtensions());
             	ServerNameList serverNameList = TlsExtensionsUtils.getServerNameExtension(clientExtensions);
             	if ((oldServerNameList != null && oldServerNameList.getServerNameList() != null) && //
             			!oldServerNameList.getServerNameList().equals(serverNameList.getServerNameList()))
@@ -703,6 +735,20 @@ public class TlsServerProtocol
             	}
             }
             
+            securityParameters.clientServerNames = TlsExtensionsUtils.getServerNameExtensionClient(clientExtensions);
+
+            /*
+             * RFC 5246 7.4.1.4.1. Note: this extension is not meaningful for TLS versions prior
+             * to 1.2. Clients MUST NOT offer it if they are offering prior versions.
+             */
+            if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(client_version))
+            {
+                securityParameters.clientSigAlgs = TlsExtensionsUtils.getSignatureAlgorithmsExtension(clientExtensions);
+                securityParameters.clientSigAlgsCert = TlsExtensionsUtils.getSignatureAlgorithmsCertExtension(clientExtensions);
+            }
+
+            securityParameters.clientSupportedGroups = TlsExtensionsUtils.getSupportedGroupsExtension(clientExtensions);
+
             tlsServer.processClientExtensions(clientExtensions);
         }
     }
@@ -716,11 +762,10 @@ public class TlsServerProtocol
         assertEmpty(buf);
 
         this.prepareFinishHash = recordStream.prepareToFinish();
-        this.securityParameters.sessionHash = TlsUtils.getCurrentPRFHash(prepareFinishHash);
+        tlsServerContext.getSecurityParametersHandshake().sessionHash = TlsUtils.getCurrentPRFHash(prepareFinishHash);
 
         establishMasterSecret(getContext(), keyExchange);
-
-        recordStream.setPendingConnectionState(getPeer().getCompression(), getPeer().getCipher());
+        recordStream.setPendingConnectionState(TlsUtils.initCipher(getContext()));
     }
 
     protected void sendCertificateRequestMessage(CertificateRequest certificateRequest)
@@ -745,6 +790,16 @@ public class TlsServerProtocol
         message.writeToRecordStream();
     }
 
+    protected void sendHelloRequestMessage()
+        throws IOException
+    {
+        byte[] message = new byte[4];
+        TlsUtils.writeUint8(HandshakeType.hello_request, message, 0);
+        TlsUtils.writeUint24(0, message, 1);
+
+        writeHandshakeMessage(message, 0, message.length);
+    }
+
     protected void sendNewSessionTicketMessage(NewSessionTicket newSessionTicket)
         throws IOException
     {
@@ -754,7 +809,7 @@ public class TlsServerProtocol
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
 
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.session_ticket);
+        HandshakeMessage message = new HandshakeMessage(HandshakeType.new_session_ticket);
 
         newSessionTicket.encode(message);
 
@@ -764,105 +819,137 @@ public class TlsServerProtocol
     protected void sendServerHelloMessage()
         throws IOException
     {
-    	LOG.debug("Send ServerHelloMessage");
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.server_hello);
+        LOG.debug("Send ServerHelloMessage");
+        SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
+        ProtocolVersion server_version;
+        if (securityParameters.isRenegotiating())
         {
-            ProtocolVersion server_version = tlsServer.getServerVersion();
+            // Always select the negotiated version from the initial handshake
+            server_version = tlsServerContext.getServerVersion();
+            LOG.debug("ServerVersion [{}]", server_version);
+        }
+        else
+        {
+            server_version = tlsServer.getServerVersion();
+            LOG.debug("ServerVersion [{}]", server_version);
 
-        	LOG.debug("ServerVersion [{}]", server_version);
-            if (!server_version.isEqualOrEarlierVersionOf(getContext().getClientVersion()))
+            if (null == server_version
+                || server_version.isEarlierVersionOf(ProtocolVersion.TLSv10)
+                || server_version.isLaterVersionOf(ProtocolVersion.TLSv12)
+                || !ProtocolVersion.contains(tlsServerContext.getClientSupportedVersions(), server_version))
             {
                 throw new TlsFatalAlert(AlertDescription.internal_error);
             }
-    
-            recordStream.setReadVersion(server_version);
-            recordStream.setWriteVersion(server_version);
-            recordStream.setRestrictReadVersion(true);
-            getContextAdmin().setServerVersion(server_version);
-    
-            TlsUtils.writeVersion(server_version, message);
+
+            ProtocolVersion legacy_record_version = server_version.isLaterVersionOf(ProtocolVersion.TLSv12)
+                ? ProtocolVersion.TLSv12
+                : server_version;
+
+            recordStream.setWriteVersion(legacy_record_version);
+            securityParameters.negotiatedVersion = server_version;
         }
 
-        message.write(this.securityParameters.serverRandom);
-
-        /*
-         * The server may return an session_id to indicate that the session will be cached
-         * and therefore can be resumed.
-         */
-        TlsUtils.writeOpaque8(tlsSession.getSessionID(), message);
-
-    	int selectedCipherSuite = tlsServer.getSelectedCipherSuite();
-    	if (!Arrays.contains(offeredCipherSuites, selectedCipherSuite)
-    			|| selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
-    			|| CipherSuite.isSCSV(selectedCipherSuite)
-    			|| !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, getContext().getServerVersion()))
-    	{
-    		throw new TlsFatalAlert(AlertDescription.internal_error);
-    	}
-    	securityParameters.cipherSuite = selectedCipherSuite;
-        LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
-
-        short selectedCompressionMethod = tlsServer.getSelectedCompressionMethod();
-        if (!Arrays.contains(offeredCompressionMethods, selectedCompressionMethod))
+        securityParameters.serverRandom = createRandomBlock(tlsServer.shouldUseGMTUnixTime(), tlsServerContext);
+        if (!server_version.equals(ProtocolVersion.getLatestTLS(tlsServer.getSupportedVersions())))
         {
-            throw new TlsFatalAlert(AlertDescription.internal_error);
+            TlsUtils.writeDowngradeMarker(server_version, securityParameters.getServerRandom());
         }
-        securityParameters.compressionAlgorithm = selectedCompressionMethod;
 
-        LOG.debug("Selected CompressionMethod [{}]", selectedCompressionMethod);
-
-        TlsUtils.writeUint16(securityParameters.cipherSuite, message);
-        TlsUtils.writeUint8(securityParameters.compressionAlgorithm, message);
-
-        this.serverExtensions = tlsServer.getServerExtensions();
-
-        /*
-         * RFC 5746 3.6. Server Behavior: Initial Handshake
-         */
-        if (this.secure_renegotiation)
         {
-            byte[] renegExtData = TlsUtils.getExtensionData(this.serverExtensions, EXT_RenegotiationInfo);
-            boolean noRenegExt = (null == renegExtData);
-
-            if (noRenegExt)
+            int selectedCipherSuite = tlsServer.getSelectedCipherSuite();
+            if (!Arrays.contains(offeredCipherSuites, selectedCipherSuite)
+                || selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
+                || CipherSuite.isSCSV(selectedCipherSuite)
+                || !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, tlsServerContext.getServerVersion()))
             {
-                /*
-                 * Note that sending a "renegotiation_info" extension in response to a ClientHello
-                 * containing only the SCSV is an explicit exception to the prohibition in RFC 5246,
-                 * Section 7.4.1.4, on the server sending unsolicited extensions and is only allowed
-                 * because the client is signaling its willingness to receive the extension via the
-                 * TLS_EMPTY_RENEGOTIATION_INFO_SCSV SCSV.
-                 */
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+            securityParameters.cipherSuite = selectedCipherSuite;
+            LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
+        }
 
-                /*
-                 * If the secure_renegotiation flag is set to TRUE, the server MUST include an empty
-                 * "renegotiation_info" extension in the ServerHello message.
-                 */
-                this.serverExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(serverExtensions);
-                this.serverExtensions.put(EXT_RenegotiationInfo, createRenegotiationInfo(TlsUtils.EMPTY_BYTES));
+        this.serverExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(tlsServer.getServerExtensions());
+
+        ProtocolVersion legacy_version = server_version;
+        if (server_version.isLaterVersionOf(ProtocolVersion.TLSv12))
+        {
+            legacy_version = ProtocolVersion.TLSv12;
+
+            TlsExtensionsUtils.addSupportedVersionsExtensionServer(serverExtensions, server_version);
+        }
+
+        if (securityParameters.isRenegotiating())
+        {
+            /*
+             * The server MUST include a "renegotiation_info" extension containing the saved
+             * client_verify_data and server_verify_data in the ServerHello.
+             */
+            if (!securityParameters.isSecureRenegotiation())
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+
+            SecurityParameters saved = tlsServerContext.getSecurityParametersConnection();
+            byte[] reneg_conn_info = TlsUtils.concat(saved.getPeerVerifyData(), saved.getLocalVerifyData());
+
+            this.serverExtensions.put(EXT_RenegotiationInfo, createRenegotiationInfo(reneg_conn_info));
+        }
+        else
+        {
+            /*
+             * RFC 5746 3.6. Server Behavior: Initial Handshake
+             */
+            if (securityParameters.isSecureRenegotiation())
+            {
+                byte[] renegExtData = TlsUtils.getExtensionData(this.serverExtensions, EXT_RenegotiationInfo);
+                boolean noRenegExt = (null == renegExtData);
+
+                if (noRenegExt)
+                {
+                    /*
+                     * Note that sending a "renegotiation_info" extension in response to a ClientHello
+                     * containing only the SCSV is an explicit exception to the prohibition in RFC 5246,
+                     * Section 7.4.1.4, on the server sending unsolicited extensions and is only allowed
+                     * because the client is signaling its willingness to receive the extension via the
+                     * TLS_EMPTY_RENEGOTIATION_INFO_SCSV SCSV.
+                     */
+
+                    /*
+                     * If the secure_renegotiation flag is set to TRUE, the server MUST include an empty
+                     * "renegotiation_info" extension in the ServerHello message.
+                     */
+                    this.serverExtensions.put(EXT_RenegotiationInfo, createRenegotiationInfo(TlsUtils.EMPTY_BYTES));
+                }
             }
         }
 
         if (securityParameters.isExtendedMasterSecret())
         {
-            this.serverExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(serverExtensions);
             TlsExtensionsUtils.addExtendedMasterSecretExtension(serverExtensions);
         }
 
         /*
-         * RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
+         * contents of this extension are irrelevant, and only the values in the new handshake
+         * messages are considered.
+         */
+        securityParameters.applicationProtocol = TlsExtensionsUtils.getALPNExtensionServer(serverExtensions);
+        securityParameters.applicationProtocolSet = true;
+
+        /*
+         * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
          * extensions appearing in the client hello, and send a server hello containing no
          * extensions.
          */
-        if (this.serverExtensions != null)
-        {
-            this.securityParameters.encryptThenMAC = TlsExtensionsUtils.hasEncryptThenMACExtension(serverExtensions);
 
-            this.securityParameters.maxFragmentLength = processMaxFragmentLengthExtension(clientExtensions,
+        if (!this.serverExtensions.isEmpty())
+        {
+            securityParameters.encryptThenMAC = TlsExtensionsUtils.hasEncryptThenMACExtension(serverExtensions);
+
+            securityParameters.maxFragmentLength = processMaxFragmentLengthExtension(clientExtensions,
                 serverExtensions, AlertDescription.internal_error);
 
-            this.securityParameters.truncatedHMac = TlsExtensionsUtils.hasTruncatedHMacExtension(serverExtensions);
+            securityParameters.truncatedHMac = TlsExtensionsUtils.hasTruncatedHMacExtension(serverExtensions);
 
             /*
              * TODO It's surprising that there's no provision to allow a 'fresh' CertificateStatus to be sent in
@@ -875,11 +962,9 @@ public class TlsServerProtocol
             this.expectSessionTicket = !this.resumedSession
                 && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsProtocol.EXT_SessionTicket,
                     AlertDescription.internal_error);
-
-           	writeExtensions(message, serverExtensions);
         }
 
-        securityParameters.prfAlgorithm = getPRFAlgorithm(getContext(), securityParameters.getCipherSuite());
+        securityParameters.prfAlgorithm = getPRFAlgorithm(tlsServerContext, securityParameters.getCipherSuite());
 
         /*
          * RFC 5246 7.4.9. Any cipher suite which does not explicitly specify verify_data_length has
@@ -888,6 +973,26 @@ public class TlsServerProtocol
         securityParameters.verifyDataLength = 12;
 
         applyMaxFragmentLengthExtension();
+
+
+
+        HandshakeMessage message = new HandshakeMessage(HandshakeType.server_hello);
+
+        TlsUtils.writeVersion(legacy_version, message);
+
+        message.write(securityParameters.getServerRandom());
+
+        /*
+         * The server may return an empty session_id to indicate that the session will not be cached
+         * and therefore cannot be resumed.
+         */
+        TlsUtils.writeOpaque8(tlsSession.getSessionID(), message);
+
+        TlsUtils.writeUint16(securityParameters.getCipherSuite(), message);
+
+        TlsUtils.writeUint8(CompressionMethod._null, message);
+
+        writeExtensions(message, serverExtensions);
 
         message.writeToRecordStream();
     }
@@ -916,6 +1021,8 @@ public class TlsServerProtocol
 
     protected boolean expectCertificateVerifyMessage()
     {
-        return peerCertificate != null && !peerCertificate.isEmpty() && keyExchange.requiresCertificateVerify();
+        Certificate clientCertificate = tlsServerContext.getSecurityParametersHandshake().getPeerCertificate();
+
+        return null != clientCertificate && !clientCertificate.isEmpty() && keyExchange.requiresCertificateVerify();
     }
 }

@@ -10,8 +10,8 @@ import java.security.Security;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 
@@ -48,7 +48,7 @@ public class SM4Test
         ByteArrayInputStream bIn;
         ByteArrayOutputStream bOut;
 
-        key = new SecretKeySpec(keyBytes, "SM4");
+        key = new DestroyableSecretKeySpec(keyBytes, "SM4");
 
         in = Cipher.getInstance("SM4/ECB/NoPadding", "BC");
         out = Cipher.getInstance("SM4/ECB/NoPadding", "BC");

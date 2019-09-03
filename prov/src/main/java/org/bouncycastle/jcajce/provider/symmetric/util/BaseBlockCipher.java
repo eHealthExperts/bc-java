@@ -28,6 +28,7 @@ import org.bouncycastle.asn1.cms.GCMParameters;
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.BufferedBlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.OutputLengthException;
@@ -78,6 +79,7 @@ public class BaseBlockCipher
     extends BaseWrapCipher
     implements PBE
 {
+    private static final int BUF_SIZE = 512;
     private static final Class gcmSpecClass = ClassUtil.loadClass(BaseBlockCipher.class, "javax.crypto.spec.GCMParameterSpec");
 
     //
@@ -454,7 +456,7 @@ public class BaseBlockCipher
                 cipher = new BufferedGenericBlockCipher(new BufferedBlockCipher(cipher.getUnderlyingCipher()));
             }
         }
-        else if (paddingName.equals("WITHCTS"))
+        else if (paddingName.equals("WITHCTS") || paddingName.equals("CTSPADDING") || paddingName.equals("CS3PADDING"))
         {
             cipher = new BufferedGenericBlockCipher(new CTSBlockCipher(cipher.getUnderlyingCipher()));
         }
@@ -836,7 +838,7 @@ public class BaseBlockCipher
 
             if (ivRandom == null)
             {
-                ivRandom = new SecureRandom();
+                ivRandom = CryptoServicesRegistrar.getSecureRandom();
             }
 
             if ((opmode == Cipher.ENCRYPT_MODE) || (opmode == Cipher.WRAP_MODE))
@@ -1003,11 +1005,38 @@ public class BaseBlockCipher
         cipher.updateAAD(input, offset, length);
     }
 
-    protected void engineUpdateAAD(ByteBuffer bytebuffer)
+    protected void engineUpdateAAD(ByteBuffer src)
     {
-        int offset = bytebuffer.arrayOffset() + bytebuffer.position();
-        int length = bytebuffer.limit() - bytebuffer.position();
-        engineUpdateAAD(bytebuffer.array(), offset, length);
+        int remaining = src.remaining();
+        if (remaining < 1)
+        {
+            // No data to update
+        }
+        else if (src.hasArray())
+        {
+            engineUpdateAAD(src.array(), src.arrayOffset() + src.position(), remaining);
+            src.position(src.limit());
+        }
+        else if (remaining <= BUF_SIZE)
+        {
+            byte[] data = new byte[remaining];
+            src.get(data);
+            engineUpdateAAD(data, 0, data.length);
+            Arrays.fill(data, (byte)0);
+        }
+        else
+        {
+            byte[] data = new byte[BUF_SIZE];
+            do
+            {
+                int length = Math.min(data.length, remaining);
+                src.get(data, 0, length);
+                engineUpdateAAD(data, 0, length);
+                remaining -= length;
+            }
+            while (remaining > 0);
+            Arrays.fill(data, (byte)0);
+        }
     }
 
     protected byte[] engineUpdate(
@@ -1363,23 +1392,6 @@ public class BaseBlockCipher
                 }
                 throw new BadPaddingException(e.getMessage());
             }
-        }
-    }
-
-    private static class InvalidKeyOrParametersException
-        extends InvalidKeyException
-    {
-        private final Throwable cause;
-
-        InvalidKeyOrParametersException(String msg, Throwable cause)
-        {
-             super(msg);
-            this.cause = cause;
-        }
-
-        public Throwable getCause()
-        {
-            return cause;
         }
     }
 }

@@ -3,12 +3,13 @@ package org.bouncycastle.tsp.test;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
-import junit.framework.TestCase;
 import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.bc.BcDigestCalculatorProvider;
 import org.bouncycastle.tsp.TimeStampToken;
 import org.bouncycastle.tsp.cms.CMSTimeStampedData;
+
+import junit.framework.TestCase;
 
 public class CMSTimeStampedDataTest
     extends TestCase

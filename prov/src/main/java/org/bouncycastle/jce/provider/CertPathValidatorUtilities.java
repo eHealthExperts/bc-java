@@ -75,7 +75,6 @@ import org.bouncycastle.util.Selector;
 import org.bouncycastle.util.Store;
 import org.bouncycastle.util.StoreException;
 import org.bouncycastle.x509.X509AttributeCertificate;
-import org.bouncycastle.x509.extension.X509ExtensionUtil;
 
 class CertPathValidatorUtilities
 {

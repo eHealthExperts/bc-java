@@ -18,8 +18,8 @@ public class TlsPSKProtocolTest
     {
         SecureRandom secureRandom = new SecureRandom();
 
-        PipedInputStream clientRead = new PipedInputStream();
-        PipedInputStream serverRead = new PipedInputStream();
+        PipedInputStream clientRead = TlsTestUtils.createPipedInputStream();
+        PipedInputStream serverRead = TlsTestUtils.createPipedInputStream();
         PipedOutputStream clientWrite = new PipedOutputStream(serverRead);
         PipedOutputStream serverWrite = new PipedOutputStream(clientRead);
 

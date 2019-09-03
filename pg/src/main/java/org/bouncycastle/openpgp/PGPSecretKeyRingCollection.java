@@ -14,8 +14,8 @@ import java.util.Map;
 
 import org.bouncycastle.bcpg.BCPGOutputStream;
 import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
-import org.bouncycastle.util.Strings;
 import org.bouncycastle.util.Iterable;
+import org.bouncycastle.util.Strings;
 
 /**
  * Often a PGP key ring file is made up of a succession of master/sub-key key rings.

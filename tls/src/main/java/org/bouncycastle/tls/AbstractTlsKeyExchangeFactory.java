@@ -1,91 +1,93 @@
 package org.bouncycastle.tls;
 
 import java.io.IOException;
-import java.util.Vector;
 
 import org.bouncycastle.tls.crypto.TlsDHConfig;
 import org.bouncycastle.tls.crypto.TlsECConfig;
 
+/**
+ * Base class for supporting a TLS key exchange factory implementation.
+ */
 public class AbstractTlsKeyExchangeFactory
     implements TlsKeyExchangeFactory
 {
-    public TlsKeyExchange createDHKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfigVerifier dhConfigVerifier) throws IOException
+    public TlsKeyExchange createDHKeyExchange(int keyExchange) throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createDHKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfig dhConfig) throws IOException
-    {
-        throw new TlsFatalAlert(AlertDescription.internal_error);
-    }
-
-    public TlsKeyExchange createDHEKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfigVerifier dhConfigVerifier) throws IOException
-    {
-        throw new TlsFatalAlert(AlertDescription.internal_error);
-    }
-
-    public TlsKeyExchange createDHEKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsDHConfig dhConfig) throws IOException
-    {
-        throw new TlsFatalAlert(AlertDescription.internal_error);
-    }
-
-    public TlsKeyExchange createECDHKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfigVerifier ecConfigVerifier, short[] clientECPointFormats, short[] serverECPointFormats)
+    public TlsKeyExchange createDHanonKeyExchangeClient(int keyExchange, TlsDHGroupVerifier dhGroupVerifier)
         throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createECDHKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfig ecConfig, short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createDHanonKeyExchangeServer(int keyExchange, TlsDHConfig dhConfig) throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createECDHEKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfigVerifier ecConfigVerifier, short[] clientECPointFormats, short[] serverECPointFormats)
+    public TlsKeyExchange createDHEKeyExchangeClient(int keyExchange, TlsDHGroupVerifier dhGroupVerifier)
         throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createECDHEKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsECConfig ecConfig, short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createDHEKeyExchangeServer(int keyExchange, TlsDHConfig dhConfig) throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createPSKKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsPSKIdentity pskIdentity, TlsDHConfigVerifier dhConfigVerifier, TlsECConfigVerifier ecConfigVerifier,
-        short[] clientECPointFormats, short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createECDHKeyExchange(int keyExchange) throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createPSKKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsPSKIdentityManager pskIdentityManager, TlsDHConfig dhConfig, TlsECConfig ecConfig,
-        short[] serverECPointFormats) throws IOException
+    public TlsKeyExchange createECDHanonKeyExchangeClient(int keyExchange) throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createRSAKeyExchange(Vector supportedSignatureAlgorithms) throws IOException
+    public TlsKeyExchange createECDHanonKeyExchangeServer(int keyExchange, TlsECConfig ecConfig) throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createSRPKeyExchangeClient(int keyExchange, Vector supportedSignatureAlgorithms,
-        TlsSRPConfigVerifier srpConfigVerifier, byte[] identity, byte[] password) throws IOException
+    public TlsKeyExchange createECDHEKeyExchangeClient(int keyExchange) throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
-    public TlsKeyExchange createSRPKeyExchangeServer(int keyExchange, Vector supportedSignatureAlgorithms,
-        byte[] identity, TlsSRPLoginParameters loginParameters) throws IOException
+    public TlsKeyExchange createECDHEKeyExchangeServer(int keyExchange, TlsECConfig ecConfig) throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public TlsKeyExchange createPSKKeyExchangeClient(int keyExchange, TlsPSKIdentity pskIdentity,
+        TlsDHGroupVerifier dhGroupVerifier) throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public TlsKeyExchange createPSKKeyExchangeServer(int keyExchange, TlsPSKIdentityManager pskIdentityManager,
+        TlsDHConfig dhConfig, TlsECConfig ecConfig) throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public TlsKeyExchange createRSAKeyExchange(int keyExchange) throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public TlsKeyExchange createSRPKeyExchangeClient(int keyExchange, TlsSRPIdentity srpIdentity,
+        TlsSRPConfigVerifier srpConfigVerifier) throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public TlsKeyExchange createSRPKeyExchangeServer(int keyExchange, TlsSRPLoginParameters loginParameters)
+        throws IOException
     {
         throw new TlsFatalAlert(AlertDescription.internal_error);
     }

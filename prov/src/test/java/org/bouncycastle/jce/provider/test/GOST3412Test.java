@@ -11,8 +11,8 @@ import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
@@ -42,7 +42,7 @@ public class GOST3412Test
         ByteArrayInputStream bIn;
         ByteArrayOutputStream bOut;
 
-        key = new SecretKeySpec(keyBytes, "GOST3412-2015");
+        key = new DestroyableSecretKeySpec(keyBytes, "GOST3412-2015");
 
         in = Cipher.getInstance("GOST3412-2015/ECB/NoPadding", "BC");
         out = Cipher.getInstance("GOST3412-2015/ECB/NoPadding", "BC");
@@ -109,7 +109,7 @@ public class GOST3412Test
         ByteArrayInputStream bIn;
         ByteArrayOutputStream bOut;
 
-        key = new SecretKeySpec(keyBytes, "GOST3412-2015");
+        key = new DestroyableSecretKeySpec(keyBytes, "GOST3412-2015");
 
         in = Cipher.getInstance("GOST3412-2015/CFB8/NoPadding", "BC");
         out = Cipher.getInstance("GOST3412-2015/CFB8/NoPadding", "BC");
@@ -182,7 +182,7 @@ public class GOST3412Test
 
         Mac mac = Mac.getInstance("GOST3412MAC", "BC");
 
-        mac.init(new SecretKeySpec(Hex.decode("8899aabbccddeeff0011223344556677fedcba98765432100123456789abcdef"), "GOST3412MAC"));
+        mac.init(new DestroyableSecretKeySpec(Hex.decode("8899aabbccddeeff0011223344556677fedcba98765432100123456789abcdef"), "GOST3412MAC"));
 
         for (int i = 0; i != inputs.length; i++)
         {

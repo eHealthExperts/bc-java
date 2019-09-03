@@ -4,8 +4,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 
-import junit.framework.Assert;
-import junit.framework.TestCase;
 import org.bouncycastle.jcajce.provider.digest.GOST3411;
 import org.bouncycastle.jcajce.provider.digest.MD2;
 import org.bouncycastle.jcajce.provider.digest.MD4;
@@ -55,6 +53,9 @@ import org.bouncycastle.jcajce.provider.symmetric.VMPC;
 import org.bouncycastle.jcajce.provider.symmetric.VMPCKSA3;
 import org.bouncycastle.jcajce.provider.symmetric.XSalsa20;
 import org.bouncycastle.jcajce.provider.symmetric.XTEA;
+
+import junit.framework.Assert;
+import junit.framework.TestCase;
 
 public class PrivateConstructorTest
     extends TestCase

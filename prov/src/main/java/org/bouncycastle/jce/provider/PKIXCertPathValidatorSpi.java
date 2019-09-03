@@ -1,6 +1,5 @@
 package org.bouncycastle.jce.provider;
 
-import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.PublicKey;
 import java.security.cert.CertPath;
@@ -481,7 +480,7 @@ public class PKIXCertPathValidatorSpi
         }
         catch (CertificateEncodingException e)
         {
-            throw new AnnotatedException("unable to process TBSCertificate");
+            throw new AnnotatedException("unable to process TBSCertificate", e);
         }
         catch (IllegalArgumentException e)
         {

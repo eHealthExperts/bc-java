@@ -22,6 +22,7 @@ import org.bouncycastle.pqc.asn1.PQCObjectIdentifiers;
 import org.bouncycastle.pqc.jcajce.provider.mceliece.McElieceCCA2KeyFactorySpi;
 import org.bouncycastle.pqc.jcajce.provider.mceliece.McElieceKeyFactorySpi;
 import org.bouncycastle.pqc.jcajce.provider.newhope.NHKeyFactorySpi;
+import org.bouncycastle.pqc.jcajce.provider.qtesla.QTESLAKeyFactorySpi;
 import org.bouncycastle.pqc.jcajce.provider.rainbow.RainbowKeyFactorySpi;
 import org.bouncycastle.pqc.jcajce.provider.sphincs.Sphincs256KeyFactorySpi;
 import org.bouncycastle.pqc.jcajce.provider.xmss.XMSSKeyFactorySpi;
@@ -54,7 +55,7 @@ import org.bouncycastle.pqc.jcajce.provider.xmss.XMSSMTKeyFactorySpi;
 public final class BouncyCastleProvider extends Provider
     implements ConfigurableProvider
 {
-    private static String info = "BouncyCastle Security Provider v1.60b";
+    private static String info = "BouncyCastle Security Provider v1.62";
 
     public static final String PROVIDER_NAME = "BC";
 
@@ -99,7 +100,7 @@ public final class BouncyCastleProvider extends Provider
 
     private static final String[] ASYMMETRIC_CIPHERS =
     {
-        "DSA", "DH", "EC", "RSA", "GOST", "ECGOST", "ElGamal", "DSTU4145", "GM"
+        "DSA", "DH", "EC", "RSA", "GOST", "ECGOST", "ElGamal", "DSTU4145", "GM", "EdEC"
     };
 
     /*
@@ -137,7 +138,7 @@ public final class BouncyCastleProvider extends Provider
      */
     public BouncyCastleProvider()
     {
-        super(PROVIDER_NAME, 1.595, info);
+        super(PROVIDER_NAME, 1.62, info);
 
         AccessController.doPrivileged(new PrivilegedAction()
         {
@@ -242,6 +243,11 @@ public final class BouncyCastleProvider extends Provider
         addKeyInfoConverter(PQCObjectIdentifiers.mcEliece, new McElieceKeyFactorySpi());
         addKeyInfoConverter(PQCObjectIdentifiers.mcElieceCca2, new McElieceCCA2KeyFactorySpi());
         addKeyInfoConverter(PQCObjectIdentifiers.rainbow, new RainbowKeyFactorySpi());
+        addKeyInfoConverter(PQCObjectIdentifiers.qTESLA_I, new QTESLAKeyFactorySpi());
+        addKeyInfoConverter(PQCObjectIdentifiers.qTESLA_III_size, new QTESLAKeyFactorySpi());
+        addKeyInfoConverter(PQCObjectIdentifiers.qTESLA_III_speed, new QTESLAKeyFactorySpi());
+        addKeyInfoConverter(PQCObjectIdentifiers.qTESLA_p_I, new QTESLAKeyFactorySpi());
+        addKeyInfoConverter(PQCObjectIdentifiers.qTESLA_p_III, new QTESLAKeyFactorySpi());
     }
 
     public void setParameter(String parameterName, Object parameter)

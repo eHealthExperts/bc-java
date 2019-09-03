@@ -62,6 +62,11 @@ public abstract class AlgorithmParametersSpi
             Class paramSpec)
             throws InvalidParameterSpecException
         {
+            if (paramSpec == AlgorithmParameterSpec.class)
+            {
+                return currentSpec;
+            }
+
             throw new InvalidParameterSpecException("unknown parameter spec passed to OAEP parameters object.");
         }
     
@@ -153,11 +158,11 @@ public abstract class AlgorithmParametersSpi
             Class paramSpec)
             throws InvalidParameterSpecException
         {
-            if (paramSpec == PSSParameterSpec.class && currentSpec != null)
+            if (paramSpec == PSSParameterSpec.class || paramSpec == AlgorithmParameterSpec.class)
             {
                 return currentSpec;
             }
-    
+
             throw new InvalidParameterSpecException("unknown parameter spec passed to PSS parameters object.");
         }
     
@@ -180,9 +185,11 @@ public abstract class AlgorithmParametersSpi
             try
             {
                 RSASSAPSSparams pssP = RSASSAPSSparams.getInstance(params);
+                String hashName = org.bouncycastle.jcajce.util.MessageDigestUtils.getDigestName(
+                    pssP.getHashAlgorithm().getAlgorithm());
 
-                currentSpec = new PSSParameterSpec(
-                                       pssP.getSaltLength().intValue());
+                currentSpec = new PSSParamSpec(
+                                       pssP.getSaltLength().intValue(), hashName);
             }
             catch (ClassCastException e)
             {

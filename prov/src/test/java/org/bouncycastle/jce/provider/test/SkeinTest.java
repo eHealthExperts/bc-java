@@ -6,8 +6,8 @@ import java.security.Security;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.spec.SkeinParameterSpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
@@ -186,7 +186,7 @@ public class SkeinTest
     {
         Mac mac = Mac.getInstance(algorithm, provider);
 
-        mac.init(new SecretKeySpec(key, algorithm));
+        mac.init(new DestroyableSecretKeySpec(key, algorithm));
 
         byte[] result = mac.doFinal(message);
         byte[] result2 = mac.doFinal(message);
@@ -261,7 +261,7 @@ public class SkeinTest
         Mac mac = Mac.getInstance("Skein-Mac-512-160", provider);
 
         // test six, init using SkeinParameters
-        mac.init(new SecretKeySpec(shortMacKey, "Skein-Mac-512-160"),
+        mac.init(new DestroyableSecretKeySpec(shortMacKey, "Skein-Mac-512-160"),
                 new SkeinParameterSpec.Builder().setKeyIdentifier(keyIdentifier).build());
         byte[] result = mac.doFinal(shortMacMessage);
 

@@ -3,7 +3,6 @@ package org.bouncycastle.cert.test;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.pkcs.Attribute;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -33,6 +32,8 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.bc.BcPKCS10CertificationRequest;
 import org.bouncycastle.pkcs.bc.BcPKCS10CertificationRequestBuilder;
 import org.bouncycastle.util.Arrays;
+
+import junit.framework.TestCase;
 
 public class BcPKCS10Test
     extends TestCase

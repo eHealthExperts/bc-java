@@ -1,0 +1,89 @@
+diff --git a/tls/src/main/java/org/bouncycastle/jsse/provider/ProvDHConfigVerifier.java b/tls/src/main/java/org/bouncycastle/jsse/provider/ProvDHConfigVerifier.java
+index 650c110f5..f35cf6d49 100644
+--- a/tls/src/main/java/org/bouncycastle/jsse/provider/ProvDHConfigVerifier.java
++++ b/tls/src/main/java/org/bouncycastle/jsse/provider/ProvDHConfigVerifier.java
+@@ -1,6 +1,18 @@
+ package org.bouncycastle.jsse.provider;
+ 
++import java.security.AlgorithmConstraints;
++import java.security.AlgorithmParameters;
++import java.security.CryptoPrimitive;
++import java.security.NoSuchAlgorithmException;
++import java.security.spec.InvalidParameterSpecException;
++import java.util.HashSet;
++import java.util.Set;
++
++import javax.crypto.spec.DHParameterSpec;
++
+ import org.bouncycastle.tls.DefaultTlsDHConfigVerifier;
++import org.bouncycastle.tls.TlsDHUtils;
++import org.bouncycastle.tls.crypto.DHGroup;
+ import org.bouncycastle.tls.crypto.TlsDHConfig;
+ 
+ class ProvDHConfigVerifier
+@@ -9,14 +21,35 @@
+     private static final int provMinimumPrimeBits = PropertyUtils.getIntegerSystemProperty("org.bouncycastle.jsse.client.dh.minimumPrimeBits", 2048, 1024, 16384);
+     private static final boolean provUnrestrictedGroups = PropertyUtils.getBooleanSystemProperty("org.bouncycastle.jsse.client.dh.unrestrictedGroups", false);
+ 
+-    ProvDHConfigVerifier()
+-    {
++    private final Object algorithmConstraints;
++
++    ProvDHConfigVerifier(final Object algorithmConstraints) {
+         super(provMinimumPrimeBits);
++        this.algorithmConstraints = algorithmConstraints;
+     }
+ 
+     @Override
+-    protected boolean checkGroup(TlsDHConfig dhConfig)
+-    {
++    protected boolean checkGroup(final TlsDHConfig dhConfig) {
++        if (this.algorithmConstraints instanceof AlgorithmConstraints) {
++
++            final Set<CryptoPrimitive> primitives = new HashSet<CryptoPrimitive>();
++            primitives.add(CryptoPrimitive.KEY_AGREEMENT);
++
++            final String algorithm = "DiffieHellman";
++            try {
++                final AlgorithmParameters parameters = AlgorithmParameters.getInstance(algorithm);
++                final DHGroup dhGroup = TlsDHUtils.getDHGroup(dhConfig);
++                parameters.init(new DHParameterSpec(dhGroup.getP(), dhGroup.getG(), dhGroup.getL()));
++
++                final AlgorithmConstraints constraints = (AlgorithmConstraints) this.algorithmConstraints;
++                return provUnrestrictedGroups || (super.checkGroup(dhConfig) && constraints.permits(primitives, algorithm, parameters));
++            } catch (final NoSuchAlgorithmException e) {
++                throw new SecurityException(e);
++            } catch (final InvalidParameterSpecException e) {
++                throw new SecurityException(e);
++            }
++        }
++
+         return provUnrestrictedGroups || super.checkGroup(dhConfig);
+     }
+ }
+diff --git a/tls/src/main/java/org/bouncycastle/jsse/provider/ProvSSLSessionContext.java b/tls/src/main/java/org/bouncycastle/jsse/provider/ProvSSLSessionContext.java
+index 9b9dd61de..db79da2da 100644
+--- a/tls/src/main/java/org/bouncycastle/jsse/provider/ProvSSLSessionContext.java
++++ b/tls/src/main/java/org/bouncycastle/jsse/provider/ProvSSLSessionContext.java
+@@ -234,7 +234,7 @@ private void removeSession(SessionEntry sessionEntry) {
+ 		boolean remove = mapRemove(sessionsByID, sessionEntry.getSessionID(), sessionEntry);
+ 
+ 		remove |= removeSessionByPeer(sessionEntry);
+-		if (remove) {
++		if (remove && sessionEntry.get() != null) {
+ 			sessionEntry.get().invalidate();
+ 		}
+ 	}
+diff --git a/tls/src/main/java/org/bouncycastle/jsse/provider/ProvTlsClient.java b/tls/src/main/java/org/bouncycastle/jsse/provider/ProvTlsClient.java
+index 0ab4d680c..378dd09c2 100644
+--- a/tls/src/main/java/org/bouncycastle/jsse/provider/ProvTlsClient.java
++++ b/tls/src/main/java/org/bouncycastle/jsse/provider/ProvTlsClient.java
+@@ -61,7 +61,7 @@
+ 
+     ProvTlsClient(ProvTlsManager manager, ProvSSLParameters sslParameters)
+     {
+-        super(manager.getContextData().getCrypto(), new DefaultTlsKeyExchangeFactory(), new ProvDHConfigVerifier());
++        super(manager.getContextData().getCrypto(), new DefaultTlsKeyExchangeFactory(), new ProvDHConfigVerifier(sslParameters.getAlgorithmConstraints()));
+ 
+         this.manager = manager;
+         this.sslParameters = sslParameters;

@@ -8,7 +8,6 @@ import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 
@@ -22,6 +21,7 @@ import org.bouncycastle.util.Pack;
 
 public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
 {
+    private static final int BUF_SIZE = 32 * 1024;
     private static final byte[] ZEROES = new byte[15];
 
     protected final Cipher cipher;
@@ -57,7 +57,18 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
                 byte[] tmp = new byte[64 + ciphertextLength];
                 System.arraycopy(input, inputOffset, tmp, 64, ciphertextLength);
 
-                if (tmp.length != cipher.doFinal(tmp, 0, tmp.length, tmp, 0))
+                // to avoid performance issue in FIPS jar  1.0.0-1.0.2
+                int tmpOff = 0;
+                while (tmpOff < tmp.length - BUF_SIZE)
+                {
+                    tmpOff += cipher.update(tmp, tmpOff, BUF_SIZE, tmp, tmpOff);
+                }
+
+                int len = cipher.update(tmp, tmpOff, tmp.length - tmpOff, tmp, tmpOff);
+                        
+                len += cipher.doFinal(tmp, len);
+
+                if (tmp.length != tmpOff + len)
                 {
                     throw new IllegalStateException();
                 }
@@ -84,7 +95,18 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
                 byte[] tmp = new byte[64 + ciphertextLength];
                 System.arraycopy(input, inputOffset, tmp, 64, ciphertextLength);
 
-                if (tmp.length != cipher.doFinal(tmp, 0, tmp.length, tmp, 0))
+                // to avoid performance issue in FIPS jar  1.0.0-1.0.2
+                int tmpOff = 0;
+                while (tmpOff < tmp.length - BUF_SIZE)
+                {
+                    tmpOff += cipher.update(tmp, tmpOff, BUF_SIZE, tmp, tmpOff);
+                }
+
+                int len = cipher.update(tmp, tmpOff, tmp.length - tmpOff, tmp, tmpOff);
+
+                len += cipher.doFinal(tmp, len);
+
+                if (tmp.length != tmpOff + len)
                 {
                     throw new IllegalStateException();
                 }
@@ -148,7 +170,7 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
 
     protected void initMAC(byte[] firstBlock) throws InvalidKeyException
     {
-        mac.init(new SecretKeySpec(firstBlock, 0, 32, "Poly1305"));
+        mac.init(new DestroyableSecretKeySpec(firstBlock, 0, 32, "Poly1305"));
 
         for (int i = 0; i < 64; ++i)
         {

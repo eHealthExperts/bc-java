@@ -11,6 +11,7 @@ import java.security.spec.AlgorithmParameterSpec;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.Digest;
+import org.bouncycastle.crypto.digests.NullDigest;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.digests.SHAKEDigest;
@@ -150,6 +151,11 @@ public class XMSSSignatureSpi
         throw new UnsupportedOperationException("engineSetParameter unsupported");
     }
 
+    public boolean isSigningCapable()
+    {
+        return treeDigest != null && signer.getUsagesRemaining() != 0;
+    }
+
     public PrivateKey getUpdatedPrivateKey()
     {
         if (treeDigest == null)
@@ -168,7 +174,7 @@ public class XMSSSignatureSpi
     {
         public withSha256()
         {
-            super("SHA256withXMSS", new SHA256Digest(), new XMSSSigner());
+            super("XMSS-SHA256", new NullDigest(), new XMSSSigner());
         }
     }
 
@@ -177,7 +183,7 @@ public class XMSSSignatureSpi
     {
         public withShake128()
         {
-            super("SHAKE128withXMSSMT", new SHAKEDigest(128), new XMSSSigner());
+            super("XMSS-SHAKE128", new NullDigest(), new XMSSSigner());
         }
     }
 
@@ -186,7 +192,7 @@ public class XMSSSignatureSpi
     {
         public withSha512()
         {
-            super("SHA512withXMSS", new SHA512Digest(), new XMSSSigner());
+            super("XMSS-SHA512", new NullDigest(), new XMSSSigner());
         }
     }
 
@@ -195,7 +201,43 @@ public class XMSSSignatureSpi
     {
         public withShake256()
         {
-            super("SHAKE256withXMSS", new SHAKEDigest(256), new XMSSSigner());
+            super("XMSS-SHAKE256", new NullDigest(), new XMSSSigner());
+        }
+    }
+
+    static public class withSha256andPrehash
+        extends XMSSSignatureSpi
+    {
+        public withSha256andPrehash()
+        {
+            super("SHA256withXMSS-SHA256", new SHA256Digest(), new XMSSSigner());
+        }
+    }
+
+    static public class withShake128andPrehash
+        extends XMSSSignatureSpi
+    {
+        public withShake128andPrehash()
+        {
+            super("SHAKE128withXMSSMT-SHAKE128", new SHAKEDigest(128), new XMSSSigner());
+        }
+    }
+
+    static public class withSha512andPrehash
+        extends XMSSSignatureSpi
+    {
+        public withSha512andPrehash()
+        {
+            super("SHA512withXMSS-SHA512", new SHA512Digest(), new XMSSSigner());
+        }
+    }
+
+    static public class withShake256andPrehash
+        extends XMSSSignatureSpi
+    {
+        public withShake256andPrehash()
+        {
+            super("SHAKE256withXMSS-SHAKE256", new SHAKEDigest(256), new XMSSSigner());
         }
     }
 }

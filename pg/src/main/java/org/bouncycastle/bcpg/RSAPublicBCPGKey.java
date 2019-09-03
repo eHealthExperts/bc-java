@@ -1,7 +1,7 @@
 package org.bouncycastle.bcpg;
 
+import java.io.IOException;
 import java.math.BigInteger;
-import java.io.*;
 
 /**
  * base class for an RSA Public Key.

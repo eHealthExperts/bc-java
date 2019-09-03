@@ -40,8 +40,10 @@ public class FixedPointCombMultiplier extends AbstractECMultiplier
 
             for (int j = top - i; j >= 0; j -= d)
             {
+                int secretBit = K[j >>> 5] >>> (j & 0x1F);
+                secretIndex ^= secretBit >>> 1;
                 secretIndex <<= 1;
-                secretIndex |= Nat.getBit(K, j);
+                secretIndex ^= secretBit;
             }
 
             ECPoint add = lookupTable.lookup(secretIndex);
@@ -50,11 +52,5 @@ public class FixedPointCombMultiplier extends AbstractECMultiplier
         }
 
         return R.add(info.getOffset());
-    }
-
-    /** @deprecated Is no longer used; remove any overrides in subclasses. */
-    protected int getWidthForCombSize(int combSize)
-    {
-        return combSize > 257 ? 6 : 5;
     }
 }

@@ -10,9 +10,9 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.bcpg.S2K;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.util.DefaultJcaJceHelper;
 import org.bouncycastle.jcajce.util.NamedJcaJceHelper;
 import org.bouncycastle.jcajce.util.ProviderJcaJceHelper;
@@ -117,7 +117,7 @@ public class JcePBEKeyEncryptionMethodGenerator
         {
             String cName = PGPUtil.getSymmetricCipherName(encAlgorithm);
             Cipher c = helper.createCipher(cName + "/CFB/NoPadding");
-            SecretKey sKey = new SecretKeySpec(key, PGPUtil.getSymmetricCipherName(encAlgorithm));
+            SecretKey sKey = new DestroyableSecretKeySpec(key, PGPUtil.getSymmetricCipherName(encAlgorithm));
 
             c.init(Cipher.ENCRYPT_MODE, sKey, new IvParameterSpec(new byte[c.getBlockSize()]));
 

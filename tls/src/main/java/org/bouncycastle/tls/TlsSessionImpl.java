@@ -21,7 +21,9 @@ class TlsSessionImpl implements TlsSession
 
         this.sessionID = Arrays.clone(sessionID);
         this.sessionParameters = sessionParameters;
-        this.resumable = sessionID.length > 0;
+        this.resumable = sessionID.length > 0
+            && null != sessionParameters
+            && sessionParameters.isExtendedMasterSecret();
     }
 
     public synchronized SessionParameters exportSessionParameters()
@@ -45,6 +47,10 @@ class TlsSessionImpl implements TlsSession
 
     public synchronized boolean isResumable()
     {
+    	if(resumable && sessionParameters.getMasterSecret().isDestroy()) {
+    		resumable = false;
+    	}
+    	
         return resumable;
     }
 }

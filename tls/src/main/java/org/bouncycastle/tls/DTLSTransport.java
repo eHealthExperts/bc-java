@@ -1,6 +1,7 @@
 package org.bouncycastle.tls;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 
 public class DTLSTransport
     implements DatagramTransport
@@ -27,6 +28,23 @@ public class DTLSTransport
     public int receive(byte[] buf, int off, int len, int waitMillis)
         throws IOException
     {
+        if (null == buf)
+        {
+            throw new NullPointerException("'buf' cannot be null");
+        }
+        if (off < 0 || off >= buf.length)
+        {
+            throw new IllegalArgumentException("'off' is an invalid offset: " + off);
+        }
+        if (len < 0 || len > buf.length - off)
+        {
+            throw new IllegalArgumentException("'len' is an invalid length: " + len);
+        }
+        if (waitMillis < 0)
+        {
+            throw new IllegalArgumentException("'waitMillis' cannot be negative");
+        }
+
         try
         {
             return recordLayer.receive(buf, off, len, waitMillis);
@@ -35,6 +53,10 @@ public class DTLSTransport
         {
             recordLayer.fail(fatalAlert.getAlertDescription());
             throw fatalAlert;
+        }
+        catch (InterruptedIOException e)
+        {
+            throw e;
         }
         catch (IOException e)
         {
@@ -51,6 +73,19 @@ public class DTLSTransport
     public void send(byte[] buf, int off, int len)
         throws IOException
     {
+        if (null == buf)
+        {
+            throw new NullPointerException("'buf' cannot be null");
+        }
+        if (off < 0 || off >= buf.length)
+        {
+            throw new IllegalArgumentException("'off' is an invalid offset: " + off);
+        }
+        if (len < 0 || len > buf.length - off)
+        {
+            throw new IllegalArgumentException("'len' is an invalid length: " + len);
+        }
+
         try
         {
             recordLayer.send(buf, off, len);
@@ -59,6 +94,10 @@ public class DTLSTransport
         {
             recordLayer.fail(fatalAlert.getAlertDescription());
             throw fatalAlert;
+        }
+        catch (InterruptedIOException e)
+        {
+            throw e;
         }
         catch (IOException e)
         {

@@ -2,11 +2,12 @@ package org.bouncycastle.pqc.jcajce.provider.test;
 
 import java.security.Security;
 
+import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
+
 import junit.extensions.TestSetup;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
 
 /**
  * Full test suite for the BCPQC provider.
@@ -42,6 +43,7 @@ public class AllTests
         suite.addTestSuite(Sphincs256KeyPairGeneratorTest.class);
         suite.addTestSuite(XMSSTest.class);
         suite.addTestSuite(XMSSMTTest.class);
+        suite.addTestSuite(QTESLATest.class);
 
         return new BCTestSetup(suite);
     }

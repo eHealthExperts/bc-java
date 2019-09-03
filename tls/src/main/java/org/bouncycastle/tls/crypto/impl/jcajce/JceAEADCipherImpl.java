@@ -1,21 +1,19 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
-import java.lang.reflect.Constructor;
 import java.security.AccessController;
+import java.security.AlgorithmParameters;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
-import java.security.spec.AlgorithmParameterSpec;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.Destroyable;
 
+import org.bouncycastle.asn1.cms.GCMParameters;
 import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.spec.AEADParameterSpec;
+import org.bouncycastle.jcajce.util.JcaJceHelper;
 import org.bouncycastle.tls.crypto.impl.TlsAEADCipherImpl;
 
 /**
@@ -24,93 +22,101 @@ import org.bouncycastle.tls.crypto.impl.TlsAEADCipherImpl;
 public class JceAEADCipherImpl
     implements TlsAEADCipherImpl
 {
-    private static Logger LOG = Logger.getLogger(JceAEADCipherImpl.class.getName());
-    
-    private static Constructor<AlgorithmParameterSpec> initSpecConstructor()
+    private static final int BUF_SIZE = 32 * 1024;
+
+    private static boolean checkForAEAD()
+    {
+        return (Boolean)AccessController.doPrivileged(new PrivilegedAction()
+        {
+            public Object run()
+            {
+                try
+                {
+                    return Cipher.class.getMethod("updateAAD", byte[].class) != null;
+                }
+                catch (Exception ignore)
+                {
+                    // TODO[logging] Log the fact that we are falling back to BC-specific class
+                    return Boolean.FALSE;
+                }
+            }
+        });
+    }
+
+    private static final boolean canDoAEAD = checkForAEAD();
+
+    private static String getAlgParamsName(JcaJceHelper helper, String cipherName)
     {
         try
         {
-            Class<AlgorithmParameterSpec> clazz = AccessController.doPrivileged(new PrivilegedAction<Class<AlgorithmParameterSpec>>()
-            {
-                public Class<AlgorithmParameterSpec> run()
-                {
-                    try
-                    {
-                        return (Class<AlgorithmParameterSpec>)
-                            Class.forName("javax.crypto.spec.GCMParameterSpec", true, IvParameterSpec.class.getClassLoader());
-                    }
-                    catch (Exception e)
-                    {
-                        return null;
-                    }
-                }
-            });
-            return clazz.getConstructor(int.class, byte[].class);
+            String algName = cipherName.contains("CCM") ? "CCM" : "GCM";
+            helper.createAlgorithmParameters(algName);
+            return algName;
         }
-        catch (Exception ignore)
+        catch (Exception e)
         {
-            // TODO[logging] Log the fact that we are falling back to BC-specific class
             return null;
         }
     }
 
-    private static final Constructor<AlgorithmParameterSpec> specConstructor = initSpecConstructor();
-
+    private final JcaJceHelper helper;
     private final int cipherMode;
     private final Cipher cipher;
     private final String algorithm;
+    private final int keySize;
+    private final String algorithmParamsName;
 
     private SecretKey key;
 
-    public JceAEADCipherImpl(Cipher cipher, String algorithm, boolean isEncrypting)
+    public JceAEADCipherImpl(JcaJceHelper helper, String cipherName, String algorithm, int keySize, boolean isEncrypting)
         throws GeneralSecurityException
     {
-        this.cipher = cipher;
+        this.helper = helper;
+        this.cipher = helper.createCipher(cipherName);
         this.algorithm = algorithm;
+        this.keySize = keySize;
         this.cipherMode = (isEncrypting) ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE;
+        this.algorithmParamsName = getAlgParamsName(helper, cipherName);
     }
 
     public void setKey(byte[] key, int keyOff, int keyLen)
     {
-        this.key = new DestroyableSecretKeySpec(key, keyOff, keyLen, algorithm);
+        if (keySize != keyLen)
+        {
+            throw new IllegalStateException();
+        }
+
+		this.key = new DestroyableSecretKeySpec(key, keyOff, keyLen, algorithm);
     }
 
     public void init(byte[] nonce, int macSize, byte[] additionalData)
     {
-
         try
         {
-            // Try to use GCMParameterSpec (introduced in JDK 7)
-            if (specConstructor != null)
+            if (canDoAEAD && algorithmParamsName != null)
             {
-                try
+                AlgorithmParameters algParams = helper.createAlgorithmParameters(algorithmParamsName);
+
+                // fortunately CCM and GCM parameters have the same ASN.1 structure
+                algParams.init(new GCMParameters(nonce, macSize).getEncoded());
+
+                cipher.init(cipherMode, key, algParams);
+
+                if (additionalData != null && additionalData.length > 0)
                 {
-                    AlgorithmParameterSpec spec = specConstructor.newInstance(macSize * 8, nonce);
-                    cipher.init(cipherMode, key, spec);
-                    if (additionalData != null && additionalData.length > 0)
-                    {
-                        cipher.updateAAD(additionalData);
-                    }
-                    return;
-                }
-                catch (GeneralSecurityException e)
-                {
-                    // no point in falling back if it's one of these
-                    throw e;
-                }
-                catch (Exception e)
-                {
-                    // we don't have the spec class, ignore.
+                    cipher.updateAAD(additionalData);
                 }
             }
-
-            // Otherwise fall back to the BC-specific AEADParameterSpec
-            cipher.init(cipherMode, key, new AEADParameterSpec(nonce, macSize * 8, additionalData));
+            else
+            {
+                // Otherwise fall back to the BC-specific AEADParameterSpec
+                cipher.init(cipherMode, key, new AEADParameterSpec(nonce, macSize * 8, additionalData));
+            }
         }
-        catch (GeneralSecurityException e)
+        catch (Exception e)
         {
-            throw new IllegalStateException(e);
-        } 
+            throw Exceptions.illegalStateException(e.getMessage(), e);
+        }
     }
 
     public int getOutputSize(int inputLength)
@@ -122,11 +128,24 @@ public class JceAEADCipherImpl
     {
         try
         {
-            return cipher.doFinal(input, inputOffset, inputLength, output, outputOffset);
+            // to avoid performance issue in FIPS jar  1.0.0-1.0.2
+            int totLen = 0;
+            while (inputLength > BUF_SIZE)
+            {
+                totLen += cipher.update(input, inputOffset, BUF_SIZE, output, outputOffset + totLen);
+
+                inputOffset += BUF_SIZE;
+                inputLength -= BUF_SIZE;
+            }
+
+            totLen += cipher.update(input, inputOffset, inputLength, output, outputOffset + totLen);
+            totLen += cipher.doFinal(output, outputOffset + totLen);
+
+            return totLen;
         }
         catch (GeneralSecurityException e)
         {
-            throw new IllegalStateException(e);
+            throw Exceptions.illegalStateException("", e);
         }
     }
     

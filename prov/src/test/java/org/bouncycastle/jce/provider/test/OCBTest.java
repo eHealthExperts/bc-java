@@ -6,8 +6,8 @@ import java.security.Security;
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
@@ -63,7 +63,7 @@ public class OCBTest
         Key key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, cipher);
+        key = new DestroyableSecretKeySpec(K, cipher);
 
         in = Cipher.getInstance(cipher + "/OCB/NoPadding", "BC");
         out = Cipher.getInstance(cipher + "/OCB/NoPadding", "BC");

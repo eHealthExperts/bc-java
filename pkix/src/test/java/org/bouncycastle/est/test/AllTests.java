@@ -2,10 +2,11 @@ package org.bouncycastle.est.test;
 
 import java.security.Security;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 public class AllTests
     extends TestCase
@@ -35,6 +36,7 @@ public class AllTests
 
         suite.addTestSuite(ESTParsingTest.class);
         suite.addTestSuite(HostNameAuthorizerMatchTest.class);
+        suite.addTestSuite(TestHostNameAuthorizer.class);
 
         return new ESTTestSetup(suite);
     }

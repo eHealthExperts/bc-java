@@ -5,8 +5,9 @@ import java.security.Security;
 import java.util.Arrays;
 import java.util.Random;
 
-import junit.framework.TestCase;
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
+
+import junit.framework.TestCase;
 
 public abstract class FlexiTest
     extends TestCase

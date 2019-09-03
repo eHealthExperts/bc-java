@@ -4,8 +4,8 @@ import java.security.Provider;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.util.DefaultJcaJceHelper;
 import org.bouncycastle.jcajce.util.NamedJcaJceHelper;
 import org.bouncycastle.jcajce.util.ProviderJcaJceHelper;
@@ -80,7 +80,7 @@ public class JcePBEDataDecryptorFactoryBuilder
                          String cipherName = PGPUtil.getSymmetricCipherName(keyAlgorithm);
                          Cipher keyCipher = helper.createCipher(cipherName + "/CFB/NoPadding");
 
-                         keyCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, cipherName), new IvParameterSpec(new byte[keyCipher.getBlockSize()]));
+                         keyCipher.init(Cipher.DECRYPT_MODE, new DestroyableSecretKeySpec(key, cipherName), new IvParameterSpec(new byte[keyCipher.getBlockSize()]));
 
                          return keyCipher.doFinal(secKeyData);
                      }

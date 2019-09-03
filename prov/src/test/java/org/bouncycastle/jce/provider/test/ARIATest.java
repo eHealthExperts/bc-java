@@ -12,10 +12,10 @@ import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.nsri.NSRIObjectIdentifiers;
 import org.bouncycastle.crypto.prng.FixedSecureRandom;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 
@@ -60,7 +60,7 @@ public class ARIATest
         ByteArrayInputStream    bIn;
         ByteArrayOutputStream   bOut;
 
-        key = new SecretKeySpec(keyBytes, "ARIA");
+        key = new DestroyableSecretKeySpec(keyBytes, "ARIA");
 
         in = Cipher.getInstance("ARIA/ECB/NoPadding", "BC");
         out = Cipher.getInstance("ARIA/ECB/NoPadding", "BC");
@@ -154,7 +154,7 @@ public class ARIATest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "ARIA");
+        key = new DestroyableSecretKeySpec(K, "ARIA");
 
         in = Cipher.getInstance("ARIA/EAX/NoPadding", "BC");
         out = Cipher.getInstance("ARIA/EAX/NoPadding", "BC");
@@ -198,7 +198,7 @@ public class ARIATest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "ARIA");
+        key = new DestroyableSecretKeySpec(K, "ARIA");
 
         in = Cipher.getInstance("ARIA/CCM/NoPadding", "BC");
         out = Cipher.getInstance("ARIA/CCM/NoPadding", "BC");
@@ -252,7 +252,7 @@ public class ARIATest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "ARIA");
+        key = new DestroyableSecretKeySpec(K, "ARIA");
 
         in = Cipher.getInstance("ARIA/GCM/NoPadding", "BC");
         out = Cipher.getInstance("ARIA/GCM/NoPadding", "BC");
@@ -300,7 +300,7 @@ public class ARIATest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "ARIA");
+        key = new DestroyableSecretKeySpec(K, "ARIA");
 
         in = Cipher.getInstance("ARIA/OCB/NoPadding", "BC");
         out = Cipher.getInstance("ARIA/OCB/NoPadding", "BC");

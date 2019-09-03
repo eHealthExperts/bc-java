@@ -24,7 +24,7 @@ public class ExtensionType
     public static final int server_authz = 8;
 
     /*
-     * RFC RFC6091
+     * RFC 6091
      */
     public static final int cert_type = 9;
 
@@ -105,9 +105,28 @@ public class ExtensionType
     public static final int cached_info = 25;
 
     /*
+     * RFC 8449
+     */
+    public static final int record_size_limit = 28;
+
+    /*
      * RFC 5077 7.
      */
     public static final int session_ticket = 35;
+
+    /*
+     * RFC 8446
+     */
+    public static final int pre_shared_key = 41;
+    public static final int early_data = 42;
+    public static final int supported_versions = 43;
+    public static final int cookie = 44;
+    public static final int psk_key_exchange_modes = 45;
+    public static final int certificate_authorities = 47;
+    public static final int oid_filters = 48;
+    public static final int post_handshake_auth = 49;
+    public static final int signature_algorithms_cert = 50;
+    public static final int key_share = 51;
 
     /*
      * RFC 5746 3.2.

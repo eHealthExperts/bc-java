@@ -3,7 +3,6 @@ package org.bouncycastle.cert.test;
 import java.math.BigInteger;
 import java.util.Date;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.DERSequence;
@@ -25,6 +24,8 @@ import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 import org.bouncycastle.util.encoders.Base64;
+
+import junit.framework.TestCase;
 
 public class BcAttrCertSelectorTest
     extends TestCase

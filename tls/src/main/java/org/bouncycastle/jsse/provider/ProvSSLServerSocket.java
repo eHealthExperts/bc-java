@@ -61,10 +61,11 @@ class ProvSSLServerSocket
     @Override
     public synchronized Socket accept() throws IOException
     {
-        ProvSSLSocketDirect socket = new ProvSSLSocketDirect(context, contextData, enableSessionCreation,
+        ProvSSLSocketDirect socket = SSLSocketUtil.create(context, contextData, enableSessionCreation,
             useClientMode, sslParameters.copy());
 
         implAccept(socket);
+        socket.notifyConnected();
 
         return socket;
     }
@@ -138,22 +139,12 @@ class ProvSSLServerSocket
     @Override
     public synchronized void setEnabledCipherSuites(String[] suites)
     {
-        if (!context.isSupportedCipherSuites(suites))
-        {
-            throw new IllegalArgumentException("'suites' cannot be null, or contain unsupported cipher suites");
-        }
-
         sslParameters.setCipherSuites(suites);
     }
 
     @Override
     public synchronized void setEnabledProtocols(String[] protocols)
     {
-        if (!context.isSupportedProtocols(protocols))
-        {
-            throw new IllegalArgumentException("'protocols' cannot be null, or contain unsupported protocols");
-        }
-
         sslParameters.setProtocols(protocols);
     }
 
@@ -170,11 +161,14 @@ class ProvSSLServerSocket
     }
 
     @Override
-    public synchronized void setUseClientMode(boolean mode)
+    public synchronized void setUseClientMode(boolean useClientMode)
     {
-        this.useClientMode = mode;
+        if (this.useClientMode != useClientMode)
+        {
+            context.updateDefaultProtocols(sslParameters, !useClientMode);
 
-        context.updateDefaultProtocols(sslParameters, !useClientMode);
+            this.useClientMode = useClientMode;
+        }
     }
 
     @Override

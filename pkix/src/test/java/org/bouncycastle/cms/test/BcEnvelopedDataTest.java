@@ -19,9 +19,6 @@ import java.util.Iterator;
 
 import javax.crypto.SecretKey;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DEROctetString;
@@ -66,6 +63,10 @@ import org.bouncycastle.operator.bc.BcSymmetricKeyUnwrapper;
 import org.bouncycastle.operator.bc.BcSymmetricKeyWrapper;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
+
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 public class BcEnvelopedDataTest
     extends TestCase

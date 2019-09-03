@@ -20,6 +20,13 @@ w
 q
 %
 
+ed org/bouncycastle/asn1/BEROctetString.java <<%
+g/private final ASN1OctetString/s/final//
+g/private final int/s/final//
+w
+q
+%
+
 ed org/bouncycastle/asn1/DERIA5String.java <<%
 g/private final byte.. *string;/s/final//
 w
@@ -40,6 +47,12 @@ q
 
 ed org/bouncycastle/asn1/DERT61String.java <<%
 g/private final byte.. *string;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/asn1/crmf/DhSigStatic.java <<%
+g/private final /s/final//
 w
 q
 %
@@ -69,6 +82,30 @@ q
 ed org/bouncycastle/asn1/x500/style/RFC4519Style.java <<%
 g/protected final .*defaultLookUp;/s/final//
 g/protected final .*defaultSymbols;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/agreement/kdf/GSKKDFParameters.java <<%
+g/private final /s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/signers/Ed448Signer.java <<%
+g/private final/s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/signers/Ed25519ctxSigner.java <<%
+g/private final/s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/signers/SM2Signer.java <<%
+g/private final/s/final//
 w
 q
 %
@@ -251,6 +288,12 @@ w
 q
 %
 
+ed org/bouncycastle/asn1/bc/LinkedCertificate.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
 ed org/bouncycastle/crypto/modes/G3413CFBBlockCipher.java <<%
 g/private.*final.*;/s/final//
 w
@@ -270,6 +313,60 @@ q
 %
 
 ed org/bouncycastle/jcajce/spec/DHUParameterSpec.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/jcajce/spec/DHDomainParameterSpec.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/jcajce/spec/GOST3410ParameterSpec.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/params/ECGOST3410Parameters.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/jcajce/provider/asymmetric/dh/KeyAgreementSpi.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/util/JournalingSecureRandom.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/util/Fingerprint.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/openpgp/operator/jcajce/JcaPGPContentSignerBuilder.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/openpgp/operator/jcajce/JcaKeyFingerprintCalculator.java <<%
+g/private.*final.*;/s/final//
+w
+q
+%
+
+ed org/bouncycastle/jcajce/provider/asymmetric/x509/PEMUtil <<%
 g/private.*final.*;/s/final//
 w
 q

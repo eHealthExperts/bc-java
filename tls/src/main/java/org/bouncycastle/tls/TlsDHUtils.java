@@ -8,25 +8,20 @@ import java.math.BigInteger;
 import org.bouncycastle.tls.crypto.DHGroup;
 import org.bouncycastle.tls.crypto.DHStandardGroups;
 import org.bouncycastle.tls.crypto.TlsDHConfig;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.BigIntegers;
 
 public class TlsDHUtils
 {
-    public static boolean containsDHECipherSuites(int[] cipherSuites)
+    public static TlsDHConfig createNamedDHConfig(TlsContext context, int namedGroup)
     {
-        for (int i = 0; i < cipherSuites.length; ++i)
+        if (namedGroup < 0 || NamedGroup.getFiniteFieldBits(namedGroup) < 1)
         {
-            if (isDHECipherSuite(cipherSuites[i]))
-            {
-                return true;
-            }
+            return null;
         }
-        return false;
-    }
 
-    public static TlsDHConfig createNamedDHConfig(int namedGroup)
-    {
-        return NamedGroup.getFiniteFieldBits(namedGroup) > 0 ? new TlsDHConfig(namedGroup) : null;
+        boolean padded = TlsUtils.isTLSv13(context);
+        return new TlsDHConfig(namedGroup, padded);
     }
 
     public static DHGroup getDHGroup(TlsDHConfig dhConfig)
@@ -63,21 +58,22 @@ public class TlsDHUtils
     {
         /*
          * NOTE: An equivalent mechanism was added to support a minimum bit-size requirement for ECC
-         * mooted in draft-ietf-tls-ecdhe-psk-aead-00. This requirement was removed in later drafts,
-         * so that mechanism is currently somewhat trivial, and this similarly so.
+         * mooted in early drafts of RFC 8442. This requirement was removed in later drafts, so that
+         * mechanism is currently somewhat trivial, and this similarly so.
          */
-        return isDHECipherSuite(cipherSuite) ? 1 : 0;
+        return isDHCipherSuite(cipherSuite) ? 1 : 0;
     }
 
-    public static boolean isDHECipherSuite(int cipherSuite)
+    public static boolean isDHCipherSuite(int cipherSuite)
     {
         switch (TlsUtils.getKeyExchangeAlgorithm(cipherSuite))
         {
+        case KeyExchangeAlgorithm.DH_anon:
+        case KeyExchangeAlgorithm.DH_DSS:
+        case KeyExchangeAlgorithm.DH_RSA:
         case KeyExchangeAlgorithm.DHE_DSS:
-        case KeyExchangeAlgorithm.DHE_DSS_EXPORT:
         case KeyExchangeAlgorithm.DHE_PSK:
         case KeyExchangeAlgorithm.DHE_RSA:
-        case KeyExchangeAlgorithm.DHE_RSA_EXPORT:
             return true;
 
         default:
@@ -103,33 +99,35 @@ public class TlsDHUtils
         return -1;
     }
 
-    public static TlsDHConfig readDHConfig(InputStream input) throws IOException
+    public static TlsDHConfig receiveDHConfig(TlsContext context, TlsDHGroupVerifier dhGroupVerifier,
+        InputStream input) throws IOException
     {
         BigInteger p = readDHParameter(input);
         BigInteger g = readDHParameter(input);
 
         int namedGroup = getNamedGroupForDHParameters(p, g);
-        if (namedGroup >= 0)
+        if (namedGroup < 0)
         {
-            return new TlsDHConfig(namedGroup);
+            DHGroup dhGroup = new DHGroup(p, null, g, 0);
+            if (!dhGroupVerifier.accept(dhGroup))
+            {
+                throw new TlsFatalAlert(AlertDescription.insufficient_security);
+            }
+            return new TlsDHConfig(dhGroup);
         }
 
-        return new TlsDHConfig(new DHGroup(p, null, g, 0));
-    }
-
-    public static TlsDHConfig receiveDHConfig(TlsDHConfigVerifier dhConfigVerifier, InputStream input) throws IOException
-    {
-        TlsDHConfig dhConfig = readDHConfig(input);
-        if (!dhConfigVerifier.accept(dhConfig))
+        int[] clientSupportedGroups = context.getSecurityParametersHandshake().getClientSupportedGroups();
+        if (null == clientSupportedGroups || Arrays.contains(clientSupportedGroups, namedGroup))
         {
-            throw new TlsFatalAlert(AlertDescription.insufficient_security);
+            return new TlsDHConfig(namedGroup, false);
         }
-        return dhConfig;
+
+        throw new TlsFatalAlert(AlertDescription.illegal_parameter);
     }
 
     public static BigInteger readDHParameter(InputStream input) throws IOException
     {
-        return new BigInteger(1, TlsUtils.readOpaque16(input));
+        return new BigInteger(1, TlsUtils.readOpaque16(input, 1));
     }
 
     public static void writeDHConfig(TlsDHConfig dhConfig, OutputStream output)

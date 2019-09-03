@@ -28,7 +28,9 @@ import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.security.spec.DSAParameterSpec;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.PSSParameterSpec;
 import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Collection;
@@ -67,6 +69,8 @@ import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.IssuingDistributionPoint;
 import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x9.ECNamedCurveTable;
+import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.asn1.x9.X9ObjectIdentifiers;
 import org.bouncycastle.cert.X509AttributeCertificateHolder;
 import org.bouncycastle.cert.X509CRLEntryHolder;
@@ -106,6 +110,7 @@ import org.bouncycastle.operator.bc.BcRSAContentVerifierProviderBuilder;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
+import org.bouncycastle.pqc.jcajce.spec.QTESLAParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.SPHINCS256KeyGenParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.XMSSMTParameterSpec;
 import org.bouncycastle.pqc.jcajce.spec.XMSSParameterSpec;
@@ -1325,7 +1330,8 @@ public class CertTest
             Certificate cert = fact.generateCertificate(bIn);
 
             PublicKey k = cert.getPublicKey();
-            // System.out.println(cert);
+//            System.out.println("****** " + id + " ******");
+//            System.out.println(cert);
         }
         catch (Exception e)
         {
@@ -1538,6 +1544,8 @@ public class CertTest
         ContentSigner sigGen = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider(BC).build(privKey);
         X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(builder.build(), BigInteger.valueOf(1), new Date(System.currentTimeMillis() - 50000), new Date(System.currentTimeMillis() + 50000), builder.build(), pubKey);
 
+        isTrue(!certGen.hasExtension(Extension.authorityKeyIdentifier));
+        
         X509Certificate cert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
 
         cert.checkValidity(new Date());
@@ -1578,6 +1586,15 @@ public class CertTest
                     }));
 
         X509CertificateHolder certHolder = certGen.build(sigGen);
+
+        isEquals(new Extension(new ASN1ObjectIdentifier("2.5.29.15"), true,
+                        new X509KeyUsage(X509KeyUsage.encipherOnly).getEncoded()), certGen.getExtension(new ASN1ObjectIdentifier("2.5.29.15")));
+
+        certGen.replaceExtension(new Extension(new ASN1ObjectIdentifier("2.5.29.15"), true,
+                                new X509KeyUsage(X509KeyUsage.digitalSignature).getEncoded()));
+        
+        isEquals(new Extension(new ASN1ObjectIdentifier("2.5.29.15"), true,
+                        new X509KeyUsage(X509KeyUsage.digitalSignature).getEncoded()), certGen.getExtension(new ASN1ObjectIdentifier("2.5.29.15")));
 
         cert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certHolder);
 
@@ -1805,7 +1822,7 @@ public class CertTest
     }
 
     /*
-     * we generate a self signed certificate for the sake of testing - DSA
+     * we generate a self signed certificate for the sake of testing - SM3withSM2
      */
     public void checkSm3WithSm2Creation()
         throws Exception
@@ -1908,16 +1925,9 @@ public class CertTest
      */
     public void checkCreation3()
     {
-        ECCurve curve = new ECCurve.Fp(
-            new BigInteger("883423532389192164791648750360308885314476597252960362792450860609699839"), // q
-            new BigInteger("7fffffffffffffffffffffff7fffffffffff8000000000007ffffffffffc", 16), // a
-            new BigInteger("6b016c3bdcf18941d0d654921475ca71a9db2fb27d1d37796185c2942c0a", 16)); // b
-
-        ECParameterSpec spec = new ECParameterSpec(
-            curve,
-            curve.decodePoint(Hex.decode("020ffa963cdca8816ccc33b8642bedf905c3d358573d3f27fbbd3b3cb9aaaf")), // G
-            new BigInteger("883423532389192164791648750360308884807550341691627752275345424702807307")); // n
-
+        X9ECParameters x9 = ECNamedCurveTable.getByName("prime239v1");
+        ECCurve curve = x9.getCurve();
+        ECParameterSpec spec = new ECParameterSpec(curve, x9.getG(), x9.getN(), x9.getH());
 
         ECPrivateKeySpec privKeySpec = new ECPrivateKeySpec(
             new BigInteger("876300101507107567501066130761671078357010671067781776716671676178726717"), // d
@@ -2039,15 +2049,9 @@ public class CertTest
     private void createECCert(String algorithm, ASN1ObjectIdentifier algOid)
         throws Exception
     {
-        ECCurve.Fp curve = new ECCurve.Fp(
-            new BigInteger("6864797660130609714981900799081393217269435300143305409394463459185543183397656052122559640661454554977296311391480858037121987999716643812574028291115057151"), // q (or p)
-            new BigInteger("01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC", 16),   // a
-            new BigInteger("0051953EB9618E1C9A1F929A21A0B68540EEA2DA725B99B315F3B8B489918EF109E156193951EC7E937B1652C0BD3BB1BF073573DF883D2C34F1EF451FD46B503F00", 16));  // b
-
-        ECParameterSpec spec = new ECParameterSpec(
-            curve,
-            curve.decodePoint(Hex.decode("0200C6858E06B70404E9CD9E3ECB662395B4429C648139053FB521F828AF606B4D3DBAA14B5E77EFE75928FE1DC127A2FFA8DE3348B3C1856A429BF97E7E31C2E5BD66")), // G
-            new BigInteger("01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA51868783BF2F966B7FCC0148F709A5D03BB5C9B8899C47AEBB6FB71E91386409", 16)); // n
+        X9ECParameters x9 = ECNamedCurveTable.getByName("secp521r1");
+        ECCurve curve = x9.getCurve();
+        ECParameterSpec spec = new ECParameterSpec(curve, x9.getG(), x9.getN(), x9.getH());
 
         ECPrivateKeySpec privKeySpec = new ECPrivateKeySpec(
             new BigInteger("5769183828869504557786041598510887460263120754767955773309066354712783118202294874205844512909370791582896372147797293913785865682804434049019366394746072023"), // d
@@ -2172,7 +2176,15 @@ public class CertTest
 
         crlGen.addExtension(Extension.authorityKeyIdentifier, false, extUtils.createAuthorityKeyIdentifier(pair.getPublic()));
 
+        isTrue(crlGen.hasExtension(Extension.authorityKeyIdentifier));
+
         X509CRLHolder crl = crlGen.build(new JcaContentSignerBuilder("SHA256withRSAEncryption").setProvider(BC).build(pair.getPrivate()));
+
+        Extension authOrig = crlGen.getExtension(Extension.authorityKeyIdentifier);
+
+        crlGen.removeExtension(Extension.authorityKeyIdentifier);
+        
+        isTrue(!crlGen.hasExtension(Extension.authorityKeyIdentifier));
 
         if (!crl.getIssuer().equals(new X500Name("CN=Test CA")))
         {
@@ -2184,6 +2196,11 @@ public class CertTest
         if (authExt == null)
         {
             fail("failed to find CRL extension");
+        }
+
+        if (!authExt.equals(authOrig))
+        {
+            fail("auth not matching original");
         }
 
         AuthorityKeyIdentifier authId = AuthorityKeyIdentifier.getInstance(authExt.getParsedValue());
@@ -2219,6 +2236,18 @@ public class CertTest
         else
         {
             fail("CRL entry reasonCode not found");
+        }
+
+        // build from template
+        crlGen = new X509v2CRLBuilder(crl);
+
+        crl = crlGen.build(new JcaContentSignerBuilder("SHA256withRSAEncryption").setProvider(BC).build(pair.getPrivate()));
+
+        isTrue(crlGen.hasExtension(Extension.authorityKeyIdentifier));
+
+        if (!crl.getIssuer().equals(new X500Name("CN=Test CA")))
+        {
+            fail("failed CRL issuer test");
         }
     }
 
@@ -2259,6 +2288,8 @@ public class CertTest
         X509CRLHolder crlHolder = crlGen.build(new JcaContentSignerBuilder("SHA256withRSAEncryption").setProvider(BC).build(pair.getPrivate()));
 
         X509CRL crl = new JcaX509CRLConverter().setProvider(BC).getCRL(crlHolder);
+
+        crl.verify(pair.getPublic(), "BC");
 
         if (!crl.getIssuerX500Principal().equals(new X500Principal("CN=Test CA")))
         {
@@ -2461,6 +2492,8 @@ public class CertTest
 
         X509CRL readCrl = (X509CRL)cFact.generateCRL(new ByteArrayInputStream(crlHolder.getEncoded()));
 
+        readCrl.verify(pair.getPublic(), "BC");
+
         if (readCrl == null)
         {
             fail("crl not returned!");
@@ -2471,6 +2504,186 @@ public class CertTest
         if (col.size() != 1)
         {
             fail("wrong number of CRLs found in collection");
+        }
+    }
+
+    public void checkCRLCreation4()
+        throws Exception
+    {
+        KeyPairGenerator kpGen = KeyPairGenerator.getInstance("RSA", BC);
+
+        Date now = new Date();
+        KeyPair pair = kpGen.generateKeyPair();
+        X509v2CRLBuilder crlGen = new JcaX509v2CRLBuilder(new X500Principal("CN=Test CA"), now);
+
+        crlGen.setNextUpdate(new Date(now.getTime() + 100000));
+
+        Vector extOids = new Vector();
+        Vector extValues = new Vector();
+
+        CRLReason crlReason = CRLReason.lookup(CRLReason.privilegeWithdrawn);
+
+        try
+        {
+            extOids.addElement(Extension.reasonCode);
+            extValues.addElement(new Extension(Extension.reasonCode, false, new DEROctetString(crlReason.getEncoded())));
+        }
+        catch (IOException e)
+        {
+            throw new IllegalArgumentException("error encoding reason: " + e);
+        }
+
+        Extensions entryExtensions = generateExtensions(extOids, extValues);
+
+        crlGen.addCRLEntry(BigInteger.ONE, now, entryExtensions);
+
+        JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
+
+        crlGen.addExtension(Extension.authorityKeyIdentifier, false, extUtils.createAuthorityKeyIdentifier(pair.getPublic()));
+
+        X509CRLHolder crlHolder = crlGen.build(new JcaContentSignerBuilder("SHA256withRSAandMGF1").setProvider(BC).build(pair.getPrivate()));
+
+        X509CRL crl = new JcaX509CRLConverter().setProvider(BC).getCRL(crlHolder);
+
+        crl.verify(pair.getPublic(), "BC");
+
+        if (!crl.getIssuerX500Principal().equals(new X500Principal("CN=Test CA")))
+        {
+            fail("failed CRL issuer test");
+        }
+
+        byte[] authExt = crl.getExtensionValue(Extension.authorityKeyIdentifier.getId());
+
+        if (authExt == null)
+        {
+            fail("failed to find CRL extension");
+        }
+
+        AuthorityKeyIdentifier authId = AuthorityKeyIdentifier.getInstance(ASN1OctetString.getInstance(authExt).getOctets());
+
+        X509CRLEntry entry = crl.getRevokedCertificate(BigInteger.ONE);
+
+        if (entry == null)
+        {
+            fail("failed to find CRL entry");
+        }
+
+        if (!entry.getSerialNumber().equals(BigInteger.ONE))
+        {
+            fail("CRL cert serial number does not match");
+        }
+
+        if (!entry.hasExtensions())
+        {
+            fail("CRL entry extension not found");
+        }
+
+        byte[] ext = entry.getExtensionValue(Extension.reasonCode.getId());
+
+        if (ext != null)
+        {
+            ASN1Enumerated reasonCode = (ASN1Enumerated)fromExtensionValue(ext);
+
+            if (reasonCode.getValue().intValue() != CRLReason.privilegeWithdrawn)
+            {
+                fail("CRL entry reasonCode wrong");
+            }
+        }
+        else
+        {
+            fail("CRL entry reasonCode not found");
+        }
+    }
+
+    public void checkCRLCreation5()
+        throws Exception
+    {
+        KeyPairGenerator kpGen = KeyPairGenerator.getInstance("RSA", BC);
+
+        Date now = new Date();
+        KeyPair pair = kpGen.generateKeyPair();
+        X509v2CRLBuilder crlGen = new JcaX509v2CRLBuilder(new X500Principal("CN=Test CA"), now);
+
+        crlGen.setNextUpdate(new Date(now.getTime() + 100000));
+
+        Vector extOids = new Vector();
+        Vector extValues = new Vector();
+
+        CRLReason crlReason = CRLReason.lookup(CRLReason.privilegeWithdrawn);
+
+        try
+        {
+            extOids.addElement(Extension.reasonCode);
+            extValues.addElement(new Extension(Extension.reasonCode, false, new DEROctetString(crlReason.getEncoded())));
+        }
+        catch (IOException e)
+        {
+            throw new IllegalArgumentException("error encoding reason: " + e);
+        }
+
+        Extensions entryExtensions = generateExtensions(extOids, extValues);
+
+        crlGen.addCRLEntry(BigInteger.ONE, now, entryExtensions);
+
+        JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
+
+        crlGen.addExtension(Extension.authorityKeyIdentifier, false, extUtils.createAuthorityKeyIdentifier(pair.getPublic()));
+
+        ContentSigner signer = new JcaContentSignerBuilder(
+            "RSAPSS",
+            new PSSParameterSpec("SHA-256", "MGF1", new MGF1ParameterSpec("SHA-256"), 20, 1))
+                                        .setProvider(BC).build(pair.getPrivate());
+        X509CRLHolder crlHolder = crlGen.build(signer);
+
+        X509CRL crl = new JcaX509CRLConverter().setProvider(BC).getCRL(crlHolder);
+
+        crl.verify(pair.getPublic(), "BC");
+
+        if (!crl.getIssuerX500Principal().equals(new X500Principal("CN=Test CA")))
+        {
+            fail("failed CRL issuer test");
+        }
+
+        byte[] authExt = crl.getExtensionValue(Extension.authorityKeyIdentifier.getId());
+
+        if (authExt == null)
+        {
+            fail("failed to find CRL extension");
+        }
+
+        AuthorityKeyIdentifier authId = AuthorityKeyIdentifier.getInstance(ASN1OctetString.getInstance(authExt).getOctets());
+
+        X509CRLEntry entry = crl.getRevokedCertificate(BigInteger.ONE);
+
+        if (entry == null)
+        {
+            fail("failed to find CRL entry");
+        }
+
+        if (!entry.getSerialNumber().equals(BigInteger.ONE))
+        {
+            fail("CRL cert serial number does not match");
+        }
+
+        if (!entry.hasExtensions())
+        {
+            fail("CRL entry extension not found");
+        }
+
+        byte[] ext = entry.getExtensionValue(Extension.reasonCode.getId());
+
+        if (ext != null)
+        {
+            ASN1Enumerated reasonCode = (ASN1Enumerated)fromExtensionValue(ext);
+
+            if (reasonCode.getValue().intValue() != CRLReason.privilegeWithdrawn)
+            {
+                fail("CRL entry reasonCode wrong");
+            }
+        }
+        else
+        {
+            fail("CRL entry reasonCode not found");
         }
     }
 
@@ -2837,7 +3050,7 @@ public class CertTest
     }
 
     /*
-     * we generate a self signed certificate for the sake of testing - XMSS
+     * we generate a self signed certificate for the sake of testing - XMSS^MT
      */
     public void checkCreation9()
         throws Exception
@@ -2863,6 +3076,57 @@ public class CertTest
         // create the certificate - version 3
         //
         ContentSigner sigGen = new JcaContentSignerBuilder("SHAKE256withXMSSMT").setProvider("BCPQC").build(privKey);
+        X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(builder.build(), BigInteger.valueOf(1), new Date(System.currentTimeMillis() - 50000), new Date(System.currentTimeMillis() + 50000), builder.build(), pubKey);
+
+        X509Certificate cert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
+
+        cert.checkValidity(new Date());
+
+        //
+        // check verifies in general
+        //
+        cert.verify(pubKey);
+
+        //
+        // check verifies with contained key
+        //
+        cert.verify(cert.getPublicKey());
+
+        ByteArrayInputStream bIn = new ByteArrayInputStream(cert.getEncoded());
+        CertificateFactory fact = CertificateFactory.getInstance("X.509", BC);
+
+        cert = (X509Certificate)fact.generateCertificate(bIn);
+
+        //System.out.println(cert);
+    }
+
+    /*
+     * we generate a self signed certificate for the sake of testing - qTESLA
+     */
+    public void checkCreationQTESLA()
+        throws Exception
+    {
+        //
+        // set up the keys
+        //
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("qTESLA", "BCPQC");
+
+        kpg.initialize(new QTESLAParameterSpec(QTESLAParameterSpec.HEURISTIC_I), new SecureRandom());
+
+        KeyPair kp = kpg.generateKeyPair();
+
+        PrivateKey privKey = kp.getPrivate();
+        PublicKey pubKey = kp.getPublic();
+
+        //
+        // distinguished name table.
+        //
+        X500NameBuilder builder = createStdBuilder();
+
+        //
+        // create the certificate - version 3
+        //
+        ContentSigner sigGen = new JcaContentSignerBuilder(pubKey.getAlgorithm()).setProvider("BCPQC").build(privKey);
         X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(builder.build(), BigInteger.valueOf(1), new Date(System.currentTimeMillis() - 50000), new Date(System.currentTimeMillis() + 50000), builder.build(), pubKey);
 
         X509Certificate cert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
@@ -2974,6 +3238,15 @@ public class CertTest
                 "SHA3-384WITHRSAENCRYPTION",
                 "SHA3-512WITHRSA",
                 "SHA3-512WITHRSAENCRYPTION",
+                "SHA1WITHRSAANDMGF1",
+                "SHA224WITHRSAANDMGF1",
+                "SHA256WITHRSAANDMGF1",
+                "SHA384WITHRSAANDMGF1",
+                "SHA512WITHRSAANDMGF1",
+                "SHA3-224WITHRSAANDMGF1",
+                "SHA3-256WITHRSAANDMGF1",
+                "SHA3-384WITHRSAANDMGF1",
+                "SHA3-512WITHRSAANDMGF1",
             };
 
         ASN1ObjectIdentifier[] oids = new ASN1ObjectIdentifier[]
@@ -2995,10 +3268,50 @@ public class CertTest
                 NISTObjectIdentifiers.id_rsassa_pkcs1_v1_5_with_sha3_384,
                 NISTObjectIdentifiers.id_rsassa_pkcs1_v1_5_with_sha3_384,
                 NISTObjectIdentifiers.id_rsassa_pkcs1_v1_5_with_sha3_512,
-                NISTObjectIdentifiers.id_rsassa_pkcs1_v1_5_with_sha3_512
+                NISTObjectIdentifiers.id_rsassa_pkcs1_v1_5_with_sha3_512,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS,
+                PKCSObjectIdentifiers.id_RSASSA_PSS
             };
 
         doGenSelfSignedCert(privKey, pubKey, algs, oids);
+
+        X500NameBuilder builder = createStdBuilder();
+
+        //
+        // create the certificate - version 3
+        //
+        ContentSigner sigGen = new JcaContentSignerBuilder("RSAPSS",
+            new PSSParameterSpec("SHA-256", "MGF1", new MGF1ParameterSpec("SHA-256"), 20, 1))
+            .setProvider("BC").build(privKey);
+        X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(builder.build(), BigInteger.valueOf(1), new Date(System.currentTimeMillis() - 50000), new Date(System.currentTimeMillis() + 50000), builder.build(), pubKey);
+        
+        X509Certificate cert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
+
+        cert.checkValidity(new Date());
+
+        //
+        // check verifies in general
+        //
+        cert.verify(pubKey);
+
+        //
+        // check verifies with contained key
+        //
+        cert.verify(cert.getPublicKey());
+
+        ByteArrayInputStream bIn = new ByteArrayInputStream(cert.getEncoded());
+        CertificateFactory fact = CertificateFactory.getInstance("X.509", BC);
+
+        cert = (X509Certificate)fact.generateCertificate(bIn);
+
+        //System.out.println(cert);
     }
 
     /*
@@ -3089,7 +3402,7 @@ public class CertTest
 
             cert = (X509Certificate)fact.generateCertificate(bIn);
 
-            //System.out.println(cert);
+//            System.out.println(cert);
         }
     }
 
@@ -3282,6 +3595,12 @@ public class CertTest
             new GeneralNames(new GeneralName(GeneralName.rfc822Name, "test@test.test")));
 
         X509Certificate baseCert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
+
+        baseCert.verify(pubKey);
+
+        certGen = new JcaX509v3CertificateBuilder(baseCert);
+
+        baseCert = new JcaX509CertificateConverter().setProvider(BC).getCertificate(certGen.build(sigGen));
 
         baseCert.verify(pubKey);
     }
@@ -3708,6 +4027,11 @@ public class CertTest
     public void performTest()
         throws Exception
     {
+        if (Security.getProvider("BCPQC") == null)
+        {
+            Security.addProvider(new BouncyCastlePQCProvider());
+        }
+        
         testDirect();
         testIndirect();
         testIndirect2();
@@ -3752,6 +4076,7 @@ public class CertTest
         checkCreation8();
         checkCreation9();
 
+        checkCreationQTESLA();
         checkCreationDSA();
         checkCreationECDSA();
         checkCreationRSA();
@@ -3772,6 +4097,8 @@ public class CertTest
         checkCRLCreation1();
         checkCRLCreation2();
         checkCRLCreation3();
+        checkCRLCreation4();
+        checkCRLCreation5();
 
         pemTest();
         pkcs7Test();
@@ -3816,7 +4143,7 @@ public class CertTest
         String[] args)
     {
         Security.addProvider(new BouncyCastleProvider());
-
+        
         runTest(new CertTest());
     }
 }

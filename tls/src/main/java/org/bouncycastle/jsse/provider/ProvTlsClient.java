@@ -1,37 +1,36 @@
 package org.bouncycastle.jsse.provider;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.Socket;
 import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.net.ssl.X509KeyManager;
+import javax.net.ssl.X509ExtendedKeyManager;
 import javax.security.auth.x500.X500Principal;
 
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.jsse.BCSNIHostName;
 import org.bouncycastle.jsse.BCSNIServerName;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.AlertLevel;
 import org.bouncycastle.tls.Certificate;
 import org.bouncycastle.tls.CertificateRequest;
 import org.bouncycastle.tls.CertificateStatusRequest;
-import org.bouncycastle.tls.CompressionMethod;
 import org.bouncycastle.tls.DefaultTlsClient;
-import org.bouncycastle.tls.DefaultTlsKeyExchangeFactory;
 import org.bouncycastle.tls.KeyExchangeAlgorithm;
-import org.bouncycastle.tls.NameType;
 import org.bouncycastle.tls.ProtocolVersion;
+import org.bouncycastle.tls.SecurityParameters;
 import org.bouncycastle.tls.ServerName;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
 import org.bouncycastle.tls.TlsAuthentication;
 import org.bouncycastle.tls.TlsCredentials;
+import org.bouncycastle.tls.TlsDHGroupVerifier;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsServerCertificate;
 import org.bouncycastle.tls.TlsSession;
@@ -40,7 +39,6 @@ import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.tls.crypto.TlsCryptoParameters;
 import org.bouncycastle.tls.crypto.impl.jcajce.JcaDefaultTlsCredentialedSigner;
 import org.bouncycastle.tls.crypto.impl.jcajce.JcaTlsCrypto;
-import org.bouncycastle.tls.crypto.impl.jcajce.JceDefaultTlsCredentialedAgreement;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.IPAddress;
 import org.bouncycastle.util.encoders.Hex;
@@ -49,22 +47,28 @@ class ProvTlsClient
     extends DefaultTlsClient
     implements ProvTlsPeer
 {
-    private static Logger LOG = Logger.getLogger(ProvTlsClient.class.getName());
+    private static final Logger LOG = Logger.getLogger(ProvTlsClient.class.getName());
 
     private static final boolean provEnableSNIExtension = PropertyUtils.getBooleanSystemProperty("jsse.enableSNIExtension", true);
 
     protected final ProvTlsManager manager;
     protected final ProvSSLParameters sslParameters;
 
-    protected ProvSSLSessionImpl sslSession = null;
+    protected ProvSSLSession sslSession = null;
     protected boolean handshakeComplete = false;
 
     ProvTlsClient(ProvTlsManager manager, ProvSSLParameters sslParameters)
     {
-        super(manager.getContextData().getCrypto(), new DefaultTlsKeyExchangeFactory(), new ProvDHConfigVerifier());
+        super(manager.getContextData().getCrypto());
 
         this.manager = manager;
         this.sslParameters = sslParameters;
+    }
+
+    @Override
+    protected Vector getProtocolNames()
+    {
+        return JsseUtils.getProtocolNames(sslParameters.getApplicationProtocols());
     }
 
     @Override
@@ -74,9 +78,9 @@ class ProvTlsClient
     }
 
     @Override
-    protected Vector getSupportedGroups(boolean offeringDH, boolean offeringEC)
+    protected Vector getSupportedGroups(Vector namedGroupRoles)
     {
-        return SupportedGroups.getClientSupportedGroups(manager.getContext().isFips(), getCrypto(), offeringDH, offeringEC);
+        return SupportedGroups.getClientSupportedGroups(getCrypto(), manager.getContext().isFips(), namedGroupRoles);
     }
     
 
@@ -86,47 +90,46 @@ class ProvTlsClient
         if (provEnableSNIExtension)
         {
             List<BCSNIServerName> sniServerNames = sslParameters.getServerNames();
-            if (sniServerNames == null)
+            if (null == sniServerNames)
             {
-                String peerHost = manager.getPeerHost();
-                if (peerHost != null && peerHost.indexOf('.') > 0 && !IPAddress.isValid(peerHost))
+                String peerHostSNI = manager.getPeerHostSNI();
+
+                /*
+                 * TODO[jsse] Consider removing the restriction that the name must contain a '.'
+                 * character, which is currently there for compatibility with SunJSSE.
+                 */
+                if (null != peerHostSNI && peerHostSNI.indexOf('.') > 0 && !IPAddress.isValid(peerHostSNI))
                 {
-                    Vector serverNames = new Vector(1);
-                    serverNames.addElement(new ServerName(NameType.host_name, peerHost));
-                    return serverNames;
+                    try
+                    {
+                        sniServerNames = Collections.<BCSNIServerName>singletonList(new BCSNIHostName(peerHostSNI));
+                    }
+                    catch (RuntimeException e)
+                    {
+                        LOG.fine("Failed to add peer host as default SNI host_name: " + peerHostSNI);
+                    }
                 }
             }
-            else
+
+            // NOTE: We follow SunJSSE behaviour and disable SNI if there are no server names to send
+            if (null != sniServerNames && !sniServerNames.isEmpty())
             {
                 Vector serverNames = new Vector(sniServerNames.size());
                 for (BCSNIServerName sniServerName : sniServerNames)
                 {
-                    /*
-                     * TODO[jsse] Add support for constructing ServerName using
-                     * BCSNIServerName.getEncoded() directly, then remove the 'host_name' limitation
-                     * (although it's currently the only defined type).
-                     */
-                    if (sniServerName.getType() == NameType.host_name)
-                    {
-                        try
-                        {
-                            serverNames.addElement(new ServerName((short)sniServerName.getType(), new String(sniServerName.getEncoded(), "ASCII")));
-                        }
-                        catch (UnsupportedEncodingException e)
-                        {
-                            LOG.log(Level.WARNING, "Unable to include SNI server name", e);
-                        }
-                    }
+                    serverNames.addElement(new ServerName((short)sniServerName.getType(), sniServerName.getEncoded()));
                 }
-
-                // NOTE: We follow SunJSSE behaviour and disable SNI if there are no server names to send
-                if (!serverNames.isEmpty())
-                {
-                    return serverNames;
-                }
+                return serverNames;
             }
         }
         return null;
+    }
+
+    @Override
+    protected int[] getSupportedCipherSuites()
+    {
+        return TlsUtils.getSupportedCipherSuites(manager.getContextData().getCrypto(),
+            manager.getContext().convertCipherSuites(sslParameters.getCipherSuites()));
     }
 
     @Override
@@ -140,6 +143,12 @@ class ProvTlsClient
         return handshakeComplete;
     }
 
+    @Override
+    public TlsDHGroupVerifier getDHGroupVerifier()
+    {
+        return new ProvDHGroupVerifier(sslParameters.getAlgorithmConstraints());
+    }
+
     public TlsAuthentication getAuthentication() throws IOException
     {
         return new TlsAuthentication()
@@ -148,16 +157,10 @@ class ProvTlsClient
             {
                 // TODO[jsse] What criteria determines whether we are willing to send client authentication?
 
+                int selectedCipherSuite = context.getSecurityParametersHandshake().getCipherSuite();
                 int keyExchangeAlgorithm = TlsUtils.getKeyExchangeAlgorithm(selectedCipherSuite);
                 switch (keyExchangeAlgorithm)
                 {
-                case KeyExchangeAlgorithm.DH_DSS:
-                case KeyExchangeAlgorithm.DH_RSA:
-                case KeyExchangeAlgorithm.ECDH_ECDSA:
-                case KeyExchangeAlgorithm.ECDH_RSA:
-                    // TODO[jsse] Add support for the static key exchanges
-                    return null;
-
                 case KeyExchangeAlgorithm.DHE_DSS:
                 case KeyExchangeAlgorithm.DHE_RSA:
                 case KeyExchangeAlgorithm.ECDHE_ECDSA:
@@ -170,12 +173,6 @@ class ProvTlsClient
                     throw new TlsFatalAlert(AlertDescription.internal_error);
                 }
 
-                X509KeyManager km = manager.getContextData().getKeyManager();
-                if (km == null)
-                {
-                    return null;
-                }
-
                 short[] certTypes = certificateRequest.getCertificateTypes();
                 if (certTypes == null || certTypes.length == 0)
                 {
@@ -183,6 +180,7 @@ class ProvTlsClient
                     return null;
                 }
 
+                // TODO[RFC 8422] Rework this in light of ed25519/ed448 and handle the supported signature algorithms TODO
                 String[] keyTypes = new String[certTypes.length];
                 for (int i = 0; i < certTypes.length; ++i)
                 {
@@ -199,10 +197,7 @@ class ProvTlsClient
                 	issuers = principals.toArray(new Principal[principals.size()]);
                 }
 
-                // TODO[jsse] How is this used?
-                Socket socket = null;
-
-                String alias = km.chooseClientAlias(keyTypes, issuers, socket);
+                String alias = manager.chooseClientAlias(keyTypes, issuers);
                 if (alias == null)
                 {
                     return null;
@@ -215,8 +210,9 @@ class ProvTlsClient
                     throw new UnsupportedOperationException();
                 }
 
-                PrivateKey privateKey = km.getPrivateKey(alias);
-                Certificate certificate = JsseUtils.getCertificateMessage(crypto, km.getCertificateChain(alias));
+                X509ExtendedKeyManager x509KeyManager = manager.getContextData().getX509KeyManager();
+                PrivateKey privateKey = x509KeyManager.getPrivateKey(alias);
+                Certificate certificate = JsseUtils.getCertificateMessage(crypto, x509KeyManager.getCertificateChain(alias));
 
                 if (privateKey == null || certificate.isEmpty())
                 {
@@ -232,25 +228,15 @@ class ProvTlsClient
 
                 switch (keyExchangeAlgorithm)
                 {
-                case KeyExchangeAlgorithm.DH_DSS:
-                case KeyExchangeAlgorithm.DH_RSA:
-                case KeyExchangeAlgorithm.ECDH_ECDSA:
-                case KeyExchangeAlgorithm.ECDH_RSA:
-                {
-                    // TODO[jsse] Need to have TlsCrypto construct the credentials from the certs/key
-                    return new JceDefaultTlsCredentialedAgreement((JcaTlsCrypto)crypto, certificate, privateKey);
-                }
-
                 case KeyExchangeAlgorithm.DHE_DSS:
                 case KeyExchangeAlgorithm.DHE_RSA:
                 case KeyExchangeAlgorithm.ECDHE_ECDSA:
                 case KeyExchangeAlgorithm.ECDHE_RSA:
                 case KeyExchangeAlgorithm.RSA:
                 {
-                    short certificateType = certificate.getCertificateAt(0).getClientCertificateType();
-                    short signatureAlgorithm = TlsUtils.getSignatureAlgorithmClient(certificateType);
+                    short signatureAlgorithm = certificate.getCertificateAt(0).getLegacySignatureAlgorithm();
                     SignatureAndHashAlgorithm sigAlg = TlsUtils.chooseSignatureAndHashAlgorithm(context,
-                        supportedSignatureAlgorithms, signatureAlgorithm);
+                        context.getSecurityParametersHandshake().getClientSigAlgs(), signatureAlgorithm);
 
                     // TODO[jsse] Need to have TlsCrypto construct the credentials from the certs/key
                     return new JcaDefaultTlsCredentialedSigner(new TlsCryptoParameters(context), (JcaTlsCrypto)crypto,
@@ -265,70 +251,39 @@ class ProvTlsClient
 
             public void notifyServerCertificate(TlsServerCertificate serverCertificate) throws IOException
             {
-                boolean noServerCert = serverCertificate == null || serverCertificate.getCertificate() == null
-                    || serverCertificate.getCertificate().isEmpty();
-                if (noServerCert)
+                if (null == serverCertificate || null == serverCertificate.getCertificate()
+                    || serverCertificate.getCertificate().isEmpty())
                 {
                     throw new TlsFatalAlert(AlertDescription.handshake_failure);
                 }
-                else
-                {
-                    X509Certificate[] chain = JsseUtils.getX509CertificateChain(manager.getContextData().getCrypto(), serverCertificate.getCertificate());
-                    String authType = JsseUtils.getAuthTypeServer(TlsUtils.getKeyExchangeAlgorithm(selectedCipherSuite));
 
-                    if (!manager.isServerTrusted(chain, authType))
-                    {
-                        throw new TlsFatalAlert(AlertDescription.bad_certificate);
-                    }
-                }
+                X509Certificate[] chain = JsseUtils.getX509CertificateChain(manager.getContextData().getCrypto(), serverCertificate.getCertificate());
+                int selectedCipherSuite = context.getSecurityParametersHandshake().getCipherSuite();
+                String authType = JsseUtils.getAuthTypeServer(TlsUtils.getKeyExchangeAlgorithm(selectedCipherSuite));
+
+                manager.checkServerTrusted(chain, authType);
             }
         };
     }
 
     @Override
-    public int[] getCipherSuites()
+    public ProtocolVersion[] getSupportedVersions()
     {
-        return TlsUtils.getSupportedCipherSuites(manager.getContextData().getCrypto(),
-            manager.getContext().convertCipherSuites(sslParameters.getCipherSuites()));
-    }
-
-    @Override
-    public short[] getCompressionMethods()
-    {
-        return manager.getContext().isFips()
-            ?   new short[]{ CompressionMethod._null }
-            :   super.getCompressionMethods();
-    }
-
-//    public TlsKeyExchange getKeyExchange() throws IOException
-//    {
-//        // TODO[jsse] Check that all key exchanges used in JSSE supportedCipherSuites are handled
-//        return super.getKeyExchange();
-//    }
-
-    @Override
-    public ProtocolVersion getMinimumVersion()
-    {
-        return manager.getContext().getMinimumVersion(sslParameters.getProtocols());
-    }
-
-    @Override
-    public ProtocolVersion getClientVersion()
-    {
-        return manager.getContext().getMaximumVersion(sslParameters.getProtocols());
+        return manager.getContext().getSupportedVersions(sslParameters.getProtocols());
     }
 
     @Override
     public TlsSession getSessionToResume()
     {
-        ProvSSLSessionContext sessionContext = manager.getContextData().getClientSessionContext();
-        this.sslSession = sessionContext.getSessionImpl(manager.getPeerHost(), manager.getPeerPort());
+        ProvSSLSessionContext sslSessionContext = manager.getContextData().getClientSessionContext();
+        ProvSSLSession availableSSLSession = sslSessionContext.getSessionImpl(manager.getPeerHost(), manager.getPeerPort());
 
-        if (sslSession != null)
+        if (null != availableSSLSession)
         {
-            TlsSession sessionToResume = sslSession.getTlsSession();
-            if (sessionToResume != null)
+            TlsSession sessionToResume = availableSSLSession.getTlsSession();
+            if (null != sessionToResume && isResumable(availableSSLSession))
             {
+                this.sslSession = availableSSLSession;
                 return sessionToResume;
             }
         }
@@ -381,14 +336,22 @@ class ProvTlsClient
     @Override
     public synchronized void notifyHandshakeComplete() throws IOException
     {
+        super.notifyHandshakeComplete();
+
         this.handshakeComplete = true;
 
-        TlsSession handshakeSession = context.getSession();
+        TlsSession connectionTlsSession = context.getSession();
 
-        if (sslSession == null || sslSession.getTlsSession() != handshakeSession)
+        if (null == sslSession || sslSession.getTlsSession() != connectionTlsSession)
         {
-            sslSession = manager.getContextData().getClientSessionContext().reportSession(handshakeSession,
-                manager.getPeerHost(), manager.getPeerPort());
+            ProvSSLSessionContext sslSessionContext = manager.getContextData().getClientSessionContext();
+            String peerHost = manager.getPeerHost();
+            int peerPort = manager.getPeerPort();
+            JsseSessionParameters jsseSessionParameters = new JsseSessionParameters(
+                sslParameters.getEndpointIdentificationAlgorithm());
+
+            this.sslSession = sslSessionContext.reportSession(peerHost, peerPort, connectionTlsSession,
+                jsseSessionParameters);
         }
 
         manager.notifyHandshakeComplete(new ProvSSLConnection(context, sslSession));
@@ -416,49 +379,87 @@ class ProvTlsClient
     {
         manager.getContext().validateNegotiatedCipherSuite(selectedCipherSuite);
 
-        super.notifySelectedCipherSuite(selectedCipherSuite);
-
         LOG.fine("Client notified of selected cipher suite: " + manager.getContext().getCipherSuiteString(selectedCipherSuite));
+
+        super.notifySelectedCipherSuite(selectedCipherSuite);
     }
 
     @Override
     public void notifyServerVersion(ProtocolVersion serverVersion) throws IOException
     {
-        String selected = manager.getContext().getProtocolString(serverVersion);
-        if (selected != null)
-        {
-            for (String protocol : sslParameters.getProtocols())
-            {
-                if (selected.equals(protocol))
-                {
-                    LOG.fine("Client notified of selected protocol version: " + selected);
-                    return;
-                }
-            }
-        }
-        throw new TlsFatalAlert(AlertDescription.protocol_version);
+        String protocolString = manager.getContext().getProtocolString(serverVersion);
+
+        LOG.fine("Client notified of selected protocol version: " + protocolString);
+
+        super.notifyServerVersion(serverVersion);
     }
 
     @Override
     public void notifySessionID(byte[] sessionID)
     {
-        super.notifySessionID(sessionID);
+        final boolean isResumed = (null != sessionID && sessionID.length > 0 && null != sslSession
+            && Arrays.areEqual(sessionID, sslSession.getId()));
 
-        if (sessionID == null || sessionID.length == 0)
-        {
-            LOG.fine("Server did not specify a session ID");
-        }
-        else if (sslSession != null && Arrays.areEqual(sessionID, sslSession.getId()))
+        if (isResumed)
         {
             LOG.fine("Server resumed session: " + Hex.toHexString(sessionID));
         }
-        else if (!manager.getEnableSessionCreation())
-        {
-            throw new IllegalStateException("Server did not resume session and session creation is disabled");
-        }
         else
         {
-            LOG.fine("Server specified new session: " + Hex.toHexString(sessionID));
+            if (sessionID == null || sessionID.length < 1)
+            {
+                LOG.fine("Server did not specify a session ID");
+            }
+            else
+            {
+                LOG.fine("Server specified new session: " + Hex.toHexString(sessionID));
+            }
+
+            if (!manager.getEnableSessionCreation())
+            {
+                throw new IllegalStateException("Server did not resume session and session creation is disabled");
+            }
         }
+
+        {
+            ProvSSLSessionContext sslSessionContext = manager.getContextData().getClientSessionContext();
+            String peerHost = manager.getPeerHost();
+            int peerPort = manager.getPeerPort();
+            SecurityParameters securityParameters = context.getSecurityParametersHandshake();
+
+            ProvSSLSessionHandshake handshakeSession;
+            if (!isResumed)
+            {
+                handshakeSession = new ProvSSLSessionHandshake(sslSessionContext, peerHost, peerPort, securityParameters);
+            }
+            else
+            {
+                handshakeSession = new ProvSSLSessionResumed(sslSessionContext, peerHost, peerPort, securityParameters,
+                    sslSession.getTlsSession(), sslSession.getJsseSessionParameters());
+            }
+
+            manager.notifyHandshakeSession(handshakeSession);
+        }
+    }
+
+    protected boolean isResumable(ProvSSLSession availableSSLSession)
+    {
+        // TODO[jsse] We could check EMS here, although the protocol classes reject non-EMS sessions anyway
+
+        JsseSessionParameters jsseSessionParameters = availableSSLSession.getJsseSessionParameters();
+
+        String endpointIDAlgorithm = sslParameters.getEndpointIdentificationAlgorithm();
+        if (null != endpointIDAlgorithm)
+        {
+            String identificationProtocol = jsseSessionParameters.getIdentificationProtocol();
+            if (!endpointIDAlgorithm.equalsIgnoreCase(identificationProtocol))
+            {
+                LOG.finest("Session not resumed - endpoint ID algorithm mismatch; requested: " + endpointIDAlgorithm
+                    + ", session: " + identificationProtocol);
+                return false;
+            }
+        }
+
+        return true;
     }
 }

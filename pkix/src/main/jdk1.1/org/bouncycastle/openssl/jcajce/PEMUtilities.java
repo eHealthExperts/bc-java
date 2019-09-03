@@ -92,7 +92,7 @@ class PEMUtilities
 
         SecretKey sKey = keyGen.generateSecret(new PBEKeySpec(password, salt, iterationCount, PEMUtilities.getKeySize(algorithm)));
 
-        return new SecretKeySpec(sKey.getEncoded(), algorithm);
+        return new DestroyableSecretKeySpec(sKey.getEncoded(), algorithm);
     }
 
     static byte[] crypt(
@@ -262,7 +262,7 @@ class PEMUtilities
                 System.arraycopy(key, 0, key, 16, 8);
             }
 
-            return new SecretKeySpec(key, algorithm);
+            return new DestroyableSecretKeySpec(key, algorithm);
         }
         catch (Exception e)
         {

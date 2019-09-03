@@ -1,6 +1,7 @@
 package org.bouncycastle.jcajce.provider.asymmetric.util;
 
 import java.security.NoSuchAlgorithmException;
+
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
@@ -8,7 +9,6 @@ import java.util.Map;
 import javax.crypto.KeyAgreementSpi;
 import javax.crypto.SecretKey;
 import javax.crypto.ShortBufferException;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.cryptopro.CryptoProObjectIdentifiers;
@@ -26,6 +26,7 @@ import org.bouncycastle.crypto.params.DESParameters;
 import org.bouncycastle.crypto.params.KDFParameters;
 import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
 import org.bouncycastle.util.Strings;
 
@@ -141,8 +142,8 @@ public abstract class BaseAgreementSpi
         des.put(PKCSObjectIdentifiers.id_alg_CMS3DESwrap.getId(), "DES");
     }
 
-    private final String kaAlgorithm;
-    private final DerivationFunction kdf;
+    protected final String kaAlgorithm;
+    protected final DerivationFunction kdf;
 
     protected byte[]     ukmParameters;
 
@@ -221,8 +222,15 @@ public abstract class BaseAgreementSpi
     {
         if (kdf != null)
         {
-            throw new UnsupportedOperationException(
-                "KDF can only be used when algorithm is known");
+            byte[] secret = calcSecret();
+            try
+            {
+                return getSharedSecretBytes(secret, null, secret.length * 8);
+            }
+            catch (NoSuchAlgorithmException e)
+            {
+                throw new IllegalStateException(e.getMessage());
+            }
         }
 
         return calcSecret();
@@ -249,7 +257,6 @@ public abstract class BaseAgreementSpi
         String algorithm)
         throws NoSuchAlgorithmException
     {
-        byte[] secret = calcSecret();
         String algKey = Strings.toUpperCase(algorithm);
         String oidAlgorithm = algorithm;
 
@@ -260,6 +267,21 @@ public abstract class BaseAgreementSpi
 
         int    keySize = getKeySize(oidAlgorithm);
 
+        byte[] secret = getSharedSecretBytes(calcSecret(), oidAlgorithm, keySize);
+
+        String algName = getAlgorithm(algorithm);
+
+        if (des.containsKey(algName))
+        {
+            DESParameters.setOddParity(secret);
+        }
+
+        return new DestroyableSecretKeySpec(secret, algName);
+    }
+
+    private byte[] getSharedSecretBytes(byte[] secret, String oidAlgorithm, int keySize)
+        throws NoSuchAlgorithmException
+    {
         if (kdf != null)
         {
             if (keySize < 0)
@@ -270,6 +292,10 @@ public abstract class BaseAgreementSpi
 
             if (kdf instanceof DHKEKGenerator)
             {
+                if (oidAlgorithm == null)
+                {
+                    throw new NoSuchAlgorithmException("algorithm OID is null");
+                }
                 ASN1ObjectIdentifier oid;
                 try
                 {
@@ -292,7 +318,9 @@ public abstract class BaseAgreementSpi
 
             kdf.generateBytes(keyBytes, 0, keyBytes.length);
 
-            secret = keyBytes;
+            Arrays.clear(secret);
+
+            return keyBytes;
         }
         else
         {
@@ -302,22 +330,13 @@ public abstract class BaseAgreementSpi
 
                 System.arraycopy(secret, 0, keyBytes, 0, keyBytes.length);
 
-                secret = keyBytes;
+                Arrays.clear(secret);
+
+                return keyBytes;
             }
+
+            return secret;
         }
-
-        String algName = getAlgorithm(algorithm);
-
-        if (des.containsKey(algName))
-        {
-            DESParameters.setOddParity(secret);
-        }
-
-        DestroyableSecretKeySpec secretKeySpec = new DestroyableSecretKeySpec(secret, algName);
-
-        EraseUtil.clearByteArray(secret);
-        
-        return secretKeySpec;
     }
 
     protected abstract byte[] calcSecret();

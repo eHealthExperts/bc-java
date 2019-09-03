@@ -383,9 +383,9 @@ public class BCFKSStoreTest
 
         store1.setKeyEntry("privkey", privKey, testPassword, new X509Certificate[]{interCert, finalCert});
         store1.setCertificateEntry("trusted", cert);
-        SecretKeySpec aesKey = new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f"), "AES");
+        SecretKeySpec aesKey = new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f"), "AES");
         store1.setKeyEntry("secret1", aesKey, "secretPwd1".toCharArray(), null);
-        SecretKeySpec edeKey = new SecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "DESede");
+        SecretKeySpec edeKey = new DestroyableSecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "DESede");
         store1.setKeyEntry("secret2", edeKey, "secretPwd2".toCharArray(), null);
 
         ByteArrayOutputStream bOut = new ByteArrayOutputStream();
@@ -433,15 +433,15 @@ public class BCFKSStoreTest
 
         store1.load(null, null);
 
-        SecretKeySpec aesKey = new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f"), "AES");
-        SecretKeySpec edeKey1 = new SecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "DESede");
-        SecretKeySpec edeKey2 = new SecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "TripleDES");
-        SecretKeySpec edeKey3 = new SecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "TDEA");
-        SecretKeySpec hmacKey1 = new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff"), "HmacSHA1");
-        SecretKeySpec hmacKey224 = new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff"), "HmacSHA224");
-        SecretKeySpec hmacKey256 = new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff01ff"), "HmacSHA256");
-        SecretKeySpec hmacKey384 = new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff0102ff"), "HmacSHA384");
-        SecretKeySpec hmacKey512 = new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff010203ff"), "HmacSHA512");
+        SecretKeySpec aesKey = new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f"), "AES");
+        SecretKeySpec edeKey1 = new DestroyableSecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "DESede");
+        SecretKeySpec edeKey2 = new DestroyableSecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "TripleDES");
+        SecretKeySpec edeKey3 = new DestroyableSecretKeySpec(Hex.decode("010102020404070708080b0b0d0d0e0e"), "TDEA");
+        SecretKeySpec hmacKey1 = new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff"), "HmacSHA1");
+        SecretKeySpec hmacKey224 = new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff"), "HmacSHA224");
+        SecretKeySpec hmacKey256 = new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff01ff"), "HmacSHA256");
+        SecretKeySpec hmacKey384 = new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff0102ff"), "HmacSHA384");
+        SecretKeySpec hmacKey512 = new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0eff010203ff"), "HmacSHA512");
 
         store1.setKeyEntry("secret1", aesKey, "secretPwd1".toCharArray(), null);
         store1.setKeyEntry("secret2", edeKey1, "secretPwd2".toCharArray(), null);
@@ -530,8 +530,8 @@ public class BCFKSStoreTest
     public void shouldStoreOneSecretKey()
         throws Exception
     {
-        checkOneSecretKey(new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f"), "AES"), null);
-        checkOneSecretKey(new SecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f"), "AES"), testPassword);
+        checkOneSecretKey(new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f"), "AES"), null);
+        checkOneSecretKey(new DestroyableSecretKeySpec(Hex.decode("000102030405060708090a0b0c0d0e0f"), "AES"), testPassword);
     }
 
     private void checkOneSecretKey(SecretKey key, char[] passwd)

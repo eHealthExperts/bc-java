@@ -47,7 +47,7 @@ class MockPSKTlsServer
     {
         super.notifyHandshakeComplete();
 
-        byte[] pskIdentity = context.getSecurityParameters().getPSKIdentity();
+        byte[] pskIdentity = context.getSecurityParametersConnection().getPSKIdentity();
         if (pskIdentity != null)
         {
             String name = Strings.fromUTF8ByteArray(pskIdentity);
@@ -55,9 +55,9 @@ class MockPSKTlsServer
         }
     }
 
-    protected ProtocolVersion getMinimumVersion()
+    public ProtocolVersion[] getSupportedVersions()
     {
-        return ProtocolVersion.TLSv12;
+        return ProtocolVersion.TLSv12.only();
     }
 
     public ProtocolVersion getServerVersion() throws IOException
@@ -90,7 +90,7 @@ class MockPSKTlsServer
                 String name = Strings.fromUTF8ByteArray(identity);
                 if (name.equals("client"))
                 {
-                    return new byte[16];
+                    return Strings.toUTF8ByteArray("TLS_TEST_PSK");
                 }
             }
             return null;

@@ -18,14 +18,16 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.cms.GCMParameters;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.spec.AEADParameterSpec;
 import org.bouncycastle.jcajce.spec.RepeatedSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
+
+import junit.framework.TestCase;
 
 public class AEADTest extends SimpleTest
 {
@@ -86,7 +88,7 @@ public class AEADTest extends SimpleTest
         BadPaddingException
     {
         Cipher eax = Cipher.getInstance("AES/EAX/NoPadding", "BC");
-        final SecretKeySpec key = new SecretKeySpec(new byte[eax.getBlockSize()], eax.getAlgorithm());
+        final DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(new byte[eax.getBlockSize()], eax.getAlgorithm());
         final IvParameterSpec iv = new IvParameterSpec(new byte[eax.getBlockSize()]);
 
         eax.init(Cipher.ENCRYPT_MODE, key, iv);
@@ -121,7 +123,7 @@ public class AEADTest extends SimpleTest
             InvalidAlgorithmParameterException, NoSuchProviderException
     {
         Cipher eax = Cipher.getInstance("AES/EAX/NoPadding", "BC");
-        SecretKeySpec key = new SecretKeySpec(K, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(K, "AES");
         IvParameterSpec iv = new IvParameterSpec(N);
         eax.init(Cipher.ENCRYPT_MODE, key, iv);
 
@@ -151,7 +153,7 @@ public class AEADTest extends SimpleTest
         throws Exception
     {
         Cipher eax = Cipher.getInstance("AES/EAX/NoPadding", "BC");
-        SecretKeySpec key = new SecretKeySpec(K, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(K, "AES");
 
         AEADParameterSpec spec = new AEADParameterSpec(N, 128, A);
         eax.init(Cipher.ENCRYPT_MODE, key, spec);
@@ -222,7 +224,7 @@ public class AEADTest extends SimpleTest
         InvalidAlgorithmParameterException, NoSuchProviderException, IOException
     {
         Cipher eax = Cipher.getInstance("AES/EAX/NoPadding", "BC");
-        SecretKeySpec key = new SecretKeySpec(K, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(K, "AES");
 
         // GCMParameterSpec mapped to AEADParameters and overrides default MAC
         // size
@@ -266,7 +268,7 @@ public class AEADTest extends SimpleTest
         throws Exception
     {
         Cipher eax = Cipher.getInstance("AES/EAX/NoPadding", "BC");
-        SecretKeySpec key = new SecretKeySpec(K, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(K, "AES");
         SecureRandom random = new SecureRandom();
 
         // GCMParameterSpec mapped to AEADParameters and overrides default MAC
@@ -324,7 +326,7 @@ public class AEADTest extends SimpleTest
         BadPaddingException, InvalidAlgorithmParameterException, NoSuchProviderException, IOException
     {
         Cipher eax = Cipher.getInstance("AES/EAX/NoPadding", "BC");
-        SecretKeySpec key = new SecretKeySpec(K, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(K, "AES");
         GCMParameterSpec spec = new GCMParameterSpec(128, N);
         eax.init(Cipher.ENCRYPT_MODE, key, spec);
 
@@ -369,7 +371,7 @@ public class AEADTest extends SimpleTest
         InvalidAlgorithmParameterException, NoSuchProviderException, IOException, InvalidParameterSpecException
     {
         Cipher eax = Cipher.getInstance("AES/GCM/NoPadding", "BC");
-        SecretKeySpec key = new SecretKeySpec(K, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(K, "AES");
 
         // GCMParameterSpec mapped to AEADParameters and overrides default MAC
         // size
@@ -428,7 +430,7 @@ public class AEADTest extends SimpleTest
         BadPaddingException, InvalidAlgorithmParameterException, NoSuchProviderException, IOException
     {
         Cipher eax = Cipher.getInstance("AES/GCM/NoPadding", "BC");
-        SecretKeySpec key = new SecretKeySpec(K, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(K, "AES");
         GCMParameterSpec spec = new GCMParameterSpec(128, N);
         eax.init(Cipher.ENCRYPT_MODE, key, spec);
 
@@ -472,7 +474,7 @@ public class AEADTest extends SimpleTest
 
         try
         {
-            eax.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(K, "AES"), new IvParameterSpec(spec.getIV()));
+            eax.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(K, "AES"), new IvParameterSpec(spec.getIV()));
             fail("no exception");
         }
         catch (InvalidKeyException e)

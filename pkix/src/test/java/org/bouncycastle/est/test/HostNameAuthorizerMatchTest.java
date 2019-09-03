@@ -3,8 +3,9 @@ package org.bouncycastle.est.test;
 import java.io.IOException;
 import java.util.HashSet;
 
-import junit.framework.TestCase;
 import org.bouncycastle.est.jcajce.JsseDefaultHostnameAuthorizer;
+
+import junit.framework.TestCase;
 
 public class HostNameAuthorizerMatchTest
     extends TestCase
@@ -32,6 +33,9 @@ public class HostNameAuthorizerMatchTest
             {"Invalid 13", "foo.example.com","*.example.com",true},
             {"Invalid 14", "bar.foo.example.com", "*.example.com", false},
             {"Invalid 15", "example.com", "*.example.com", false},
+            {"Invalid 16", "foobaz.example.com","b*z.example.com",false},
+            {"Invalid 17", "foobaz.example.com","ob*z.example.com",false},
+            { "Valid", "foobaz.example.com","foob*z.example.com",true}
         };
 
         for (Object[] j : v)

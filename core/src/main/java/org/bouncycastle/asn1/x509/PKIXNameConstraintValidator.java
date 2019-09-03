@@ -1,5 +1,6 @@
 package org.bouncycastle.asn1.x509;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -11,10 +12,14 @@ import java.util.Set;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DERIA5String;
+import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.IETFUtils;
+import org.bouncycastle.asn1.x500.style.RFC4519Style;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
 import org.bouncycastle.util.Strings;
+import org.bouncycastle.util.encoders.Hex;
 
 public class PKIXNameConstraintValidator
     implements NameConstraintValidator
@@ -29,6 +34,8 @@ public class PKIXNameConstraintValidator
 
     private Set excludedSubtreesIP = new HashSet();
 
+    private Set excludedSubtreesOtherName = new HashSet();
+
     private Set permittedSubtreesDN;
 
     private Set permittedSubtreesDNS;
@@ -38,6 +45,8 @@ public class PKIXNameConstraintValidator
     private Set permittedSubtreesURI;
 
     private Set permittedSubtreesIP;
+
+    private Set permittedSubtreesOtherName;
 
     public PKIXNameConstraintValidator()
     {
@@ -54,6 +63,9 @@ public class PKIXNameConstraintValidator
     {
         switch (name.getTagNo())
         {
+        case GeneralName.otherName:
+            checkPermittedOtherName(permittedSubtreesOtherName, OtherName.getInstance(name.getName()));
+            break;
         case GeneralName.rfc822Name:
             checkPermittedEmail(permittedSubtreesEmail,
                 extractNameAsString(name));
@@ -73,6 +85,9 @@ public class PKIXNameConstraintValidator
             byte[] ip = ASN1OctetString.getInstance(name.getName()).getOctets();
 
             checkPermittedIP(permittedSubtreesIP, ip);
+            break;
+        default:
+            // other tags to be ignored.
         }
     }
 
@@ -88,6 +103,9 @@ public class PKIXNameConstraintValidator
     {
         switch (name.getTagNo())
         {
+        case GeneralName.otherName:
+            checkExcludedOtherName(excludedSubtreesOtherName, OtherName.getInstance(name.getName()));
+            break;
         case GeneralName.rfc822Name:
             checkExcludedEmail(excludedSubtreesEmail, extractNameAsString(name));
             break;
@@ -106,6 +124,9 @@ public class PKIXNameConstraintValidator
             byte[] ip = ASN1OctetString.getInstance(name.getName()).getOctets();
 
             checkExcludedIP(excludedSubtreesIP, ip);
+            break;
+        default:
+            // other tags to be ignored.
         }
     }
 
@@ -136,13 +157,18 @@ public class PKIXNameConstraintValidator
             ((Set)subtreesMap.get(tagNo)).add(subtree);
         }
 
-        for (Iterator it = subtreesMap.entrySet().iterator(); it.hasNext(); )
+        for (Iterator it = subtreesMap.entrySet().iterator(); it.hasNext();)
         {
             Map.Entry entry = (Map.Entry)it.next();
 
             // go through all subtree groups
-            switch (((Integer)entry.getKey()).intValue())
+            int nameType = ((Integer)entry.getKey()).intValue();
+            switch (nameType)
             {
+            case GeneralName.otherName:
+                permittedSubtreesOtherName = intersectOtherName(permittedSubtreesOtherName,
+                    (Set)entry.getValue());
+                break;
             case GeneralName.rfc822Name:
                 permittedSubtreesEmail = intersectEmail(permittedSubtreesEmail,
                     (Set)entry.getValue());
@@ -162,6 +188,9 @@ public class PKIXNameConstraintValidator
             case GeneralName.iPAddress:
                 permittedSubtreesIP = intersectIP(permittedSubtreesIP,
                     (Set)entry.getValue());
+                break;
+            default:
+                throw new IllegalStateException("Unknown tag encountered: " + nameType);
             }
         }
     }
@@ -170,6 +199,9 @@ public class PKIXNameConstraintValidator
     {
         switch (nameType)
         {
+        case GeneralName.otherName:
+            permittedSubtreesOtherName = new HashSet();
+            break;
         case GeneralName.rfc822Name:
             permittedSubtreesEmail = new HashSet();
             break;
@@ -184,6 +216,9 @@ public class PKIXNameConstraintValidator
             break;
         case GeneralName.iPAddress:
             permittedSubtreesIP = new HashSet();
+            break;
+        default:
+            throw new IllegalStateException("Unknown tag encountered: " + nameType);
         }
     }
 
@@ -198,6 +233,10 @@ public class PKIXNameConstraintValidator
 
         switch (base.getTagNo())
         {
+        case GeneralName.otherName:
+            excludedSubtreesOtherName = unionOtherName(excludedSubtreesOtherName,
+                OtherName.getInstance(base.getName()));
+            break;
         case GeneralName.rfc822Name:
             excludedSubtreesEmail = unionEmail(excludedSubtreesEmail,
                 extractNameAsString(base));
@@ -218,6 +257,8 @@ public class PKIXNameConstraintValidator
             excludedSubtreesIP = unionIP(excludedSubtreesIP, ASN1OctetString
                 .getInstance(base.getName()).getOctets());
             break;
+        default:
+            throw new IllegalStateException("Unknown tag encountered: " + base.getTagNo());
         }
     }
 
@@ -228,11 +269,13 @@ public class PKIXNameConstraintValidator
             + hashCollection(excludedSubtreesEmail)
             + hashCollection(excludedSubtreesIP)
             + hashCollection(excludedSubtreesURI)
+            + hashCollection(excludedSubtreesOtherName)
             + hashCollection(permittedSubtreesDN)
             + hashCollection(permittedSubtreesDNS)
             + hashCollection(permittedSubtreesEmail)
             + hashCollection(permittedSubtreesIP)
-            + hashCollection(permittedSubtreesURI);
+            + hashCollection(permittedSubtreesURI)
+            + hashCollection(permittedSubtreesOtherName);
     }
 
     public boolean equals(Object o)
@@ -247,78 +290,22 @@ public class PKIXNameConstraintValidator
             && collectionsAreEqual(constraintValidator.excludedSubtreesEmail, excludedSubtreesEmail)
             && collectionsAreEqual(constraintValidator.excludedSubtreesIP, excludedSubtreesIP)
             && collectionsAreEqual(constraintValidator.excludedSubtreesURI, excludedSubtreesURI)
+            && collectionsAreEqual(constraintValidator.excludedSubtreesOtherName, excludedSubtreesOtherName)
             && collectionsAreEqual(constraintValidator.permittedSubtreesDN, permittedSubtreesDN)
             && collectionsAreEqual(constraintValidator.permittedSubtreesDNS, permittedSubtreesDNS)
             && collectionsAreEqual(constraintValidator.permittedSubtreesEmail, permittedSubtreesEmail)
             && collectionsAreEqual(constraintValidator.permittedSubtreesIP, permittedSubtreesIP)
-            && collectionsAreEqual(constraintValidator.permittedSubtreesURI, permittedSubtreesURI);
+            && collectionsAreEqual(constraintValidator.permittedSubtreesURI, permittedSubtreesURI)
+            && collectionsAreEqual(constraintValidator.permittedSubtreesOtherName, permittedSubtreesOtherName);
     }
 
-    public String toString()
-    {
-        String temp = "";
-        temp += "permitted:\n";
-        if (permittedSubtreesDN != null)
-        {
-            temp += "DN:\n";
-            temp += permittedSubtreesDN.toString() + "\n";
-        }
-        if (permittedSubtreesDNS != null)
-        {
-            temp += "DNS:\n";
-            temp += permittedSubtreesDNS.toString() + "\n";
-        }
-        if (permittedSubtreesEmail != null)
-        {
-            temp += "Email:\n";
-            temp += permittedSubtreesEmail.toString() + "\n";
-        }
-        if (permittedSubtreesURI != null)
-        {
-            temp += "URI:\n";
-            temp += permittedSubtreesURI.toString() + "\n";
-        }
-        if (permittedSubtreesIP != null)
-        {
-            temp += "IP:\n";
-            temp += stringifyIPCollection(permittedSubtreesIP) + "\n";
-        }
-        temp += "excluded:\n";
-        if (!excludedSubtreesDN.isEmpty())
-        {
-            temp += "DN:\n";
-            temp += excludedSubtreesDN.toString() + "\n";
-        }
-        if (!excludedSubtreesDNS.isEmpty())
-        {
-            temp += "DNS:\n";
-            temp += excludedSubtreesDNS.toString() + "\n";
-        }
-        if (!excludedSubtreesEmail.isEmpty())
-        {
-            temp += "Email:\n";
-            temp += excludedSubtreesEmail.toString() + "\n";
-        }
-        if (!excludedSubtreesURI.isEmpty())
-        {
-            temp += "URI:\n";
-            temp += excludedSubtreesURI.toString() + "\n";
-        }
-        if (!excludedSubtreesIP.isEmpty())
-        {
-            temp += "IP:\n";
-            temp += stringifyIPCollection(excludedSubtreesIP) + "\n";
-        }
-        return temp;
-    }
-
-    private void checkPermittedDN(X500Name dns)
+    public void checkPermittedDN(X500Name dns)
         throws NameConstraintValidatorException
     {
         checkPermittedDN(permittedSubtreesDN, ASN1Sequence.getInstance(dns.toASN1Primitive()));
     }
 
-    private void checkExcludedDN(X500Name dns)
+    public void checkExcludedDN(X500Name dns)
         throws NameConstraintValidatorException
     {
         checkExcludedDN(excludedSubtreesDN, ASN1Sequence.getInstance(dns));
@@ -338,9 +325,39 @@ public class PKIXNameConstraintValidator
             return false;
         }
 
-        for (int j = subtree.size() - 1; j >= 0; j--)
+        for (int j = 0; j < subtree.size(); j++)
         {
-            if (!subtree.getObjectAt(j).equals(dns.getObjectAt(j)))
+            // both subtree and dns are a ASN.1 Name and the elements are a RDN
+            RDN subtreeRdn = RDN.getInstance(subtree.getObjectAt(j));
+            RDN dnsRdn = RDN.getInstance(dns.getObjectAt(j));
+
+            // check if types and values of all naming attributes are matching, other types which are not restricted are allowed, see https://tools.ietf.org/html/rfc5280#section-7.1
+            if (subtreeRdn.size() == dnsRdn.size())
+            {
+                // Two relative distinguished names
+                //   RDN1 and RDN2 match if they have the same number of naming attributes
+                //   and for each naming attribute in RDN1 there is a matching naming attribute in RDN2.
+                //   NOTE: this is checking the attributes in the same order, which might be not necessary, if this is a problem also IETFUtils.rDNAreEqual mus tbe changed.
+                // use new RFC 5280 comparison, NOTE: this is now different from with RFC 3280, where only binary comparison is used
+                // obey RFC 5280 7.1
+                // special treatment of serialNumber for GSMA SGP.22 RSP specification
+                if (!subtreeRdn.getFirst().getType().equals(dnsRdn.getFirst().getType()))
+                {
+                    return false;
+                }
+                if (subtreeRdn.size() == 1 && subtreeRdn.getFirst().getType().equals(RFC4519Style.serialNumber))
+                {
+                    if (!dnsRdn.getFirst().getValue().toString().startsWith(subtreeRdn.getFirst().getValue().toString()))
+                    {
+                        return false;
+                    }
+                }
+                else if (!IETFUtils.rDNAreEqual(subtreeRdn, dnsRdn))
+                {
+                    return false;
+                }
+            }
+            else
             {
                 return false;
             }
@@ -402,7 +419,7 @@ public class PKIXNameConstraintValidator
     private Set intersectDN(Set permitted, Set dns)
     {
         Set intersect = new HashSet();
-        for (Iterator it = dns.iterator(); it.hasNext(); )
+        for (Iterator it = dns.iterator(); it.hasNext();)
         {
             ASN1Sequence dn = ASN1Sequence.getInstance(((GeneralSubtree)it
                 .next()).getBase().getName().toASN1Primitive());
@@ -474,10 +491,29 @@ public class PKIXNameConstraintValidator
         }
     }
 
+    private Set intersectOtherName(Set permitted, Set otherNames)
+    {
+        Set intersect = new HashSet(permitted);
+
+        intersect.retainAll(otherNames);
+
+        return intersect;
+    }
+
+
+    private Set unionOtherName(Set permitted, OtherName otherName)
+    {
+        Set union = new HashSet(permitted);
+
+        union.add(otherName);
+
+        return union;
+    }
+
     private Set intersectEmail(Set permitted, Set emails)
     {
         Set intersect = new HashSet();
-        for (Iterator it = emails.iterator(); it.hasNext(); )
+        for (Iterator it = emails.iterator(); it.hasNext();)
         {
             String email = extractNameAsString(((GeneralSubtree)it.next())
                 .getBase());
@@ -543,7 +579,7 @@ public class PKIXNameConstraintValidator
     private Set intersectIP(Set permitted, Set ips)
     {
         Set intersect = new HashSet();
-        for (Iterator it = ips.iterator(); it.hasNext(); )
+        for (Iterator it = ips.iterator(); it.hasNext();)
         {
             byte[] ip = ASN1OctetString.getInstance(
                 ((GeneralSubtree)it.next()).getBase().getName()).getOctets();
@@ -629,7 +665,7 @@ public class PKIXNameConstraintValidator
     }
 
     /**
-     * Calculates the interesction if two IP ranges.
+     * Calculates the intersection if two IP ranges.
      *
      * @param ipWithSubmask1 The first IP address with its subnet mask.
      * @param ipWithSubmask2 The second IP address with its subnet mask.
@@ -774,6 +810,52 @@ public class PKIXNameConstraintValidator
             "Subject email address is not from a permitted subtree.");
     }
 
+    private void checkPermittedOtherName(Set permitted, OtherName name)
+        throws NameConstraintValidatorException
+    {
+        if (permitted == null)
+        {
+            return;
+        }
+
+        Iterator it = permitted.iterator();
+
+        while (it.hasNext())
+        {
+            OtherName str = ((OtherName)it.next());
+
+            if (otherNameIsConstrained(name, str))
+            {
+                return;
+            }
+        }
+
+        throw new NameConstraintValidatorException(
+            "Subject OtherName is not from a permitted subtree.");
+    }
+
+    private void checkExcludedOtherName(Set excluded, OtherName name)
+        throws NameConstraintValidatorException
+    {
+        if (excluded.isEmpty())
+        {
+            return;
+        }
+
+        Iterator it = excluded.iterator();
+
+        while (it.hasNext())
+        {
+            OtherName str = OtherName.getInstance(it.next());
+
+            if (otherNameIsConstrained(name, str))
+            {
+                throw new NameConstraintValidatorException(
+                    "OtherName is from an excluded subtree.");
+            }
+        }
+    }
+
     private void checkExcludedEmail(Set excluded, String email)
         throws NameConstraintValidatorException
     {
@@ -899,6 +981,16 @@ public class PKIXNameConstraintValidator
         return Arrays.areEqual(permittedSubnetAddress, ipSubnetAddress);
     }
 
+    private boolean otherNameIsConstrained(OtherName name, OtherName constraint)
+    {
+        if (constraint.equals(name))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private boolean emailIsConstrained(String email, String constraint)
     {
         String sub = email.substring(email.indexOf('@') + 1);
@@ -906,6 +998,10 @@ public class PKIXNameConstraintValidator
         if (constraint.indexOf('@') != -1)
         {
             if (email.equalsIgnoreCase(constraint))
+            {
+                return true;
+            }
+            if (sub.equalsIgnoreCase(constraint.substring(1)))
             {
                 return true;
             }
@@ -1297,7 +1393,7 @@ public class PKIXNameConstraintValidator
     private Set intersectDNS(Set permitted, Set dnss)
     {
         Set intersect = new HashSet();
-        for (Iterator it = dnss.iterator(); it.hasNext(); )
+        for (Iterator it = dnss.iterator(); it.hasNext();)
         {
             String dns = extractNameAsString(((GeneralSubtree)it.next())
                 .getBase());
@@ -1496,7 +1592,7 @@ public class PKIXNameConstraintValidator
     private Set intersectURI(Set permitted, Set uris)
     {
         Set intersect = new HashSet();
-        for (Iterator it = uris.iterator(); it.hasNext(); )
+        for (Iterator it = uris.iterator(); it.hasNext();)
         {
             String uri = extractNameAsString(((GeneralSubtree)it.next())
                 .getBase());
@@ -1887,34 +1983,147 @@ public class PKIXNameConstraintValidator
      */
     private String stringifyIP(byte[] ip)
     {
-        String temp = "";
+        StringBuilder temp = new StringBuilder();
         for (int i = 0; i < ip.length / 2; i++)
         {
-            temp += Integer.toString(ip[i] & 0x00FF) + ".";
+            if (temp.length() > 0)
+            {
+                temp.append(".");
+            }
+            temp.append(Integer.toString(ip[i] & 0x00FF));
         }
-        temp = temp.substring(0, temp.length() - 1);
-        temp += "/";
+
+        temp.append("/");
+        boolean first = true;
         for (int i = ip.length / 2; i < ip.length; i++)
         {
-            temp += Integer.toString(ip[i] & 0x00FF) + ".";
+            if (first)
+            {
+                first = false;
+            }
+            else
+            {
+                temp.append(".");
+            }
+            temp.append(Integer.toString(ip[i] & 0x00FF));
         }
-        temp = temp.substring(0, temp.length() - 1);
-        return temp;
+
+        return temp.toString();
     }
 
     private String stringifyIPCollection(Set ips)
     {
-        String temp = "";
-        temp += "[";
-        for (Iterator it = ips.iterator(); it.hasNext(); )
+        StringBuilder temp = new StringBuilder();
+        temp.append("[");
+        for (Iterator it = ips.iterator(); it.hasNext();)
         {
-            temp += stringifyIP((byte[])it.next()) + ",";
+            if (temp.length() > 1)
+            {
+                temp.append(",");
+            }
+            temp.append(stringifyIP((byte[])it.next()));
         }
-        if (temp.length() > 1)
+        temp.append("]");
+        return temp.toString();
+    }
+
+    private String stringifyOtherNameCollection(Set otherNames)
+    {
+        StringBuilder temp = new StringBuilder();
+        temp.append("[");
+        for (Iterator it = otherNames.iterator(); it.hasNext();)
         {
-            temp = temp.substring(0, temp.length() - 1);
+            if (temp.length() > 1)
+            {
+                temp.append(",");
+            }
+            OtherName name = OtherName.getInstance(it.next());
+            temp.append(name.getTypeID().getId());
+            temp.append(":");
+            try
+            {
+                temp.append(Hex.toHexString(name.getValue().toASN1Primitive().getEncoded()));
+            }
+            catch (IOException e)
+            {
+                temp.append(e.toString());
+            }
         }
-        temp += "]";
-        return temp;
+        temp.append("]");
+        return temp.toString();
+    }
+
+    private final void addLine(StringBuilder sb, String str)
+    {
+         sb.append(str).append(Strings.lineSeparator());
+    }
+
+    public String toString()
+    {
+        StringBuilder temp = new StringBuilder();
+
+        addLine(temp, "permitted:");
+        if (permittedSubtreesDN != null)
+        {
+            addLine(temp, "DN:");
+            addLine(temp, permittedSubtreesDN.toString());
+        }
+        if (permittedSubtreesDNS != null)
+        {
+            addLine(temp, "DNS:");
+            addLine(temp, permittedSubtreesDNS.toString());
+        }
+        if (permittedSubtreesEmail != null)
+        {
+            addLine(temp, "Email:");
+            addLine(temp, permittedSubtreesEmail.toString());
+        }
+        if (permittedSubtreesURI != null)
+        {
+            addLine(temp, "URI:");
+            addLine(temp, permittedSubtreesURI.toString());
+        }
+        if (permittedSubtreesIP != null)
+        {
+            addLine(temp, "IP:");
+            addLine(temp, stringifyIPCollection(permittedSubtreesIP));
+        }
+        if (permittedSubtreesOtherName != null)
+        {
+            addLine(temp, "OtherName:");
+            addLine(temp, stringifyOtherNameCollection(permittedSubtreesOtherName));
+        }
+        addLine(temp, "excluded:");
+        if (!excludedSubtreesDN.isEmpty())
+        {
+            addLine(temp, "DN:");
+            addLine(temp, excludedSubtreesDN.toString());
+        }
+        if (!excludedSubtreesDNS.isEmpty())
+        {
+            addLine(temp, "DNS:");
+            addLine(temp, excludedSubtreesDNS.toString());
+        }
+        if (!excludedSubtreesEmail.isEmpty())
+        {
+            addLine(temp, "Email:");
+            addLine(temp, excludedSubtreesEmail.toString());
+        }
+        if (!excludedSubtreesURI.isEmpty())
+        {
+            addLine(temp, "URI:");
+            addLine(temp, excludedSubtreesURI.toString());
+        }
+        if (!excludedSubtreesIP.isEmpty())
+        {
+            addLine(temp, "IP:");
+            addLine(temp, stringifyIPCollection(excludedSubtreesIP));
+        }
+        if (!excludedSubtreesOtherName.isEmpty())
+        {
+            addLine(temp, "OtherName:");
+            addLine(temp, stringifyOtherNameCollection(excludedSubtreesOtherName));
+        }
+        return temp.toString();
     }
 }

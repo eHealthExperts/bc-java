@@ -21,11 +21,11 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.RC2ParameterSpec;
 import javax.crypto.spec.RC5ParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.crypto.BlockCipher;
 import org.bouncycastle.crypto.BufferedBlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.engines.DESEngine;
@@ -40,6 +40,7 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.bouncycastle.crypto.params.RC2Parameters;
 import org.bouncycastle.crypto.params.RC5Parameters;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jcajce.provider.symmetric.util.BCPBEKey;
 import org.bouncycastle.util.Strings;
 
@@ -292,7 +293,7 @@ public class BrokenJCEBlockCipher
         {
             if (random == null)
             {
-                random = new SecureRandom();
+                random = CryptoServicesRegistrar.getSecureRandom();
             }
 
             if ((opmode == Cipher.ENCRYPT_MODE) || (opmode == Cipher.WRAP_MODE))
@@ -509,7 +510,7 @@ public class BrokenJCEBlockCipher
 
         if (wrappedKeyType == Cipher.SECRET_KEY)
         {
-            return new SecretKeySpec(encoded, wrappedKeyAlgorithm);
+            return new DestroyableSecretKeySpec(encoded, wrappedKeyAlgorithm);
         }
         else
         {

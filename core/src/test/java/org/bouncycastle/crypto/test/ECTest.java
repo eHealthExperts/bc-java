@@ -7,6 +7,7 @@ import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.nist.NISTNamedCurves;
 import org.bouncycastle.asn1.sec.SECNamedCurves;
+import org.bouncycastle.asn1.x9.ECNamedCurveTable;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.BasicAgreement;
@@ -15,6 +16,7 @@ import org.bouncycastle.crypto.agreement.ECDHCBasicAgreement;
 import org.bouncycastle.crypto.agreement.ECDHCUnifiedAgreement;
 import org.bouncycastle.crypto.agreement.ECMQVBasicAgreement;
 import org.bouncycastle.crypto.digests.SHA3Digest;
+import org.bouncycastle.crypto.ec.CustomNamedCurves;
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
 import org.bouncycastle.crypto.params.ECDHUPrivateParameters;
 import org.bouncycastle.crypto.params.ECDHUPublicParameters;
@@ -110,12 +112,8 @@ public class ECTest
 
     private void decodeTest()
     {
-        ECCurve.Fp curve = new ECCurve.Fp(
-            new BigInteger("6277101735386680763835789423207666416083908700390324961279"), // q
-            new BigInteger("fffffffffffffffffffffffffffffffefffffffffffffffc", 16), // a
-            new BigInteger("64210519e59c80e70fa7e9ab72243049feb8deecc146b9b1", 16)); // b
-
-        ECPoint p = curve.decodePoint(Hex.decode("03188da80eb03090f67cbf20eb43a18800f4ff0afd82ff1012")).normalize();
+        X9ECParameters x9 = ECNamedCurveTable.getByName("prime192v1");
+        ECPoint p = x9.getG();
 
         if (!p.getAffineXCoord().toBigInteger().equals(new BigInteger("188da80eb03090f67cbf20eb43a18800f4ff0afd82ff1012", 16)))
         {
@@ -127,7 +125,7 @@ public class ECTest
             fail("y uncompressed incorrectly");
         }
 
-        byte[] encoding = p.getEncoded();
+        byte[] encoding = p.getEncoded(true);
 
         if (!areEqual(encoding, Hex.decode("03188da80eb03090f67cbf20eb43a18800f4ff0afd82ff1012")))
         {
@@ -737,7 +735,7 @@ public class ECTest
     /**
      * Basic Key Agreement Test
      */
-    private void testECBasicAgreementTest()
+    private void testECDHBasicAgreement()
     {
         SecureRandom random = new SecureRandom();
 
@@ -792,6 +790,34 @@ public class ECTest
 
         k1 = e1.calculateAgreement(p2.getPublic());
         k2 = e2.calculateAgreement(p1.getPublic());
+
+        if (!k1.equals(k2))
+        {
+            fail("calculated agreement test failed");
+        }
+    }
+
+    private void testECDHBasicAgreementCofactor()
+    {
+        SecureRandom random = new SecureRandom();
+
+        X9ECParameters x9 = CustomNamedCurves.getByName("curve25519");
+        ECDomainParameters ec = new ECDomainParameters(x9.getCurve(), x9.getG(), x9.getN(), x9.getH(), x9.getSeed());
+
+        ECKeyPairGenerator kpg = new ECKeyPairGenerator();
+        kpg.init(new ECKeyGenerationParameters(ec, random));
+
+        AsymmetricCipherKeyPair p1 = kpg.generateKeyPair();
+        AsymmetricCipherKeyPair p2 = kpg.generateKeyPair();
+
+        BasicAgreement e1 = new ECDHBasicAgreement();
+        BasicAgreement e2 = new ECDHBasicAgreement();
+
+        e1.init(p1.getPrivate());
+        e2.init(p2.getPrivate());
+
+        BigInteger k1 = e1.calculateAgreement(p2.getPublic());
+        BigInteger k2 = e2.calculateAgreement(p1.getPublic());
 
         if (!k1.equals(k2))
         {
@@ -1078,7 +1104,8 @@ public class ECTest
         testECDSA191bitBinary();
         testECDSA239bitBinary();
         testECDSAKeyGenTest();
-        testECBasicAgreementTest();
+        testECDHBasicAgreement();
+        testECDHBasicAgreementCofactor();
 
         testECDSAP224sha224();
         testECDSAP224OneByteOver();

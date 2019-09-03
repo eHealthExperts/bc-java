@@ -3,9 +3,10 @@ package org.bouncycastle.eac.test;
 
 import java.security.Security;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import junit.extensions.TestSetup;
 import junit.framework.Test;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 class EACTestSetup
     extends TestSetup

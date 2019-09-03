@@ -1,17 +1,10 @@
 package org.bouncycastle.crypto.signers;
 
-import java.io.IOException;
 import java.math.BigInteger;
-import java.security.SecureRandom;
 
-import org.bouncycastle.asn1.ASN1EncodableVector;
-import org.bouncycastle.asn1.ASN1Encoding;
-import org.bouncycastle.asn1.ASN1Integer;
-import org.bouncycastle.asn1.ASN1Primitive;
-import org.bouncycastle.asn1.ASN1Sequence;
-import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.crypto.CipherParameters;
 import org.bouncycastle.crypto.CryptoException;
+import org.bouncycastle.crypto.CryptoServicesRegistrar;
 import org.bouncycastle.crypto.Digest;
 import org.bouncycastle.crypto.Signer;
 import org.bouncycastle.crypto.digests.SM3Digest;
@@ -27,7 +20,6 @@ import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECMultiplier;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.math.ec.FixedPointCombMultiplier;
-import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
 
 /**
@@ -37,12 +29,35 @@ public class SM2Signer
     implements Signer, ECConstants
 {
     private final DSAKCalculator kCalculator = new RandomDSAKCalculator();
-    private final SM3Digest digest = new SM3Digest();
+    private final Digest digest;
+    private final DSAEncoding encoding;
 
     private ECDomainParameters ecParams;
     private ECPoint pubPoint;
     private ECKeyParameters ecKey;
     private byte[] z;
+
+    public SM2Signer()
+    {
+        this(StandardDSAEncoding.INSTANCE, new SM3Digest());
+    }
+
+    public SM2Signer(Digest digest)
+    {
+        this(StandardDSAEncoding.INSTANCE, digest);
+    }
+
+    public SM2Signer(DSAEncoding encoding)
+    {
+        this.encoding = encoding;
+        this.digest = new SM3Digest();
+    }
+
+    public SM2Signer(DSAEncoding encoding, Digest digest)
+    {
+        this.encoding = encoding;
+        this.digest = digest;
+    }
 
     public void init(boolean forSigning, CipherParameters param)
     {
@@ -53,11 +68,17 @@ public class SM2Signer
         {
             baseParam = ((ParametersWithID)param).getParameters();
             userID = ((ParametersWithID)param).getID();
+
+            if (userID.length >= 8192)
+            {
+                throw new IllegalArgumentException("SM2 user ID must be less than 2^16 bits long");
+            }
         }
         else
         {
             baseParam = param;
-            userID = Hex.decode("31323334353637383132333435363738"); // the default value
+            // the default value, string value is "1234567812345678"
+            userID = Hex.decode("31323334353637383132333435363738");
         }
 
         if (forSigning)
@@ -74,7 +95,7 @@ public class SM2Signer
             {
                 ecKey = (ECKeyParameters)baseParam;
                 ecParams = ecKey.getParameters();
-                kCalculator.init(ecParams.getN(), new SecureRandom());
+                kCalculator.init(ecParams.getN(), CryptoServicesRegistrar.getSecureRandom());
             }
             pubPoint = createBasePointMultiplier().multiply(ecParams.getG(), ((ECPrivateKeyParameters)ecKey).getD()).normalize();
         }
@@ -104,13 +125,11 @@ public class SM2Signer
     {
         try
         {
-            BigInteger[] rs = derDecode(signature);
-            if (rs != null)
-            {
-                return verifySignature(rs[0], rs[1]);
-            }
+            BigInteger[] rs = encoding.decode(ecParams.getN(), signature);
+
+            return verifySignature(rs[0], rs[1]);
         }
-        catch (IOException e)
+        catch (Exception e)
         {
         }
 
@@ -133,7 +152,7 @@ public class SM2Signer
         byte[] eHash = digestDoFinal();
 
         BigInteger n = ecParams.getN();
-        BigInteger e = calculateE(eHash);
+        BigInteger e = calculateE(n, eHash);
         BigInteger d = ((ECPrivateKeyParameters)ecKey).getD();
 
         BigInteger r, s;
@@ -168,9 +187,9 @@ public class SM2Signer
         // A7
         try
         {
-            return derEncode(r, s);
+            return encoding.encode(ecParams.getN(), r, s);
         }
-        catch (IOException ex)
+        catch (Exception ex)
         {
             throw new CryptoException("unable to encode signature: " + ex.getMessage(), ex);
         }
@@ -197,7 +216,7 @@ public class SM2Signer
         byte[] eHash = digestDoFinal();
 
         // B4
-        BigInteger e = calculateE(eHash);
+        BigInteger e = calculateE(n, eHash);
 
         // B5
         BigInteger t = r.add(s).mod(n);
@@ -269,39 +288,9 @@ public class SM2Signer
         return new FixedPointCombMultiplier();
     }
 
-    protected BigInteger calculateE(byte[] message)
+    protected BigInteger calculateE(BigInteger n, byte[] message)
     {
+        // TODO Should hashes larger than the order be truncated as with ECDSA?
         return new BigInteger(1, message);
-    }
-
-    protected BigInteger[] derDecode(byte[] encoding)
-        throws IOException
-    {
-        ASN1Sequence seq = ASN1Sequence.getInstance(ASN1Primitive.fromByteArray(encoding));
-        if (seq.size() != 2)
-        {
-            return null;
-        }
-
-        BigInteger r = ASN1Integer.getInstance(seq.getObjectAt(0)).getValue();
-        BigInteger s = ASN1Integer.getInstance(seq.getObjectAt(1)).getValue();
-
-        byte[] expectedEncoding = derEncode(r, s);
-        if (!Arrays.constantTimeAreEqual(expectedEncoding, encoding))
-        {
-            return null;
-        }
-
-        return new BigInteger[]{ r, s };
-    }
-
-    protected byte[] derEncode(BigInteger r, BigInteger s)
-        throws IOException
-    {
-
-        ASN1EncodableVector v = new ASN1EncodableVector();
-        v.add(new ASN1Integer(r));
-        v.add(new ASN1Integer(s));
-        return new DERSequence(v).getEncoded(ASN1Encoding.DER);
     }
 }

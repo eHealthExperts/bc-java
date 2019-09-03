@@ -3,7 +3,6 @@ package org.bouncycastle.pkcs.test;
 import java.math.BigInteger;
 import java.security.Security;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.DERNull;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.EncryptedPrivateKeyInfo;
@@ -22,6 +21,8 @@ import org.bouncycastle.pkcs.jcajce.JcePKCSPBEInputDecryptorProviderBuilder;
 import org.bouncycastle.pkcs.jcajce.JcePKCSPBEOutputEncryptorBuilder;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Base64;
+
+import junit.framework.TestCase;
 
 public class PKCS8Test
     extends TestCase
@@ -127,6 +128,11 @@ public class PKCS8Test
     public void testScrypt()
         throws Exception
     {
+        if (getJvmVersion() < 7)  // runs out of memory
+        {
+            return;
+        }
+        
         PKCS8EncryptedPrivateKeyInfo info = new PKCS8EncryptedPrivateKeyInfo(pkcs8Scrypt);
 
         PrivateKeyInfo pkInfo = info.decryptPrivateKeyInfo(new JcePKCSPBEInputDecryptorProviderBuilder().setProvider("BC").build("Rabbit".toCharArray()));
@@ -191,6 +197,11 @@ public class PKCS8Test
     public void testScryptEncryption()
         throws Exception
     {
+        if (getJvmVersion() < 7)      // runs out of memory
+        {
+            return;
+        }
+
         PKCS8EncryptedPrivateKeyInfoBuilder bldr = new PKCS8EncryptedPrivateKeyInfoBuilder(scryptKey);
 
         PBKDFConfig scrypt = new ScryptConfig.Builder(1048576, 8, 1)
@@ -208,5 +219,29 @@ public class PKCS8Test
         PrivateKeyInfo pkInfo = info.decryptPrivateKeyInfo(new JcePKCSPBEInputDecryptorProviderBuilder().setProvider("BC").build("Rabbit".toCharArray()));
 
         assertTrue(Arrays.areEqual(scryptKey, pkInfo.getEncoded()));
+    }
+
+    private static int getJvmVersion()
+    {
+        String version = System.getProperty("java.version");
+
+        if (version.startsWith("1.7"))
+        {
+            return 7;
+        }
+        if (version.startsWith("1.8"))
+        {
+            return 8;
+        }
+        if (version.startsWith("1.9"))
+        {
+            return 9;
+        }
+        if (version.startsWith("1.1"))
+        {
+            return 10;
+        }
+
+        return -1;
     }
 }

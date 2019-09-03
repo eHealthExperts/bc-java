@@ -28,12 +28,7 @@ import java.util.Iterator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource;
-import javax.crypto.spec.SecretKeySpec;
 
-import junit.framework.Assert;
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;
@@ -68,6 +63,7 @@ import org.bouncycastle.cms.CMSEnvelopedData;
 import org.bouncycastle.cms.CMSEnvelopedDataGenerator;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.cms.CMSProcessableByteArray;
+import org.bouncycastle.cms.CMSTypedData;
 import org.bouncycastle.cms.KeyAgreeRecipientInformation;
 import org.bouncycastle.cms.KeyTransRecipientInformation;
 import org.bouncycastle.cms.OriginatorInfoGenerator;
@@ -93,6 +89,7 @@ import org.bouncycastle.cms.jcajce.JceKeyTransRecipientId;
 import org.bouncycastle.cms.jcajce.JceKeyTransRecipientInfoGenerator;
 import org.bouncycastle.cms.jcajce.JcePasswordEnvelopedRecipient;
 import org.bouncycastle.cms.jcajce.JcePasswordRecipientInfoGenerator;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.ECGOST3410NamedCurveTable;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMKeyPair;
@@ -102,6 +99,11 @@ import org.bouncycastle.operator.jcajce.JcaAlgorithmParametersConverter;
 import org.bouncycastle.util.Strings;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
+
+import junit.framework.Assert;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 public class NewEnvelopedDataTest
     extends TestCase
@@ -499,26 +501,26 @@ public class NewEnvelopedDataTest
 
     public byte[] gost2012_KeyTrans_Reci_Cert = Base64.decode(
         "MIIEMzCCA+CgAwIBAgIEBSqgszAKBggqhQMHAQEDAjCByTELMAkGA1UEBhMCUlUxIDAeBgNVBAgMF9ChLtCf0LjRgtC10YDQ" +
-        "sdGD0YDQs9GKMR8wHQYDVQQKDBbQodC+0LLRgNC10LzQtdC90L3QuNC6MR8wHQYDVQQLDBbQoNGD0LrQvtCy0L7QtNGB0YLQ" +
-        "stC+MRkwFwYDVQQMDBDQoNC10LTQsNC60YLQvtGAMTswOQYDVQQDDDLQn9GD0YjQutC40L0g0JDQu9C10LrRgdCw0L3QtNGA" +
-        "INCh0LXRgNCz0LXQtdCy0LjRhzAeFw0xNzA3MTYxNDAwMDBaFw0zNzA3MTYxNDAwMDBaMIHJMQswCQYDVQQGEwJSVTEgMB4G" +
-        "A1UECAwX0KEu0J/QuNGC0LXRgNCx0YPRgNCz0YoxHzAdBgNVBAoMFtCh0L7QstGA0LXQvNC10L3QvdC40LoxHzAdBgNVBAsM" +
-        "FtCg0YPQutC+0LLQvtC00YHRgtCy0L4xGTAXBgNVBAwMENCg0LXQtNCw0LrRgtC+0YAxOzA5BgNVBAMMMtCf0YPRiNC60LjQ" +
-        "vSDQkNC70LXQutGB0LDQvdC00YAg0KHQtdGA0LPQtdC10LLQuNGHMGYwHwYIKoUDBwEBAQEwEwYHKoUDAgIkAAYIKoUDBwEB" +
-        "AgIDQwAEQEG5/wUY0LkiqETYAZY6o5mrjwWQNBYbSIKghYgKzLgSv1RCuTEFXRIJQcMG0V80auKVZNty9kcvn9P0IcJpGfGj" +
-        "ggGlMIIBoTAOBgNVHQ8BAf8EBAMCAf4wYwYDVR0lBFwwWgYIKwYBBQUHAwEGCCsGAQUFBwMCBggrBgEFBQcDAwYIKwYBBQUH" +
-        "AwQGCCsGAQUFBwMFBggrBgEFBQcDBgYIKwYBBQUHAwcGCCsGAQUFBwMIBggrBgEFBQcDCTAPBgNVHRMBAf8EBTADAQH/MB0G" +
-        "A1UdDgQWBBQJwiUIQOJNbB0Fzh6ucd3uRE9QzDCB+QYDVR0jBIHxMIHugBQJwiUIQOJNbB0Fzh6ucd3uRE9QzKGBz6SBzDCB" +
-        "yTELMAkGA1UEBhMCUlUxIDAeBgNVBAgMF9ChLtCf0LjRgtC10YDQsdGD0YDQs9GKMR8wHQYDVQQKDBbQodC+0LLRgNC10LzQ" +
-        "tdC90L3QuNC6MR8wHQYDVQQLDBbQoNGD0LrQvtCy0L7QtNGB0YLQstC+MRkwFwYDVQQMDBDQoNC10LTQsNC60YLQvtGAMTsw" +
-        "OQYDVQQDDDLQn9GD0YjQutC40L0g0JDQu9C10LrRgdCw0L3QtNGAINCh0LXRgNCz0LXQtdCy0LjRh4IEBSqgszAKBggqhQMH" +
-        "AQEDAgNBAKLmdCiVR9MWeoC+MNudXGny3l2uDBBttvhTli0gDEaQLnBFyvD+cfSLgsheoz8vwhyqD/6W3ATBMRiGjqNJjQE=");
+            "sdGD0YDQs9GKMR8wHQYDVQQKDBbQodC+0LLRgNC10LzQtdC90L3QuNC6MR8wHQYDVQQLDBbQoNGD0LrQvtCy0L7QtNGB0YLQ" +
+            "stC+MRkwFwYDVQQMDBDQoNC10LTQsNC60YLQvtGAMTswOQYDVQQDDDLQn9GD0YjQutC40L0g0JDQu9C10LrRgdCw0L3QtNGA" +
+            "INCh0LXRgNCz0LXQtdCy0LjRhzAeFw0xNzA3MTYxNDAwMDBaFw0zNzA3MTYxNDAwMDBaMIHJMQswCQYDVQQGEwJSVTEgMB4G" +
+            "A1UECAwX0KEu0J/QuNGC0LXRgNCx0YPRgNCz0YoxHzAdBgNVBAoMFtCh0L7QstGA0LXQvNC10L3QvdC40LoxHzAdBgNVBAsM" +
+            "FtCg0YPQutC+0LLQvtC00YHRgtCy0L4xGTAXBgNVBAwMENCg0LXQtNCw0LrRgtC+0YAxOzA5BgNVBAMMMtCf0YPRiNC60LjQ" +
+            "vSDQkNC70LXQutGB0LDQvdC00YAg0KHQtdGA0LPQtdC10LLQuNGHMGYwHwYIKoUDBwEBAQEwEwYHKoUDAgIkAAYIKoUDBwEB" +
+            "AgIDQwAEQEG5/wUY0LkiqETYAZY6o5mrjwWQNBYbSIKghYgKzLgSv1RCuTEFXRIJQcMG0V80auKVZNty9kcvn9P0IcJpGfGj" +
+            "ggGlMIIBoTAOBgNVHQ8BAf8EBAMCAf4wYwYDVR0lBFwwWgYIKwYBBQUHAwEGCCsGAQUFBwMCBggrBgEFBQcDAwYIKwYBBQUH" +
+            "AwQGCCsGAQUFBwMFBggrBgEFBQcDBgYIKwYBBQUHAwcGCCsGAQUFBwMIBggrBgEFBQcDCTAPBgNVHRMBAf8EBTADAQH/MB0G" +
+            "A1UdDgQWBBQJwiUIQOJNbB0Fzh6ucd3uRE9QzDCB+QYDVR0jBIHxMIHugBQJwiUIQOJNbB0Fzh6ucd3uRE9QzKGBz6SBzDCB" +
+            "yTELMAkGA1UEBhMCUlUxIDAeBgNVBAgMF9ChLtCf0LjRgtC10YDQsdGD0YDQs9GKMR8wHQYDVQQKDBbQodC+0LLRgNC10LzQ" +
+            "tdC90L3QuNC6MR8wHQYDVQQLDBbQoNGD0LrQvtCy0L7QtNGB0YLQstC+MRkwFwYDVQQMDBDQoNC10LTQsNC60YLQvtGAMTsw" +
+            "OQYDVQQDDDLQn9GD0YjQutC40L0g0JDQu9C10LrRgdCw0L3QtNGAINCh0LXRgNCz0LXQtdCy0LjRh4IEBSqgszAKBggqhQMH" +
+            "AQEDAgNBAKLmdCiVR9MWeoC+MNudXGny3l2uDBBttvhTli0gDEaQLnBFyvD+cfSLgsheoz8vwhyqD/6W3ATBMRiGjqNJjQE=");
 
     public byte[] gost2012_KeyTrans_Reci_Key = Base64.decode(
         "MEgCAQAwHwYIKoUDBwEBBgEwEwYHKoUDAgIkAAYIKoUDBwEBAgIEIgQgy+dPu0sLqJ/Fokomiu69lRA48HaPNkP7kmzDHOxP" +
             "QFc="
     );
-    
+
     public byte[] gost2012_KeyTrans_Msg = Base64.decode(
         "MIIB/gYJKoZIhvcNAQcDoIIB7zCCAesCAQAxggGqMIIBpgIBADCB0jCByTELMAkGA1UEBhMCUlUxIDAeBgNVBAgMF9ChLtCf" +
             "0LjRgtC10YDQsdGD0YDQs9GKMR8wHQYDVQQKDBbQodC+0LLRgNC10LzQtdC90L3QuNC6MR8wHQYDVQQLDBbQoNGD0LrQvtCy" +
@@ -917,9 +919,10 @@ public class NewEnvelopedDataTest
 
         edGen.addRecipientInfoGenerator(new JceKeyTransRecipientInfoGenerator(_reciCert).setAlgorithmMapping(PKCSObjectIdentifiers.rsaEncryption, "RSA/2/PKCS1Padding").setProvider(BC));
 
+        OutputEncryptor encryptor = new JceCMSContentEncryptorBuilder(CMSAlgorithm.DES_EDE3_CBC).setProvider(BC).build();
         CMSEnvelopedData ed = edGen.generate(
             new CMSProcessableByteArray(data),
-            new JceCMSContentEncryptorBuilder(CMSAlgorithm.DES_EDE3_CBC).setProvider(BC).build());
+            encryptor);
 
         RecipientInformationStore recipients = ed.getRecipientInfos();
 
@@ -950,6 +953,32 @@ public class NewEnvelopedDataTest
             fail("recipients not matched using general recipient ID.");
         }
         assertTrue(collection.iterator().next() instanceof RecipientInformation);
+
+        ed = edGen.generate(
+            new CMSProcessableByteArray(data),
+            new JceCMSContentEncryptorBuilder(encryptor.getAlgorithmIdentifier()).setProvider(BC).build());
+
+        recipients = ed.getRecipientInfos();
+
+        assertEquals(ed.getEncryptionAlgOID(), CMSEnvelopedDataGenerator.DES_EDE3_CBC);
+
+        c = recipients.getRecipients();
+
+        assertEquals(1, c.size());
+        assertEquals(encryptor.getAlgorithmIdentifier(), ed.getContentEncryptionAlgorithm());
+        
+        it = c.iterator();
+
+        while (it.hasNext())
+        {
+            RecipientInformation recipient = (RecipientInformation)it.next();
+
+            assertEquals(recipient.getKeyEncryptionAlgOID(), PKCSObjectIdentifiers.rsaEncryption.getId());
+
+            byte[] recData = recipient.getContent(new JceKeyTransEnvelopedRecipient(_reciKP.getPrivate()).setAlgorithmMapping(PKCSObjectIdentifiers.rsaEncryption, "RSA/2/PKCS1Padding").setProvider(BC));
+
+            assertEquals(true, Arrays.equals(data, recData));
+        }
     }
 
     public void testOriginatorInfoGeneration()
@@ -1387,7 +1416,7 @@ public class NewEnvelopedDataTest
         throws Exception
     {
         byte[] data = "WallaWallaWashington".getBytes();
-        SecretKey kek = new SecretKeySpec(new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, "AES");
+        SecretKey kek = new DestroyableSecretKeySpec(new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, "AES");
 
         CMSEnvelopedData ed = new CMSEnvelopedData(oldKEK);
 
@@ -2109,6 +2138,51 @@ public class NewEnvelopedDataTest
         processInput(ecKey, expected, "ecdh/encSessH.asc", new AlgorithmIdentifier(CMSAlgorithm.AES256_WRAP));
     }
 
+    public void testGost3410_2012_KeyTransGen()
+        throws Exception
+    {
+        byte[] data = Strings.toByteArray("hello world!");
+
+
+        CMSEnvelopedDataGenerator cmsEnvelopedDataGenerator = new CMSEnvelopedDataGenerator();
+
+
+        X509Certificate cert = (X509Certificate)CertificateFactory
+                                                    .getInstance("X.509", "BC")
+                                                    .generateCertificate(new ByteArrayInputStream(gost2012_512_Reci_Cert));
+        JceKeyTransRecipientInfoGenerator jceKey = new JceKeyTransRecipientInfoGenerator(cert).setProvider("BC");
+        cmsEnvelopedDataGenerator.addRecipientInfoGenerator(jceKey);
+        CMSTypedData msg = new CMSProcessableByteArray(data);
+        OutputEncryptor encryptor = new JceCMSContentEncryptorBuilder(CMSAlgorithm.GOST28147_GCFB).setProvider("BC").build();
+        CMSEnvelopedData cmsEnvelopedData = cmsEnvelopedDataGenerator.generate(msg, encryptor);
+
+        byte[] encryptedData = cmsEnvelopedData.getEncoded();
+
+        CMSEnvelopedData ed = new CMSEnvelopedData(encryptedData);
+        KeyFactory keyFact = KeyFactory.getInstance("ECGOST3410-2012", "BC");
+        PrivateKey privKey = keyFact.generatePrivate(new PKCS8EncodedKeySpec(gost2012_512_Reci_Key));
+
+        RecipientInformationStore recipients = ed.getRecipientInfos();
+
+        assertEquals(ed.getEncryptionAlgOID(), CryptoProObjectIdentifiers.gostR28147_gcfb.getId());
+
+        Collection c = recipients.getRecipients();
+
+        Iterator it = c.iterator();
+
+         while (it.hasNext())
+         {
+             RecipientInformation recipient = (RecipientInformation)it.next();
+
+             assertEquals(recipient.getKeyEncryptionAlgOID(), RosstandartObjectIdentifiers.id_tc26_gost_3410_12_512.getId());
+
+             byte[] recData = recipient.getContent(new JceKeyTransEnvelopedRecipient(privKey).setProvider(BC));
+
+             assertTrue(Arrays.equals(data, recData));
+         }
+
+    }
+
     public void testGost3410_2001_KeyTrans()
         throws Exception
     {
@@ -2145,7 +2219,7 @@ public class NewEnvelopedDataTest
 
         RecipientId id = new JceKeyTransRecipientId((X509Certificate)certFact.generateCertificate(new ByteArrayInputStream(gost3410_RecipCert)));
 
-        Collection collection = recipients.getRecipients(id);
+        Collection<RecipientInformation> collection = recipients.getRecipients(id);
         if (collection.size() != 1)
         {
             fail("recipients not matched using general recipient ID.");
@@ -2425,7 +2499,7 @@ public class NewEnvelopedDataTest
         CMSEnvelopedDataGenerator edGen = new CMSEnvelopedDataGenerator();
 
         JceKeyAgreeRecipientInfoGenerator recipientGenerator = new JceKeyAgreeRecipientInfoGenerator(CMSAlgorithm.ECDHGOST3410_2012_256,
-           senderKey, senderCert.getPublicKey(), CMSAlgorithm.GOST28147_CRYPTOPRO_WRAP).setProvider(BC);
+            senderKey, senderCert.getPublicKey(), CMSAlgorithm.GOST28147_CRYPTOPRO_WRAP).setProvider(BC);
 
         byte[] ukm = new byte[8];
         random.nextBytes(ukm);
@@ -2488,7 +2562,7 @@ public class NewEnvelopedDataTest
         CMSEnvelopedDataGenerator edGen = new CMSEnvelopedDataGenerator();
 
         JceKeyAgreeRecipientInfoGenerator recipientGenerator = new JceKeyAgreeRecipientInfoGenerator(CMSAlgorithm.ECDHGOST3410_2012_256,
-           senderKey, senderCert.getPublicKey(), CMSAlgorithm.GOST28147_CRYPTOPRO_WRAP).setProvider(BC);
+            senderKey, senderCert.getPublicKey(), CMSAlgorithm.GOST28147_CRYPTOPRO_WRAP).setProvider(BC);
 
         byte[] ukm = new byte[8];
         random.nextBytes(ukm);
@@ -2551,7 +2625,7 @@ public class NewEnvelopedDataTest
         CMSEnvelopedDataGenerator edGen = new CMSEnvelopedDataGenerator();
 
         JceKeyAgreeRecipientInfoGenerator recipientGenerator = new JceKeyAgreeRecipientInfoGenerator(CMSAlgorithm.ECDHGOST3410_2012_512,
-           senderKey, senderCert.getPublicKey(), CMSAlgorithm.GOST28147_CRYPTOPRO_WRAP).setProvider(BC);
+            senderKey, senderCert.getPublicKey(), CMSAlgorithm.GOST28147_CRYPTOPRO_WRAP).setProvider(BC);
 
         byte[] ukm = new byte[8];
         random.nextBytes(ukm);

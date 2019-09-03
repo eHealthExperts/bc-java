@@ -7,8 +7,8 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
 import org.bouncycastle.util.test.TestFailedException;
@@ -84,7 +84,7 @@ public abstract class BaseBlockCipherTest
             c1.init(Cipher.WRAP_MODE, k);
             c2.init(Cipher.UNWRAP_MODE, k);
 
-            Key wKey = c2.unwrap(c1.wrap(new SecretKeySpec(data, algorithm)), algorithm, Cipher.SECRET_KEY);
+            Key wKey = c2.unwrap(c1.wrap(new DestroyableSecretKeySpec(data, algorithm)), algorithm, Cipher.SECRET_KEY);
 
             if (!areEqual(data, wKey.getEncoded()))
             {
@@ -123,16 +123,16 @@ public abstract class BaseBlockCipherTest
 
         if (iv != null)
         {
-            wrapper.init(Cipher.WRAP_MODE, new SecretKeySpec(kek, algorithm), new IvParameterSpec(iv), rand);
+            wrapper.init(Cipher.WRAP_MODE, new DestroyableSecretKeySpec(kek, algorithm), new IvParameterSpec(iv), rand);
         }
         else
         {
-            wrapper.init(Cipher.WRAP_MODE, new SecretKeySpec(kek, algorithm), rand);
+            wrapper.init(Cipher.WRAP_MODE, new DestroyableSecretKeySpec(kek, algorithm), rand);
         }
 
         try
         {
-            byte[]  cText = wrapper.wrap(new SecretKeySpec(in, algorithm));
+            byte[]  cText = wrapper.wrap(new DestroyableSecretKeySpec(in, algorithm));
             if (!areEqual(cText, out))
             {
                 fail("failed wrap test " + id  + " expected " + new String(Hex.encode(out)) + " got " + new String(Hex.encode(cText)));
@@ -149,11 +149,11 @@ public abstract class BaseBlockCipherTest
 
         if (iv != null)
         {
-            wrapper.init(Cipher.UNWRAP_MODE, new SecretKeySpec(kek, algorithm), new IvParameterSpec(iv));
+            wrapper.init(Cipher.UNWRAP_MODE, new DestroyableSecretKeySpec(kek, algorithm), new IvParameterSpec(iv));
         }
         else
         {
-            wrapper.init(Cipher.UNWRAP_MODE, new SecretKeySpec(kek, algorithm));
+            wrapper.init(Cipher.UNWRAP_MODE, new DestroyableSecretKeySpec(kek, algorithm));
         }
 
         try

@@ -13,10 +13,10 @@ import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.crypto.prng.FixedSecureRandom;
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Hex;
 
@@ -61,7 +61,7 @@ public class AESTest
         ByteArrayInputStream    bIn;
         ByteArrayOutputStream   bOut;
 
-        key = new SecretKeySpec(keyBytes, "AES");
+        key = new DestroyableSecretKeySpec(keyBytes, "AES");
 
         in = Cipher.getInstance("AES/ECB/NoPadding", "BC");
         out = Cipher.getInstance("AES/ECB/NoPadding", "BC");
@@ -155,7 +155,7 @@ public class AESTest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "AES");
+        key = new DestroyableSecretKeySpec(K, "AES");
 
         in = Cipher.getInstance("AES/EAX/NoPadding", "BC");
         out = Cipher.getInstance("AES/EAX/NoPadding", "BC");
@@ -199,7 +199,7 @@ public class AESTest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "AES");
+        key = new DestroyableSecretKeySpec(K, "AES");
 
         in = Cipher.getInstance("AES/CCM/NoPadding", "BC");
         out = Cipher.getInstance("AES/CCM/NoPadding", "BC");
@@ -256,7 +256,7 @@ public class AESTest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "AES");
+        key = new DestroyableSecretKeySpec(K, "AES");
 
         in = Cipher.getInstance("AES/GCM/NoPadding", "BC");
         out = Cipher.getInstance("AES/GCM/NoPadding", "BC");
@@ -332,7 +332,7 @@ public class AESTest
         Key                     key;
         Cipher                  in, out;
 
-        key = new SecretKeySpec(K, "AES");
+        key = new DestroyableSecretKeySpec(K, "AES");
 
         in = Cipher.getInstance("AES/OCB/NoPadding", "BC");
         out = Cipher.getInstance("AES/OCB/NoPadding", "BC");

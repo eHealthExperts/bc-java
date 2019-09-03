@@ -60,7 +60,7 @@ public abstract class JcePasswordRecipient
         {
             IvParameterSpec ivSpec = new IvParameterSpec(ASN1OctetString.getInstance(keyEncryptionAlgorithm.getParameters()).getOctets());
 
-            keyEncryptionCipher.init(Cipher.UNWRAP_MODE, new SecretKeySpec(derivedKey, keyEncryptionCipher.getAlgorithm()), ivSpec);
+            keyEncryptionCipher.init(Cipher.UNWRAP_MODE, new DestroyableSecretKeySpec(derivedKey, keyEncryptionCipher.getAlgorithm()), ivSpec);
 
             return keyEncryptionCipher.unwrap(encryptedContentEncryptionKey, contentEncryptionAlgorithm.getAlgorithm().getId(), Cipher.SECRET_KEY);
         }

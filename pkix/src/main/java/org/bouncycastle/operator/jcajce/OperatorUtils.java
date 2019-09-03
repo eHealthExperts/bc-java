@@ -2,8 +2,7 @@ package org.bouncycastle.operator.jcajce;
 
 import java.security.Key;
 
-import javax.crypto.spec.SecretKeySpec;
-
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.operator.GenericKey;
 
 class OperatorUtils
@@ -17,7 +16,7 @@ class OperatorUtils
 
         if (key.getRepresentation() instanceof byte[])
         {
-            return new SecretKeySpec((byte[])key.getRepresentation(), "ENC");
+            return new DestroyableSecretKeySpec((byte[])key.getRepresentation(), "ENC");
         }
 
         throw new IllegalArgumentException("unknown generic key type");

@@ -6,6 +6,7 @@ import java.security.Security;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.jcajce.provider.asymmetric.DestroyableSecretKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.Strings;
 import org.bouncycastle.util.encoders.Hex;
@@ -66,7 +67,7 @@ public class CMacTest
 
         //128 bytes key
 
-        SecretKeySpec key = new SecretKeySpec(keyBytes128, "AES");
+        DestroyableSecretKeySpec key = new DestroyableSecretKeySpec(keyBytes128, "AES");
 
         // 0 bytes message - 128 bytes key
         mac.init(key);
@@ -130,7 +131,7 @@ public class CMacTest
 
         //192 bytes key
 
-        key = new SecretKeySpec(keyBytes192, "AES");
+        key = new DestroyableSecretKeySpec(keyBytes192, "AES");
 
         // 0 bytes message - 192 bytes key
         mac.init(key);
@@ -194,7 +195,7 @@ public class CMacTest
 
         //256 bytes key
 
-        key = new SecretKeySpec(keyBytes256, "AES");
+        key = new DestroyableSecretKeySpec(keyBytes256, "AES");
 
         // 0 bytes message - 256 bytes key
         mac.init(key);
@@ -260,7 +261,7 @@ public class CMacTest
 
         //DESede
 
-        key = new SecretKeySpec(keyBytes128, "DESede");
+        key = new DestroyableSecretKeySpec(keyBytes128, "DESede");
 
         // 0 bytes message - 128 bytes key
         mac.init(key);
@@ -298,7 +299,7 @@ public class CMacTest
     private void testCMac(Mac mac, byte[] keyBytes, String algorithm, byte[] input, byte[] expected)
         throws Exception
     {
-         Key key = new SecretKeySpec(keyBytes, algorithm);
+         Key key = new DestroyableSecretKeySpec(keyBytes, algorithm);
 
          mac.init(key);
 

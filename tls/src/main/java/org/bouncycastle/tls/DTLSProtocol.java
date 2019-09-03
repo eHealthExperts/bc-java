@@ -3,6 +3,7 @@ package org.bouncycastle.tls;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -60,11 +61,11 @@ public abstract class DTLSProtocol
         return maxFragmentLength;
     }
 
-    protected static byte[] generateCertificate(Certificate certificate)
+    protected static byte[] generateCertificate(TlsContext context, Certificate certificate, OutputStream endPointHash)
         throws IOException
     {
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        certificate.encode(buf);
+        certificate.encode(context, buf, endPointHash);
         return buf.toByteArray();
     }
 
@@ -76,12 +77,32 @@ public abstract class DTLSProtocol
         return buf.toByteArray();
     }
 
-    protected byte[] createVerifyData(TlsContext context, DTLSReliableHandshake handshake, boolean isServer)
+    protected static byte[] createVerifyData(TlsContext context, DTLSReliableHandshake handshake, boolean isServer)
     {
         return TlsUtils.calculateTLSVerifyData(context, handshake.getHandshakeHash(), isServer);
     }
 
-    protected static void validateSelectedCipherSuite(int selectedCipherSuite, short alertDescription)
+    protected static void sendCertificateMessage(TlsContext context, DTLSReliableHandshake handshake,
+        Certificate certificate, OutputStream endPointHash) throws IOException
+    {
+        SecurityParameters securityParameters = context.getSecurityParametersHandshake();
+        if (null != securityParameters.getLocalCertificate())
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        if (null == certificate)
+        {
+            certificate = Certificate.EMPTY_CHAIN;
+        }
+
+        byte[] certificateBody = generateCertificate(context, certificate, endPointHash);
+        handshake.sendMessage(HandshakeType.certificate, certificateBody);
+
+        securityParameters.localCertificate = certificate;
+    }
+
+    protected static int validateSelectedCipherSuite(int selectedCipherSuite, short alertDescription)
         throws IOException
     {
         switch (TlsUtils.getEncryptionAlgorithm(selectedCipherSuite))
@@ -90,6 +111,8 @@ public abstract class DTLSProtocol
         case EncryptionAlgorithm.RC4_128:
         case -1:
             throw new TlsFatalAlert(alertDescription);
+        default:
+            return selectedCipherSuite;
         }
     }
 }
