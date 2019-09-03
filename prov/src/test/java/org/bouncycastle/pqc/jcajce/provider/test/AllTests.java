@@ -43,6 +43,7 @@ public class AllTests
         suite.addTestSuite(Sphincs256KeyPairGeneratorTest.class);
         suite.addTestSuite(XMSSTest.class);
         suite.addTestSuite(XMSSMTTest.class);
+        suite.addTestSuite(QTESLATest.class);
 
         return new BCTestSetup(suite);
     }

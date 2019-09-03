@@ -13,6 +13,7 @@ import org.bouncycastle.asn1.DERBitString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.math.ec.ECAlgorithms;
 import org.bouncycastle.math.ec.ECCurve;
+import org.bouncycastle.util.Arrays;
 
 /**
  * ASN.1 def for Elliptic-Curve Curve structure. See
@@ -29,9 +30,7 @@ public class X9Curve
     public X9Curve(
         ECCurve     curve)
     {
-        this.curve = curve;
-        this.seed = null;
-        setFieldIdentifier();
+        this(curve, null);
     }
 
     public X9Curve(
@@ -39,18 +38,8 @@ public class X9Curve
         byte[]      seed)
     {
         this.curve = curve;
-        this.seed = seed;
+        this.seed = Arrays.clone(seed);
         setFieldIdentifier();
-    }
-
-    /**
-     * @deprecated use constructor including order/cofactor
-     */
-    public X9Curve(
-        X9FieldID     fieldID,
-        ASN1Sequence  seq)
-    {
-        this(fieldID, null, null, seq);
     }
 
     public X9Curve(
@@ -108,7 +97,7 @@ public class X9Curve
 
         if (seq.size() == 3)
         {
-            seed = ((DERBitString)seq.getObjectAt(2)).getBytes();
+            seed = Arrays.clone(((DERBitString)seq.getObjectAt(2)).getBytes());
         }   
     }   
 
@@ -135,7 +124,7 @@ public class X9Curve
 
     public byte[]   getSeed()
     {
-        return seed;
+        return Arrays.clone(seed);
     }
 
     /**

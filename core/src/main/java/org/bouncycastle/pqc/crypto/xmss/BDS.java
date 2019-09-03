@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.TreeMap;
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.crypto.Digest;
+
 /**
  * BDS.
  */
@@ -109,9 +112,11 @@ public final class BDS
         this.treeHeight = last.treeHeight;
         this.k = last.k;
         this.root = last.root;
-        this.authenticationPath = new ArrayList<XMSSNode>(last.authenticationPath);
+        this.authenticationPath = new ArrayList<XMSSNode>();  // note use of addAll to avoid serialization issues
+        this.authenticationPath.addAll(last.authenticationPath);
         this.retain = last.retain;
-        this.stack = (Stack<XMSSNode>)last.stack.clone();
+        this.stack = new Stack<XMSSNode>(); // note use of addAll to avoid serialization issues
+        this.stack.addAll(last.stack);
         this.treeHashInstances = last.treeHashInstances;
         this.keep = new TreeMap<Integer, XMSSNode>(last.keep);
         this.index = last.index;
@@ -120,7 +125,25 @@ public final class BDS
 
         last.used = true;
     }
-    
+
+    private BDS(BDS last, Digest digest)
+    {
+        this.wotsPlus = new WOTSPlus(new WOTSPlusParameters(digest));
+        this.treeHeight = last.treeHeight;
+        this.k = last.k;
+        this.root = last.root;
+        this.authenticationPath = new ArrayList<XMSSNode>();  // note use of addAll to avoid serialization issues
+        this.authenticationPath.addAll(last.authenticationPath);
+        this.retain = last.retain;
+        this.stack = new Stack<XMSSNode>();     // note use of addAll to avoid serialization issues
+        this.stack.addAll(last.stack);
+        this.treeHashInstances = last.treeHashInstances;
+        this.keep = new TreeMap<Integer, XMSSNode>(last.keep);
+        this.index = last.index;
+        this.used = last.used;
+        this.validate();
+    }
+
     public BDS getNextState(byte[] publicSeed, byte[] secretKeySeed, OTSHashAddress otsHashAddress)
     {
         return new BDS(this, publicSeed, secretKeySeed, otsHashAddress);
@@ -168,7 +191,7 @@ public final class BDS
             while (!stack.isEmpty() && stack.peek().getHeight() == node.getHeight())
             {
 				/* add to authenticationPath if leafIndex == 1 */
-                int indexOnHeight = ((int)Math.floor(indexLeaf / (1 << node.getHeight())));
+                int indexOnHeight = indexLeaf / (1 << node.getHeight());
                 if (indexOnHeight == 1)
                 {
                     authenticationPath.add(node.clone());
@@ -227,13 +250,6 @@ public final class BDS
         {
             throw new IllegalStateException("index out of bounds");
         }
-		/* prepare addresses */
-        LTreeAddress lTreeAddress = (LTreeAddress)new LTreeAddress.Builder()
-            .withLayerAddress(otsHashAddress.getLayerAddress()).withTreeAddress(otsHashAddress.getTreeAddress())
-            .build();
-        HashTreeAddress hashTreeAddress = (HashTreeAddress)new HashTreeAddress.Builder()
-            .withLayerAddress(otsHashAddress.getLayerAddress()).withTreeAddress(otsHashAddress.getTreeAddress())
-            .build();
 
 		/* determine tau */
         int tau = XMSSUtil.calculateTau(index, treeHeight);
@@ -242,6 +258,15 @@ public final class BDS
         {
             keep.put(tau, authenticationPath.get(tau).clone());
         }
+
+        /* prepare addresses */
+        LTreeAddress lTreeAddress = (LTreeAddress)new LTreeAddress.Builder()
+            .withLayerAddress(otsHashAddress.getLayerAddress()).withTreeAddress(otsHashAddress.getTreeAddress())
+            .build();
+        HashTreeAddress hashTreeAddress = (HashTreeAddress)new HashTreeAddress.Builder()
+            .withLayerAddress(otsHashAddress.getLayerAddress()).withTreeAddress(otsHashAddress.getTreeAddress())
+            .build();
+
 		/* leaf is a left node */
         if (tau == 0)
         {
@@ -270,6 +295,11 @@ public final class BDS
                 .withLayerAddress(hashTreeAddress.getLayerAddress())
                 .withTreeAddress(hashTreeAddress.getTreeAddress()).withTreeHeight(tau - 1)
                 .withTreeIndex(index >> tau).withKeyAndMask(hashTreeAddress.getKeyAndMask()).build();
+            /*
+             * import WOTSPlusSecretKey as its needed to calculate the public
+             * key on the fly
+             */
+            wotsPlus.importKeys(wotsPlus.getWOTSPlusSecretKey(secretSeed, otsHashAddress), publicSeed);
             XMSSNode node = XMSSNodeUtil.randomizeHash(wotsPlus, authenticationPath.get(tau - 1), keep.get(tau - 1), hashTreeAddress);
             node = new XMSSNode(node.getHeight() + 1, node.getValue());
             authenticationPath.set(tau, node);
@@ -348,7 +378,7 @@ public final class BDS
         return ret;
     }
 
-    protected void validate()
+    private void validate()
     {
         if (authenticationPath == null)
         {
@@ -396,18 +426,13 @@ public final class BDS
         return authenticationPath;
     }
 
-    protected void setXMSS(XMSSParameters xmss)
-    {
-        if (treeHeight != xmss.getHeight())
-        {
-            throw new IllegalStateException("wrong height");
-        }
-
-        this.wotsPlus = xmss.getWOTSPlus();
-    }
-
     protected int getIndex()
     {
         return index;
+    }
+
+    public BDS withWOTSDigest(ASN1ObjectIdentifier digestName)
+    {
+        return new BDS(this, DigestUtil.getDigest(digestName));
     }
 }

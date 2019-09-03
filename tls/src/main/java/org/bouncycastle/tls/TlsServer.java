@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.util.Hashtable;
 import java.util.Vector;
 
+import org.bouncycastle.tls.crypto.TlsDHConfig;
+import org.bouncycastle.tls.crypto.TlsECConfig;
+
 /**
  * Interface describing a TLS server endpoint.
  */
@@ -29,9 +32,6 @@ public interface TlsServer
     void notifyOfferedCipherSuites(int[] offeredCipherSuites)
         throws IOException;
 
-    void notifyOfferedCompressionMethods(short[] offeredCompressionMethods)
-        throws IOException;
-
     // Hashtable is (Integer -> byte[])
     void processClientExtensions(Hashtable clientExtensions)
         throws IOException;
@@ -40,9 +40,6 @@ public interface TlsServer
         throws IOException;
 
     int getSelectedCipherSuite()
-        throws IOException;
-
-    short getSelectedCompressionMethod()
         throws IOException;
 
     // Hashtable is (Integer -> byte[])
@@ -76,11 +73,16 @@ public interface TlsServer
     CertificateStatus getCertificateStatus()
         throws IOException;
 
-    TlsKeyExchange getKeyExchange()
-        throws IOException;
-
     CertificateRequest getCertificateRequest()
         throws IOException;
+
+    TlsPSKIdentityManager getPSKIdentityManager() throws IOException;
+
+    TlsSRPLoginParameters getSRPLoginParameters() throws IOException;
+
+    TlsDHConfig getDHConfig() throws IOException;
+
+    TlsECConfig getECDHConfig() throws IOException;
 
     // Vector is (SupplementalDataEntry)
     void processClientSupplementalData(Vector clientSupplementalData)

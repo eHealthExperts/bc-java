@@ -30,30 +30,28 @@ public class DTLSClientProtocol
             throw new IllegalArgumentException("'transport' cannot be null");
         }
 
-        SecurityParameters securityParameters = new SecurityParameters();
-        securityParameters.entity = ConnectionEnd.client;
-
         ClientHandshakeState state = new ClientHandshakeState();
         state.client = client;
-        state.clientContext = new TlsClientContextImpl(client.getCrypto(), securityParameters);
-
-        securityParameters.clientRandom = TlsProtocol.createRandomBlock(client.shouldUseGMTUnixTime(), state.clientContext);
-        securityParameters.extendedPadding = client.shouldUseExtendedPadding();
+        state.clientContext = new TlsClientContextImpl(client.getCrypto());
 
         client.init(state.clientContext);
+        state.clientContext.handshakeBeginning(client);
 
-        DTLSRecordLayer recordLayer = new DTLSRecordLayer(transport, state.clientContext, client, ContentType.handshake);
+        SecurityParameters securityParameters = state.clientContext.getSecurityParametersHandshake();
+        securityParameters.extendedPadding = client.shouldUseExtendedPadding();
 
         TlsSession sessionToResume = state.client.getSessionToResume();
         if (sessionToResume != null && sessionToResume.isResumable())
         {
             SessionParameters sessionParameters = sessionToResume.exportSessionParameters();
-            if (sessionParameters != null)
+            if (sessionParameters != null && sessionParameters.isExtendedMasterSecret())
             {
                 state.tlsSession = sessionToResume;
                 state.sessionParameters = sessionParameters;
             }
         }
+
+        DTLSRecordLayer recordLayer = new DTLSRecordLayer(state.clientContext, state.client, transport);
 
         try
         {
@@ -89,10 +87,11 @@ public class DTLSClientProtocol
     protected DTLSTransport clientHandshake(ClientHandshakeState state, DTLSRecordLayer recordLayer)
         throws IOException
     {
-        SecurityParameters securityParameters = state.clientContext.getSecurityParameters();
-        DTLSReliableHandshake handshake = new DTLSReliableHandshake(state.clientContext, recordLayer);
+        SecurityParameters securityParameters = state.clientContext.getSecurityParametersHandshake();
+        DTLSReliableHandshake handshake = new DTLSReliableHandshake(state.clientContext, recordLayer,
+            state.client.getHandshakeTimeoutMillis(), null);
 
-        byte[] clientHelloBody = generateClientHello(state, state.client);
+        byte[] clientHelloBody = generateClientHello(state);
 
         recordLayer.setWriteVersion(ProtocolVersion.DTLSv10);
 
@@ -121,7 +120,7 @@ public class DTLSClientProtocol
             byte[] cookie = processHelloVerifyRequest(state, serverMessage.getBody());
             byte[] patched = patchClientHelloWithCookie(clientHelloBody, cookie);
 
-            handshake.resetHandshakeMessagesDigest();
+            handshake.resetAfterHelloVerifyRequestClient();
             handshake.sendMessage(HandshakeType.client_hello, patched);
 
             serverMessage = handshake.receiveMessage();
@@ -147,30 +146,33 @@ public class DTLSClientProtocol
         if (state.resumedSession)
         {
             securityParameters.masterSecret = state.clientContext.getCrypto().adoptSecret(state.sessionParameters.getMasterSecret());
-            recordLayer.initPendingEpoch(state.client.getCipher());
+            recordLayer.initPendingEpoch(TlsUtils.initCipher(state.clientContext));
 
             // NOTE: Calculated exclusive of the actual Finished message from the server
-            byte[] expectedServerVerifyData = createVerifyData(state.clientContext, handshake, true);
-            processFinished(handshake.receiveMessageBody(HandshakeType.finished), expectedServerVerifyData);
+            securityParameters.peerVerifyData = createVerifyData(state.clientContext, handshake, true);
+            processFinished(handshake.receiveMessageBody(HandshakeType.finished), securityParameters.getPeerVerifyData());
 
             // NOTE: Calculated exclusive of the Finished message itself
-            byte[] clientVerifyData = createVerifyData(state.clientContext, handshake, false);
-            handshake.sendMessage(HandshakeType.finished, clientVerifyData);
+            securityParameters.localVerifyData = createVerifyData(state.clientContext, handshake, false);
+            handshake.sendMessage(HandshakeType.finished, securityParameters.getLocalVerifyData());
 
             handshake.finish();
 
-            securityParameters.tlsUnique = expectedServerVerifyData;
+            if (securityParameters.isExtendedMasterSecret())
+            {
+                securityParameters.tlsUnique = securityParameters.getPeerVerifyData();
+            }
 
-            state.clientContext.setSession(state.tlsSession);
+            state.clientContext.handshakeComplete(state.client, state.tlsSession);
 
-            state.client.notifyHandshakeComplete();
+            recordLayer.initHeartbeat(state.heartbeat, HeartbeatMode.peer_allowed_to_send == state.heartbeatPolicy);
 
             return new DTLSTransport(recordLayer);
         }
 
         invalidateSession(state);
 
-        state.tlsSession = TlsUtils.importSession(state.selectedSessionID, null);
+        state.tlsSession = TlsUtils.importSession(securityParameters.getSessionID(), null);
         state.sessionParameters = null;
 
         serverMessage = handshake.receiveMessage();
@@ -185,26 +187,17 @@ public class DTLSClientProtocol
             state.client.processServerSupplementalData(null);
         }
 
-        state.keyExchange = state.client.getKeyExchange();
-        state.keyExchange.init(state.clientContext);
-
-        Certificate serverCertificate = null;
+        state.keyExchange = TlsUtils.initKeyExchangeClient(state.clientContext, state.client);
 
         if (serverMessage.getType() == HandshakeType.certificate)
         {
-            serverCertificate = processServerCertificate(state, serverMessage.getBody());
+            processServerCertificate(state, serverMessage.getBody());
             serverMessage = handshake.receiveMessage();
         }
         else
         {
             // Okay, Certificate is optional
             state.authentication = null;
-        }
-
-        // TODO[RFC 3546] Check whether empty certificates is possible, allowed, or excludes CertificateStatus
-        if (serverCertificate == null || serverCertificate.isEmpty())
-        {
-            state.allowCertificateStatus = false;
         }
 
         if (serverMessage.getType() == HandshakeType.certificate_status)
@@ -217,17 +210,8 @@ public class DTLSClientProtocol
             // Okay, CertificateStatus is optional
         }
 
-        if (state.authentication == null)
-        {
-            // There was no server certificate message; check it's OK
-            state.clientContext.getSecurityParameters().tlsServerEndPoint = TlsUtils.EMPTY_BYTES;
-            state.keyExchange.skipServerCredentials();
-        }
-        else
-        {
-            TlsUtils.processServerCertificate(serverCertificate, state.certificateStatus, state.keyExchange,
-                state.authentication, state.clientExtensions, state.serverExtensions);
-        }
+        TlsUtils.processServerCertificate(state.clientContext, state.client, state.certificateStatus, state.keyExchange,
+            state.authentication, state.clientExtensions, state.serverExtensions);
 
         if (serverMessage.getType() == HandshakeType.server_key_exchange)
         {
@@ -277,9 +261,7 @@ public class DTLSClientProtocol
             handshake.sendMessage(HandshakeType.supplemental_data, supplementalDataBody);
         }
 
-        Certificate clientCertificate = null;
-
-        if (state.certificateRequest != null)
+        if (null != state.certificateRequest)
         {
             state.clientCredentials = TlsProtocol.validateCredentials(
                 state.authentication.getClientCredentials(state.certificateRequest));
@@ -290,23 +272,20 @@ public class DTLSClientProtocol
              * 
              * NOTE: In previous RFCs, this was SHOULD instead of MUST.
              */
-            if (state.clientCredentials != null)
+
+            Certificate clientCertificate = null;
+            if (null != state.clientCredentials)
             {
                 clientCertificate = state.clientCredentials.getCertificate();
             }
-            if (clientCertificate == null)
-            {
-                clientCertificate = Certificate.EMPTY_CHAIN;
-            }
 
-            byte[] certificateBody = generateCertificate(state.clientContext, clientCertificate, null);
-            handshake.sendMessage(HandshakeType.certificate, certificateBody);
+            sendCertificateMessage(state.clientContext, handshake, clientCertificate, null);
         }
 
         TlsCredentialedSigner credentialedSigner = null;
         TlsStreamSigner streamSigner = null;
 
-        if (state.clientCredentials != null)
+        if (null != state.clientCredentials)
         {
             state.keyExchange.processClientCredentials(state.clientCredentials);
             
@@ -331,7 +310,7 @@ public class DTLSClientProtocol
         securityParameters.sessionHash = TlsUtils.getCurrentPRFHash(prepareFinishHash);
 
         TlsProtocol.establishMasterSecret(state.clientContext, state.keyExchange);
-        recordLayer.initPendingEpoch(state.client.getCipher());
+        recordLayer.initPendingEpoch(TlsUtils.initCipher(state.clientContext));
 
         if (credentialedSigner != null)
         {
@@ -342,13 +321,13 @@ public class DTLSClientProtocol
         }
 
         // NOTE: Calculated exclusive of the Finished message itself
-        byte[] clientVerifyData = createVerifyData(state.clientContext, handshake, false);
-        handshake.sendMessage(HandshakeType.finished, clientVerifyData);
+        securityParameters.localVerifyData = createVerifyData(state.clientContext, handshake, false);
+        handshake.sendMessage(HandshakeType.finished, securityParameters.getLocalVerifyData());
 
         if (state.expectSessionTicket)
         {
             serverMessage = handshake.receiveMessage();
-            if (serverMessage.getType() == HandshakeType.session_ticket)
+            if (serverMessage.getType() == HandshakeType.new_session_ticket)
             {
                 processNewSessionTicket(state, serverMessage.getBody());
             }
@@ -359,18 +338,19 @@ public class DTLSClientProtocol
         }
 
         // NOTE: Calculated exclusive of the actual Finished message from the server
-        byte[] expectedServerVerifyData = createVerifyData(state.clientContext, handshake, true);
-        processFinished(handshake.receiveMessageBody(HandshakeType.finished), expectedServerVerifyData);
+        securityParameters.peerVerifyData = createVerifyData(state.clientContext, handshake, true);
+        processFinished(handshake.receiveMessageBody(HandshakeType.finished), securityParameters.getPeerVerifyData());
 
         handshake.finish();
 
         state.sessionParameters = new SessionParameters.Builder()
             .setCipherSuite(securityParameters.getCipherSuite())
             .setCompressionAlgorithm(securityParameters.getCompressionAlgorithm())
-            .setLocalCertificate(clientCertificate)
+            .setExtendedMasterSecret(securityParameters.isExtendedMasterSecret())
+            .setLocalCertificate(securityParameters.getLocalCertificate())
             .setMasterSecret(state.clientContext.getCrypto().adoptSecret(securityParameters.getMasterSecret()))
-            .setNegotiatedVersion(state.clientContext.getServerVersion())
-            .setPeerCertificate(serverCertificate)
+            .setNegotiatedVersion(securityParameters.getNegotiatedVersion())
+            .setPeerCertificate(securityParameters.getPeerCertificate())
             .setPSKIdentity(securityParameters.getPSKIdentity())
             .setSRPIdentity(securityParameters.getSRPIdentity())
             // TODO Consider filtering extensions that aren't relevant to resumed sessions
@@ -379,11 +359,11 @@ public class DTLSClientProtocol
 
         state.tlsSession = TlsUtils.importSession(state.tlsSession.getSessionID(), state.sessionParameters);
 
-        securityParameters.tlsUnique = clientVerifyData;
+        securityParameters.tlsUnique = securityParameters.getLocalVerifyData();
 
-        state.clientContext.setSession(state.tlsSession);
+        state.clientContext.handshakeComplete(state.client, state.tlsSession);
 
-        state.client.notifyHandshakeComplete();
+        recordLayer.initHeartbeat(state.heartbeat, HeartbeatMode.peer_allowed_to_send == state.heartbeatPolicy);
 
         return new DTLSTransport(recordLayer);
     }
@@ -396,24 +376,21 @@ public class DTLSClientProtocol
         return buf.toByteArray();
     }
 
-    protected byte[] generateClientHello(ClientHandshakeState state, TlsClient client)
+    protected byte[] generateClientHello(ClientHandshakeState state)
         throws IOException
     {
-        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        TlsClientContextImpl context = state.clientContext;
+        SecurityParameters securityParameters = context.getSecurityParametersHandshake();
 
-        ProtocolVersion client_version = client.getClientVersion();
-        if (!client_version.isDTLS())
+        context.setClientSupportedVersions(state.client.getSupportedVersions());
+
+        ProtocolVersion client_version = ProtocolVersion.getLatestDTLS(context.getClientSupportedVersions());
+        if (null == client_version || !ProtocolVersion.DTLSv10.isEqualOrEarlierVersionOf(client_version))
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
 
-        TlsClientContextImpl context = state.clientContext;
-
         context.setClientVersion(client_version);
-        TlsUtils.writeVersion(client_version, buf);
-
-        SecurityParameters securityParameters = context.getSecurityParameters();
-        buf.write(securityParameters.getClientRandom());
 
         // Session ID
         byte[] session_id = TlsUtils.EMPTY_BYTES;
@@ -425,20 +402,51 @@ public class DTLSClientProtocol
                 session_id = TlsUtils.EMPTY_BYTES;
             }
         }
-        TlsUtils.writeOpaque8(session_id, buf);
 
-        // Cookie
-        TlsUtils.writeOpaque8(TlsUtils.EMPTY_BYTES, buf);
+        boolean fallback = state.client.isFallback();
 
-        boolean fallback = client.isFallback();
+        state.offeredCipherSuites = state.client.getCipherSuites();
 
-        /*
-         * Cipher suites
-         */
-        state.offeredCipherSuites = client.getCipherSuites();
+        if (session_id.length > 0 && state.sessionParameters != null)
+        {
+            /*
+             * NOTE: If we ever enable session resumption without extended_master_secret, then
+             * renegotiation MUST be disabled (see RFC 7627 5.4).
+             */
+            if (!state.sessionParameters.isExtendedMasterSecret()
+                || !Arrays.contains(state.offeredCipherSuites, state.sessionParameters.getCipherSuite())
+                || CompressionMethod._null != state.sessionParameters.getCompressionAlgorithm())
+            {
+                session_id = TlsUtils.EMPTY_BYTES;
+            }
+        }
 
-        // Integer -> byte[]
-        state.clientExtensions = client.getClientExtensions();
+        state.clientExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(state.client.getClientExtensions());
+
+        ProtocolVersion legacy_version = client_version;
+        if (client_version.isLaterVersionOf(ProtocolVersion.DTLSv12))
+        {
+            legacy_version = ProtocolVersion.DTLSv12;
+
+            TlsExtensionsUtils.addSupportedVersionsExtensionClient(state.clientExtensions,
+                context.getClientSupportedVersions());
+        }
+
+        securityParameters.clientServerNames = TlsExtensionsUtils.getServerNameExtensionClient(state.clientExtensions);
+
+        if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(client_version))
+        {
+            securityParameters.clientSigAlgs = TlsExtensionsUtils.getSignatureAlgorithmsExtension(state.clientExtensions);
+            securityParameters.clientSigAlgsCert = TlsExtensionsUtils.getSignatureAlgorithmsCertExtension(state.clientExtensions);
+        }
+
+        securityParameters.clientSupportedGroups = TlsExtensionsUtils.getSupportedGroupsExtension(state.clientExtensions);
+
+        state.clientAgreements = TlsUtils.addEarlyKeySharesToClientHello(state.clientContext, state.client, state.clientExtensions);
+
+        TlsExtensionsUtils.addExtendedMasterSecretExtension(state.clientExtensions);
+
+        securityParameters.clientRandom = TlsProtocol.createRandomBlock(state.client.shouldUseGMTUnixTime(), state.clientContext);
 
         // Cipher Suites (and SCSV)
         {
@@ -447,45 +455,45 @@ public class DTLSClientProtocol
              * or the TLS_EMPTY_RENEGOTIATION_INFO_SCSV signaling cipher suite value in the
              * ClientHello. Including both is NOT RECOMMENDED.
              */
-            byte[] renegExtData = TlsUtils.getExtensionData(state.clientExtensions, TlsProtocol.EXT_RenegotiationInfo);
-            boolean noRenegExt = (null == renegExtData);
-
+            boolean noRenegExt = (null == TlsUtils.getExtensionData(state.clientExtensions, TlsProtocol.EXT_RenegotiationInfo));
             boolean noRenegSCSV = !Arrays.contains(state.offeredCipherSuites, CipherSuite.TLS_EMPTY_RENEGOTIATION_INFO_SCSV);
 
             if (noRenegExt && noRenegSCSV)
             {
-                // TODO Consider whether to default to a client extension instead
                 state.offeredCipherSuites = Arrays.append(state.offeredCipherSuites, CipherSuite.TLS_EMPTY_RENEGOTIATION_INFO_SCSV);
             }
-
-            /*
-             * RFC 7507 4. If a client sends a ClientHello.client_version containing a lower value
-             * than the latest (highest-valued) version supported by the client, it SHOULD include
-             * the TLS_FALLBACK_SCSV cipher suite value in ClientHello.cipher_suites [..]. (The
-             * client SHOULD put TLS_FALLBACK_SCSV after all cipher suites that it actually intends
-             * to negotiate.)
-             */
-            if (fallback && !Arrays.contains(state.offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV))
-            {
-                state.offeredCipherSuites = Arrays.append(state.offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV);
-            }
-
-            TlsUtils.writeUint16ArrayWithUint16Length(state.offeredCipherSuites, buf);
         }
 
-        // TODO Add support for compression
-        // Compression methods
-        // state.offeredCompressionMethods = client.getCompressionMethods();
-        state.offeredCompressionMethods = new short[]{ CompressionMethod._null };
-
-        TlsUtils.writeUint8ArrayWithUint8Length(state.offeredCompressionMethods, buf);
-
-        // Extensions
-        if (state.clientExtensions != null)
+        /* (Fallback SCSV)
+         * RFC 7507 4. If a client sends a ClientHello.client_version containing a lower value
+         * than the latest (highest-valued) version supported by the client, it SHOULD include
+         * the TLS_FALLBACK_SCSV cipher suite value in ClientHello.cipher_suites [..]. (The
+         * client SHOULD put TLS_FALLBACK_SCSV after all cipher suites that it actually intends
+         * to negotiate.)
+         */
+        if (fallback && !Arrays.contains(state.offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV))
         {
-            TlsProtocol.writeExtensions(buf, state.clientExtensions);
+            state.offeredCipherSuites = Arrays.append(state.offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV);
         }
 
+        // Heartbeats
+        {
+            state.heartbeat = state.client.getHeartbeat();
+            state.heartbeatPolicy = state.client.getHeartbeatPolicy();
+
+            if (null != state.heartbeat || HeartbeatMode.peer_allowed_to_send == state.heartbeatPolicy)
+            {
+                TlsExtensionsUtils.addHeartbeatExtension(state.clientExtensions, new HeartbeatExtension(state.heartbeatPolicy));
+            }
+        }
+
+
+
+        ClientHello clientHello = new ClientHello(legacy_version, securityParameters.getClientRandom(), session_id,
+            TlsUtils.EMPTY_BYTES, state.offeredCipherSuites, state.clientExtensions);
+
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        clientHello.encode(state.clientContext, buf);
         return buf.toByteArray();
     }
 
@@ -559,22 +567,20 @@ public class DTLSClientProtocol
         ByteArrayInputStream buf = new ByteArrayInputStream(body);
 
         ProtocolVersion server_version = TlsUtils.readVersion(buf);
-        byte[] cookie = TlsUtils.readOpaque8(buf);
+
+        /*
+         * RFC 6347 This specification increases the cookie size limit to 255 bytes for greater
+         * future flexibility. The limit remains 32 for previous versions of DTLS.
+         */
+        int maxCookieLength = ProtocolVersion.DTLSv12.isEqualOrEarlierVersionOf(server_version) ? 255 : 32;
+
+        byte[] cookie = TlsUtils.readOpaque8(buf, 0, maxCookieLength);
 
         TlsProtocol.assertEmpty(buf);
 
         // TODO Seems this behaviour is not yet in line with OpenSSL for DTLS 1.2
 //        reportServerVersion(state, server_version);
         if (!server_version.isEqualOrEarlierVersionOf(state.clientContext.getClientVersion()))
-        {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-        }
-
-        /*
-         * RFC 6347 This specification increases the cookie size limit to 255 bytes for greater
-         * future flexibility. The limit remains 32 for previous versions of DTLS.
-         */
-        if (!ProtocolVersion.DTLSv12.isEqualOrEarlierVersionOf(server_version) && cookie.length > 32)
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
@@ -594,65 +600,75 @@ public class DTLSClientProtocol
         state.client.notifyNewSessionTicket(newSessionTicket);
     }
 
-    protected Certificate processServerCertificate(ClientHandshakeState state, byte[] body)
+    protected void processServerCertificate(ClientHandshakeState state, byte[] body)
         throws IOException
     {
-        ByteArrayInputStream buf = new ByteArrayInputStream(body);
-        ByteArrayOutputStream endPointHash = new ByteArrayOutputStream();
-
-        Certificate serverCertificate = Certificate.parse(state.clientContext, buf, endPointHash);
-
-        TlsProtocol.assertEmpty(buf);
-
-        state.clientContext.getSecurityParameters().tlsServerEndPoint = endPointHash.toByteArray();
+        TlsUtils.receiveServerCertificate(state.clientContext, new ByteArrayInputStream(body));
 
         state.authentication = state.client.getAuthentication();
-        if (state.authentication == null)
+        if (null == state.authentication)
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
-
-        return serverCertificate;
     }
 
     protected void processServerHello(ClientHandshakeState state, byte[] body)
         throws IOException
     {
-        SecurityParameters securityParameters = state.clientContext.getSecurityParameters();
-
         ByteArrayInputStream buf = new ByteArrayInputStream(body);
 
         ProtocolVersion server_version = TlsUtils.readVersion(buf);
-        reportServerVersion(state, server_version);
 
-        securityParameters.serverRandom = TlsUtils.readFully(32, buf);
+        byte[] server_random = TlsUtils.readFully(32, buf);
 
-        state.selectedSessionID = TlsUtils.readOpaque8(buf);
-        if (state.selectedSessionID.length > 32)
-        {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-        }
-        state.client.notifySessionID(state.selectedSessionID);
-        state.resumedSession = state.selectedSessionID.length > 0 && state.tlsSession != null
-            && Arrays.areEqual(state.selectedSessionID, state.tlsSession.getSessionID());
+        byte[] selectedSessionID = TlsUtils.readOpaque8(buf, 0, 32);
 
         int selectedCipherSuite = TlsUtils.readUint16(buf);
-        if (!Arrays.contains(state.offeredCipherSuites, selectedCipherSuite)
-            || selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
-            || CipherSuite.isSCSV(selectedCipherSuite)
-            || !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, state.clientContext.getServerVersion()))
-        {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
-        }
-        validateSelectedCipherSuite(selectedCipherSuite, AlertDescription.illegal_parameter);
-        state.client.notifySelectedCipherSuite(selectedCipherSuite);
 
         short selectedCompressionMethod = TlsUtils.readUint8(buf);
-        if (!Arrays.contains(state.offeredCompressionMethods, selectedCompressionMethod))
+
+        state.serverExtensions = TlsProtocol.readExtensions(buf);
+
+
+
+        SecurityParameters securityParameters = state.clientContext.getSecurityParametersHandshake();
+
+        // TODO[dtls13] Check supported_version extension for negotiated version
+
+        reportServerVersion(state, server_version);
+
+        if (!state.clientContext.getClientVersion().equals(server_version))
+        {
+            TlsUtils.checkDowngradeMarker(server_version, server_random);
+        }
+        securityParameters.serverRandom = server_random;
+
+        securityParameters.sessionID = selectedSessionID;
+        state.client.notifySessionID(selectedSessionID);
+        state.resumedSession = selectedSessionID.length > 0 && state.tlsSession != null
+            && Arrays.areEqual(selectedSessionID, state.tlsSession.getSessionID());
+
+        /*
+         * Find out which CipherSuite the server has chosen and check that it was one of the offered
+         * ones, and is a valid selection for the negotiated version.
+         */
+        {
+            if (!Arrays.contains(state.offeredCipherSuites, selectedCipherSuite)
+                || selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
+                || CipherSuite.isSCSV(selectedCipherSuite)
+                || !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, state.clientContext.getServerVersion()))
+            {
+                throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+            }
+            securityParameters.cipherSuite = validateSelectedCipherSuite(selectedCipherSuite,
+                AlertDescription.illegal_parameter);
+            state.client.notifySelectedCipherSuite(selectedCipherSuite);
+        }
+
+        if (CompressionMethod._null != selectedCompressionMethod)
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
-        state.client.notifySelectedCompressionMethod(selectedCompressionMethod);
 
         /*
          * RFC3546 2.2 The extended server hello message format MAY be sent in place of the server
@@ -669,8 +685,17 @@ public class DTLSClientProtocol
          * extensions.
          */
 
-        // Integer -> byte[]
-        state.serverExtensions = TlsProtocol.readExtensions(buf);
+        /*
+         * RFC 7627 4. Clients and servers SHOULD NOT accept handshakes that do not use the extended
+         * master secret [..]. (and see 5.2, 5.3)
+         */
+        securityParameters.extendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(state.serverExtensions);
+
+        if (!securityParameters.isExtendedMasterSecret()
+            && (state.resumedSession || state.client.requiresExtendedMasterSecret()))
+        {
+            throw new TlsFatalAlert(AlertDescription.handshake_failure);
+        }
 
         /*
          * RFC 3546 2.2 Note that the extended server hello message is only sent in response to an
@@ -740,7 +765,7 @@ public class DTLSClientProtocol
                  * field is zero, and if it is not, MUST abort the handshake (by sending a fatal
                  * handshake_failure alert).
                  */
-                state.secure_renegotiation = true;
+                securityParameters.secureRenegotiation = true;
 
                 if (!Arrays.constantTimeAreEqual(renegExtData,
                     TlsProtocol.createRenegotiationInfo(TlsUtils.EMPTY_BYTES)))
@@ -751,13 +776,38 @@ public class DTLSClientProtocol
         }
 
         // TODO[compat-gnutls] GnuTLS test server fails to send renegotiation_info extension when resuming
-        state.client.notifySecureRenegotiation(state.secure_renegotiation);
+        state.client.notifySecureRenegotiation(securityParameters.isSecureRenegotiation());
+
+        /*
+         * RFC 7301 3.1. When session resumption or session tickets [...] are used, the previous
+         * contents of this extension are irrelevant, and only the values in the new handshake
+         * messages are considered.
+         */
+        securityParameters.applicationProtocol = TlsExtensionsUtils.getALPNExtensionServer(state.serverExtensions);
+        securityParameters.applicationProtocolSet = true;
+
+        // Heartbeats
+        {
+            HeartbeatExtension heartbeatExtension = TlsExtensionsUtils.getHeartbeatExtension(state.serverExtensions);
+            if (null == heartbeatExtension)
+            {
+                state.heartbeat = null;
+                state.heartbeatPolicy = HeartbeatMode.peer_not_allowed_to_send;
+            }
+            else if (HeartbeatMode.peer_allowed_to_send != heartbeatExtension.getMode())
+            {
+                state.heartbeat = null;
+            }
+        }
+
+
 
         Hashtable sessionClientExtensions = state.clientExtensions, sessionServerExtensions = state.serverExtensions;
+
         if (state.resumedSession)
         {
-            if (selectedCipherSuite != state.sessionParameters.getCipherSuite()
-                || selectedCompressionMethod != state.sessionParameters.getCompressionAlgorithm()
+            if (securityParameters.getCipherSuite() != state.sessionParameters.getCipherSuite()
+                || CompressionMethod._null != state.sessionParameters.getCompressionAlgorithm()
                 || !server_version.equals(state.sessionParameters.getNegotiatedVersion()))
             {
                 throw new TlsFatalAlert(AlertDescription.illegal_parameter);
@@ -767,10 +817,7 @@ public class DTLSClientProtocol
             sessionServerExtensions = state.sessionParameters.readServerExtensions();
         }
 
-        securityParameters.cipherSuite = selectedCipherSuite;
-        securityParameters.compressionAlgorithm = selectedCompressionMethod;
-
-        if (sessionServerExtensions != null)
+        if (sessionServerExtensions != null && !sessionServerExtensions.isEmpty())
         {
             {
                 /*
@@ -786,8 +833,6 @@ public class DTLSClientProtocol
                 }
                 securityParameters.encryptThenMAC = serverSentEncryptThenMAC;
             }
-
-            securityParameters.extendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(sessionServerExtensions);
 
             securityParameters.maxFragmentLength = evaluateMaxFragmentLengthExtension(state.resumedSession,
                 sessionClientExtensions, sessionServerExtensions, AlertDescription.illegal_parameter);
@@ -806,13 +851,6 @@ public class DTLSClientProtocol
                 && TlsUtils.hasExpectedEmptyExtensionData(sessionServerExtensions, TlsProtocol.EXT_SessionTicket,
                     AlertDescription.illegal_parameter);
         }
-
-        /*
-         * TODO[session-hash]
-         * 
-         * draft-ietf-tls-session-hash-04 4. Clients and servers SHOULD NOT accept handshakes
-         * that do not use the extended master secret [..]. (and see 5.2, 5.3)
-         */
 
         if (sessionClientExtensions != null)
         {
@@ -850,11 +888,20 @@ public class DTLSClientProtocol
     protected void reportServerVersion(ClientHandshakeState state, ProtocolVersion server_version)
         throws IOException
     {
-        TlsClientContextImpl clientContext = state.clientContext;
-        ProtocolVersion currentServerVersion = clientContext.getServerVersion();
+        TlsClientContextImpl context = state.clientContext;
+        ProtocolVersion currentServerVersion = context.getServerVersion();
         if (null == currentServerVersion)
         {
-            clientContext.setServerVersion(server_version);
+            if (!ProtocolVersion.DTLSv10.isEqualOrEarlierVersionOf(server_version))
+            {
+                throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+            }
+            if (!ProtocolVersion.contains(context.getClientSupportedVersions(), server_version))
+            {
+                throw new TlsFatalAlert(AlertDescription.protocol_version);
+            }
+
+            context.getSecurityParametersHandshake().negotiatedVersion = server_version;
             state.client.notifyServerVersion(server_version);
         }
         else if (!currentServerVersion.equals(server_version))
@@ -891,18 +938,18 @@ public class DTLSClientProtocol
         SessionParameters sessionParameters = null;
         SessionParameters.Builder sessionParametersBuilder = null;
         int[] offeredCipherSuites = null;
-        short[] offeredCompressionMethods = null;
         Hashtable clientExtensions = null;
         Hashtable serverExtensions = null;
-        byte[] selectedSessionID = null;
         boolean resumedSession = false;
-        boolean secure_renegotiation = false;
         boolean allowCertificateStatus = false;
         boolean expectSessionTicket = false;
+        Hashtable clientAgreements = null;
         TlsKeyExchange keyExchange = null;
         TlsAuthentication authentication = null;
         CertificateStatus certificateStatus = null;
         CertificateRequest certificateRequest = null;
         TlsCredentials clientCredentials = null;
+        TlsHeartbeat heartbeat = null;
+        short heartbeatPolicy = HeartbeatMode.peer_not_allowed_to_send;
     }
 }

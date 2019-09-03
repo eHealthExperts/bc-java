@@ -803,7 +803,7 @@ public class NistCertPathTest
         String crlName)
         throws Exception
     {
-        X509CRL crl = (X509CRL)certs.get(crlName);
+        X509CRL crl = (X509CRL)crls.get(crlName);
         
         if (crl != null)
         {

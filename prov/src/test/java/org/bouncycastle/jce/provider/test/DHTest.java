@@ -41,7 +41,9 @@ import javax.crypto.spec.DHPublicKeySpec;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.bsi.BSIObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
+import org.bouncycastle.crypto.agreement.DHStandardGroups;
 import org.bouncycastle.jcajce.provider.config.ConfigurableProvider;
+import org.bouncycastle.jcajce.spec.DHDomainParameterSpec;
 import org.bouncycastle.jcajce.spec.DHUParameterSpec;
 import org.bouncycastle.jcajce.spec.MQVParameterSpec;
 import org.bouncycastle.jcajce.spec.UserKeyingMaterialSpec;
@@ -1083,11 +1085,11 @@ public class DHTest
         }
         catch (java.security.spec.InvalidKeySpecException e)
         {
-            isTrue("wrong message", "invalid KeySpec: point not on curve".equals(e.getMessage()));
+            isTrue("wrong message: " + e.getMessage(), "invalid KeySpec: Point not on curve".equals(e.getMessage()));
         }
         catch (java.security.InvalidKeyException e)
         {
-            isTrue("wrong message", "calculation failed: Invalid point".equals(e.getMessage()));
+            isTrue("wrong message: " + e.getMessage(), "calculation failed: Invalid point".equals(e.getMessage()));
         }
 
         agreement = KeyAgreement.getInstance("ECDH", "BC");
@@ -1424,6 +1426,19 @@ public class DHTest
         }
     }
 
+    private void testGenerateUsingStandardGroup()
+        throws Exception
+    {
+        KeyPairGenerator kpGen = KeyPairGenerator.getInstance("DH", "BC");
+        DHDomainParameterSpec mySpec = new DHDomainParameterSpec(DHStandardGroups.rfc7919_ffdhe2048);
+        kpGen.initialize(mySpec, new SecureRandom());
+        KeyPair kp = kpGen.generateKeyPair();
+
+        /* Obtain encoded keys */
+        PKCS8EncodedKeySpec pkcs = new PKCS8EncodedKeySpec(kp.getPrivate().getEncoded());
+        X509EncodedKeySpec x509 = new X509EncodedKeySpec(kp.getPublic().getEncoded());
+    }
+
     private KeyPair generateDHKeyPair()
         throws GeneralSecurityException
     {
@@ -1489,9 +1504,24 @@ public class DHTest
         isTrue(Arrays.areEqual(aKey.getEncoded(), bKey.getEncoded()));
     }
 
+    private void generalKeyTest()
+        throws Exception
+    {
+        SecureRandom random = new SecureRandom();
+
+        int[] keySizes = new int[]{512, 768, 1024, 2048};
+        for (int i = 0; i != keySizes.length; i++)
+        {
+            final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH", "BC");
+            keyPairGenerator.initialize(keySizes[i], random);
+            keyPairGenerator.generateKeyPair();
+        }
+    }
+
     public void performTest()
         throws Exception
     {
+        generalKeyTest();
         testDefault(64, g512, p512);
         mqvTest();
 
@@ -1537,6 +1567,7 @@ public class DHTest
         testDHUnifiedTestVector1();
 
         testMinSpecValue();
+        testGenerateUsingStandardGroup();
     }
 
     public static void main(

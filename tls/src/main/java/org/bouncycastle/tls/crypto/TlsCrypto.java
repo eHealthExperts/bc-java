@@ -93,7 +93,7 @@ public interface TlsCrypto {
      *            the algorithm of interest.
      * @return true if signatureAlgorithm is supported, false otherwise.
      */
-    boolean hasSignatureAlgorithm(int signatureAlgorithm);
+    boolean hasSignatureAlgorithm(short signatureAlgorithm);
 
     /**
      * Return true if this TlsCrypto can support the passed in signature algorithm.
@@ -201,6 +201,16 @@ public interface TlsCrypto {
     TlsHash createHash(short hashAlgorithm);
 
     /**
+     * Create a suitable HMAC using the hash algorithm identifier passed in.
+     * <p>
+     * See enumeration class {@link HashAlgorithm} for appropriate argument values.
+     * </p>
+     * @param hashAlgorithm the hash algorithm the HMAC should use.
+     * @return a {@link TlsHMAC}.
+     */
+    TlsHMAC createHMAC(short hashAlgorithm);
+
+    /**
      * Create a suitable HMAC for the MAC algorithm identifier passed in.
      * <p>
      * See enumeration class {@link MACAlgorithm} for appropriate argument values.
@@ -251,4 +261,11 @@ public interface TlsCrypto {
      * @return an initialized SRP6 verifier generator,
      */
     TlsSRP6VerifierGenerator createSRP6VerifierGenerator(TlsSRPConfig srpConfig);
+
+    /**
+     * Setup an initial "secret" for a chain of HKDF calls (RFC 5869), containing a string of HashLen zeroes.
+     * 
+     * @param hashAlgorithm the hash algorithm to instantiate HMAC with. See {@link HashAlgorithm} for values.
+     */
+    TlsSecret hkdfInit(short hashAlgorithm);
 }

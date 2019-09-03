@@ -61,10 +61,11 @@ class ProvSSLServerSocket
     @Override
     public synchronized Socket accept() throws IOException
     {
-        ProvSSLSocketDirect socket = new ProvSSLSocketDirect(context, contextData, enableSessionCreation,
+        ProvSSLSocketDirect socket = SSLSocketUtil.create(context, contextData, enableSessionCreation,
             useClientMode, sslParameters.copy());
 
         implAccept(socket);
+        socket.notifyConnected();
 
         return socket;
     }
@@ -160,11 +161,14 @@ class ProvSSLServerSocket
     }
 
     @Override
-    public synchronized void setUseClientMode(boolean mode)
+    public synchronized void setUseClientMode(boolean useClientMode)
     {
-        this.useClientMode = mode;
+        if (this.useClientMode != useClientMode)
+        {
+            context.updateDefaultProtocols(sslParameters, !useClientMode);
 
-        context.updateDefaultProtocols(sslParameters, !useClientMode);
+            this.useClientMode = useClientMode;
+        }
     }
 
     @Override

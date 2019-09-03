@@ -29,7 +29,9 @@ public class RegressionTest
         new PGPECDHTest(),
         new PGPECMessageTest(),
         new PGPParsingTest(),
-        new SExprTest()
+        new SExprTest(),
+        new ArmoredInputStreamTest(),
+        new PGPUtilTest()
     };
 
     public static void main(

@@ -1,13 +1,12 @@
 package org.bouncycastle.tsp;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Date;
 
-import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.cms.Attribute;
 import org.bouncycastle.asn1.cms.AttributeTable;
 import org.bouncycastle.asn1.cms.ContentInfo;
@@ -16,7 +15,6 @@ import org.bouncycastle.asn1.ess.ESSCertID;
 import org.bouncycastle.asn1.ess.ESSCertIDv2;
 import org.bouncycastle.asn1.ess.SigningCertificate;
 import org.bouncycastle.asn1.ess.SigningCertificateV2;
-import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.tsp.TSTInfo;
@@ -24,6 +22,8 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.asn1.x509.IssuerSerial;
+import org.bouncycastle.cert.X509AttributeCertificateHolder;
+import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.cms.CMSProcessable;
@@ -79,8 +79,8 @@ public class TimeStampToken
         {
             throw new TSPValidationException("ContentInfo object not for a time stamp.");
         }
-        
-        Collection signers = tsToken.getSignerInfos().getSigners();
+
+        Collection<SignerInformation> signers = tsToken.getSignerInfos().getSigners();
 
         if (signers.size() != 1)
         {
@@ -98,15 +98,13 @@ public class TimeStampToken
 
             content.write(bOut);
 
-            ASN1InputStream aIn = new ASN1InputStream(new ByteArrayInputStream(bOut.toByteArray()));
-
-            this.tstInfo = new TimeStampTokenInfo(TSTInfo.getInstance(aIn.readObject()));
+            this.tstInfo = new TimeStampTokenInfo(TSTInfo.getInstance(ASN1Primitive.fromByteArray(bOut.toByteArray())));
             
-            Attribute   attr = tsaSignerInfo.getSignedAttributes().get(PKCSObjectIdentifiers.id_aa_signingCertificate);
+            Attribute attr = tsaSignerInfo.getSignedAttributes().get(PKCSObjectIdentifiers.id_aa_signingCertificate);
 
             if (attr != null)
             {
-                SigningCertificate    signCert = SigningCertificate.getInstance(attr.getAttrValues().getObjectAt(0));
+                SigningCertificate signCert = SigningCertificate.getInstance(attr.getAttrValues().getObjectAt(0));
 
                 this.certID = new CertID(ESSCertID.getInstance(signCert.getCerts()[0]));
             }
@@ -150,17 +148,17 @@ public class TimeStampToken
         return tsaSignerInfo.getUnsignedAttributes();
     }
 
-    public Store getCertificates()
+    public Store<X509CertificateHolder> getCertificates()
     {
         return tsToken.getCertificates();
     }
 
-    public Store getCRLs()
+    public Store<X509CRLHolder> getCRLs()
     {
         return tsToken.getCRLs();
     }
 
-    public Store getAttributeCertificates()
+    public Store<X509AttributeCertificateHolder> getAttributeCertificates()
     {
         return tsToken.getAttributeCertificates();
     }
@@ -336,22 +334,6 @@ public class TimeStampToken
         {
             this.certIDv2 = certID;
             this.certID = null;
-        }
-
-        public String getHashAlgorithmName()
-        {
-            if (certID != null)
-            {
-                return "SHA-1";
-            }
-            else
-            {
-                if (NISTObjectIdentifiers.id_sha256.equals(certIDv2.getHashAlgorithm().getAlgorithm()))
-                {
-                    return "SHA-256";
-                }
-                return certIDv2.getHashAlgorithm().getAlgorithm().getId();
-            }
         }
 
         public AlgorithmIdentifier getHashAlgorithm()

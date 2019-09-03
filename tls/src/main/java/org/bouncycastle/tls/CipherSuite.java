@@ -5,6 +5,18 @@ package org.bouncycastle.tls;
  */
 public class CipherSuite
 {
+    public static boolean isSCSV(int cipherSuite)
+    {
+        switch (cipherSuite)
+        {
+        case TLS_EMPTY_RENEGOTIATION_INFO_SCSV:
+        case TLS_FALLBACK_SCSV:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     public static final int TLS_NULL_WITH_NULL_NULL = 0x0000;
     public static final int TLS_RSA_WITH_NULL_MD5 = 0x0001;
     public static final int TLS_RSA_WITH_NULL_SHA = 0x0002;
@@ -425,22 +437,27 @@ public class CipherSuite
     public static final int DRAFT_TLS_ECDHE_PSK_WITH_AES_256_OCB = 0xFF15;
 
     /*
-     * draft-ietf-tls-ecdhe-psk-aead-05 (code points TBD)
+     * RFC 8442
      */
-    public static final int DRAFT_TLS_ECDHE_PSK_WITH_AES_128_GCM_SHA256 = 0xD001;
-    public static final int DRAFT_TLS_ECDHE_PSK_WITH_AES_256_GCM_SHA384 = 0xD002;
-    public static final int DRAFT_TLS_ECDHE_PSK_WITH_AES_128_CCM_8_SHA256 = 0xD003;
-    public static final int DRAFT_TLS_ECDHE_PSK_WITH_AES_128_CCM_SHA256 = 0xD005;
+    public static final int TLS_ECDHE_PSK_WITH_AES_128_GCM_SHA256 = 0xD001;
+    public static final int TLS_ECDHE_PSK_WITH_AES_256_GCM_SHA384 = 0xD002;
+    public static final int TLS_ECDHE_PSK_WITH_AES_128_CCM_8_SHA256 = 0xD003;
+    public static final int TLS_ECDHE_PSK_WITH_AES_128_CCM_SHA256 = 0xD005;
 
-    public static boolean isSCSV(int cipherSuite)
-    {
-        switch (cipherSuite)
-        {
-        case TLS_EMPTY_RENEGOTIATION_INFO_SCSV:
-        case TLS_FALLBACK_SCSV:
-            return true;
-        default:
-            return false;
-        }
-    }
+    /*
+     * TLS 1.3 Section
+     * 
+     * Although TLS 1.3 uses the same cipher suite space as previous versions of TLS, TLS 1.3 cipher
+     * suites are defined differently, only specifying the symmetric ciphers, and cannot be used for
+     * TLS 1.2. Similarly, cipher suites for TLS 1.2 and lower cannot be used with TLS 1.3.
+     */
+
+    /*
+     * RFC 8446
+     */
+    public static final int TLS_AES_128_GCM_SHA256 = 0x1301;
+    public static final int TLS_AES_256_GCM_SHA384 = 0x1302;
+    public static final int TLS_CHACHA20_POLY1305_SHA256 = 0x1303;
+    public static final int TLS_AES_128_CCM_SHA256 = 0x1304;
+    public static final int TLS_AES_128_CCM_8_SHA256 = 0x1305;
 }

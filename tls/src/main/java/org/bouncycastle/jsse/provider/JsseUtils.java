@@ -1,24 +1,22 @@
 package org.bouncycastle.jsse.provider;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.security.AccessController;
 import java.security.Principal;
 import java.security.PrivateKey;
-import java.security.PrivilegedAction;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.DSAPrivateKey;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.RSAPrivateKey;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.Vector;
 
-import javax.crypto.interfaces.DHPrivateKey;
 import javax.security.auth.x500.X500Principal;
 
 import org.bouncycastle.asn1.ASN1Encoding;
@@ -33,11 +31,13 @@ import org.bouncycastle.tls.Certificate;
 import org.bouncycastle.tls.ClientCertificateType;
 import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.KeyExchangeAlgorithm;
+import org.bouncycastle.tls.ProtocolName;
+import org.bouncycastle.tls.SecurityParameters;
 import org.bouncycastle.tls.ServerName;
-import org.bouncycastle.tls.ServerNameList;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
 import org.bouncycastle.tls.TlsFatalAlert;
+import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.tls.crypto.impl.jcajce.JcaTlsCertificate;
@@ -46,6 +46,14 @@ import org.bouncycastle.tls.crypto.impl.jcajce.JcaTlsCrypto;
 abstract class JsseUtils
 {
     protected static X509Certificate[] EMPTY_CHAIN = new X509Certificate[0];
+
+    static class BCUnknownServerName extends BCSNIServerName
+    {
+        BCUnknownServerName(int nameType, byte[] encoded)
+        {
+            super(nameType, encoded);
+        }
+    }
 
     static boolean contains(String[] values, String value)
     {
@@ -66,6 +74,52 @@ abstract class JsseUtils
         return tmp;
     }
 
+    static String getApplicationProtocol(SecurityParameters securityParameters)
+    {
+        if (null == securityParameters || !securityParameters.isApplicationProtocolSet())
+        {
+            return null;
+        }
+
+        ProtocolName applicationProtocol = securityParameters.getApplicationProtocol();
+        if (null == applicationProtocol)
+        {
+            return "";
+        }
+
+        return applicationProtocol.getUtf8Decoding();
+    }
+
+    static String getAuthStringClient(short signatureAlgorithm) throws IOException
+    {
+        switch (signatureAlgorithm)
+        {
+        case SignatureAlgorithm.rsa:
+            return "RSA";
+        case SignatureAlgorithm.dsa:
+            return "DSA";
+        case SignatureAlgorithm.ecdsa:
+            return "EC";
+        // TODO[RFC 8422]
+//        case SignatureAlgorithm.ed25519:
+//            return "Ed25519";
+//        case SignatureAlgorithm.ed448:
+//            return "Ed448";
+        // TODO[RFC 8446]
+//        case SignatureAlgorithm.rsa_pss_rsae_sha256:
+//        case SignatureAlgorithm.rsa_pss_rsae_sha384:
+//        case SignatureAlgorithm.rsa_pss_rsae_sha512:
+//            return "RSA_PSS_RSAE";
+//        case SignatureAlgorithm.rsa_pss_pss_sha256:
+//        case SignatureAlgorithm.rsa_pss_pss_sha384:
+//        case SignatureAlgorithm.rsa_pss_pss_sha512:
+//            return "RSA_PSS_PSS";
+        default:
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+    }
+
+    // TODO[RFC 8422]
     public static String getAuthTypeClient(short clientCertificateType) throws IOException
     {
         switch (clientCertificateType)
@@ -76,9 +130,6 @@ abstract class JsseUtils
             return "EC";
         case ClientCertificateType.rsa_sign:
             return "RSA";
-
-        // TODO[jsse] "fixed" types and any others
-
         default:
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
@@ -90,10 +141,6 @@ abstract class JsseUtils
         {
         case KeyExchangeAlgorithm.DH_anon:
             return "DH_anon";
-        case KeyExchangeAlgorithm.DH_DSS:
-            return "DH_DSS";
-        case KeyExchangeAlgorithm.DH_RSA:
-            return "DH_RSA";
         case KeyExchangeAlgorithm.DHE_DSS:
             return "DHE_DSS";
         case KeyExchangeAlgorithm.DHE_PSK:
@@ -102,10 +149,6 @@ abstract class JsseUtils
             return "DHE_RSA";
         case KeyExchangeAlgorithm.ECDH_anon:
             return "ECDH_anon";
-        case KeyExchangeAlgorithm.ECDH_ECDSA:
-            return "ECDH_ECDSA";
-        case KeyExchangeAlgorithm.ECDH_RSA:
-            return "ECDH_RSA";
         case KeyExchangeAlgorithm.ECDHE_ECDSA:
             return "ECDHE_ECDSA";
         case KeyExchangeAlgorithm.ECDHE_PSK:
@@ -149,6 +192,37 @@ abstract class JsseUtils
         }
 
         return new Certificate(certificateList);
+    }
+
+    public static Vector getProtocolNames(String[] applicationProtocols)
+    {
+        if (null == applicationProtocols || applicationProtocols.length < 1)
+        {
+            return null;
+        }
+
+        Vector protocolNames = new Vector(applicationProtocols.length);
+        for (String applicationProtocol : applicationProtocols)
+        {
+            protocolNames.addElement(ProtocolName.asUtf8Encoding(applicationProtocol));
+        }
+        return protocolNames;
+    }
+
+    public static List<String> getProtocolNames(Vector applicationProtocols)
+    {
+        if (null == applicationProtocols || applicationProtocols.isEmpty())
+        {
+            return null;
+        }
+
+        ArrayList<String> protocolNames = new ArrayList<String>(applicationProtocols.size());
+        for (int i = 0; i < applicationProtocols.size(); ++i)
+        {
+            ProtocolName protocolName = (ProtocolName)applicationProtocols.elementAt(i);
+            protocolNames .add(protocolName.getUtf8Decoding());
+        }
+        return protocolNames;
     }
 
     public static X509Certificate[] getX509CertificateChain(TlsCrypto crypto, Certificate certificateMessage)
@@ -223,21 +297,30 @@ abstract class JsseUtils
 
     static Vector getSupportedSignatureAlgorithms(TlsCrypto crypto)
     {
+//        SignatureAndHashAlgorithm[] intrinsicSigAlgs = { SignatureAndHashAlgorithm.ed25519,
+//            SignatureAndHashAlgorithm.ed448, SignatureAndHashAlgorithm.rsa_pss_rsae_sha256,
+//            SignatureAndHashAlgorithm.rsa_pss_rsae_sha384, SignatureAndHashAlgorithm.rsa_pss_rsae_sha512,
+//            SignatureAndHashAlgorithm.rsa_pss_pss_sha256, SignatureAndHashAlgorithm.rsa_pss_pss_sha384,
+//            SignatureAndHashAlgorithm.rsa_pss_pss_sha512 };
         short[] hashAlgorithms = new short[]{ HashAlgorithm.sha1, HashAlgorithm.sha224, HashAlgorithm.sha256,
             HashAlgorithm.sha384, HashAlgorithm.sha512 };
         short[] signatureAlgorithms = new short[]{ SignatureAlgorithm.rsa, SignatureAlgorithm.ecdsa };
 
         Vector result = new Vector();
+//        for (int i = 0; i < intrinsicSigAlgs.length; ++i)
+//        {
+//            TlsUtils.addIfSupported(result, crypto, intrinsicSigAlgs[i]);
+//        }
         for (int i = 0; i < signatureAlgorithms.length; ++i)
         {
             for (int j = 0; j < hashAlgorithms.length; ++j)
             {
-                addIfSupported(crypto, result, new SignatureAndHashAlgorithm(hashAlgorithms[j], signatureAlgorithms[i]));
+                TlsUtils.addIfSupported(result, crypto, new SignatureAndHashAlgorithm(hashAlgorithms[j], signatureAlgorithms[i]));
             }
         }
 
         // TODO Dynamically detect whether the TlsCrypto implementation can handle DSA2
-        addIfSupported(crypto, result, new SignatureAndHashAlgorithm(HashAlgorithm.sha1, SignatureAlgorithm.dsa));
+        TlsUtils.addIfSupported(result, crypto, new SignatureAndHashAlgorithm(HashAlgorithm.sha1, SignatureAlgorithm.dsa));
 
         return result;
     }
@@ -252,26 +335,14 @@ abstract class JsseUtils
         String algorithm = privateKey.getAlgorithm();
         switch (keyExchangeAlgorithm)
         {
-        case KeyExchangeAlgorithm.DH_DSS:
-        case KeyExchangeAlgorithm.DH_DSS_EXPORT:
-        case KeyExchangeAlgorithm.DH_RSA:
-        case KeyExchangeAlgorithm.DH_RSA_EXPORT:
-            return privateKey instanceof DHPrivateKey || "DH".equals(algorithm);
-
-        case KeyExchangeAlgorithm.ECDH_ECDSA:
-        case KeyExchangeAlgorithm.ECDH_RSA:
-            return privateKey instanceof ECPrivateKey || "ECDH".equals(algorithm);
-
         case KeyExchangeAlgorithm.ECDHE_ECDSA:
             return privateKey instanceof ECPrivateKey || "EC".equals(algorithm);
 
         case KeyExchangeAlgorithm.DHE_DSS:
-        case KeyExchangeAlgorithm.DHE_DSS_EXPORT:
         case KeyExchangeAlgorithm.SRP_DSS:
             return privateKey instanceof DSAPrivateKey || "DSA".equals(algorithm);
 
         case KeyExchangeAlgorithm.DHE_RSA:
-        case KeyExchangeAlgorithm.DHE_RSA_EXPORT:
         case KeyExchangeAlgorithm.ECDHE_RSA:
         case KeyExchangeAlgorithm.RSA:
         case KeyExchangeAlgorithm.RSA_PSK:
@@ -342,108 +413,83 @@ abstract class JsseUtils
         return names;
     }
 
-    private static void addIfSupported(TlsCrypto crypto, Vector v, SignatureAndHashAlgorithm alg)
-    {
-        if (crypto.hasSignatureAndHashAlgorithm(alg))
-        {
-            v.addElement(alg);
-        }
-    }
-
-    static Constructor getDeclaredConstructor(final Class clazz, final Class<?>... parameterTypes)
-    {
-        return AccessController.doPrivileged(new PrivilegedAction<Constructor>()
-        {
-            public Constructor run()
-            {
-                try
-                {
-                    return clazz.getDeclaredConstructor(parameterTypes);
-                }
-                catch (Exception e)
-                {
-                    // ignore - maybe log?
-                }
-
-                return null;
-            }
-        });
-    }
-
-    static Class loadClass(Class sourceClass, final String className)
-    {
-        try
-        {
-            ClassLoader loader = sourceClass.getClassLoader();
-            if (loader != null)
-            {
-                return loader.loadClass(className);
-            }
-            else
-            {
-                return AccessController.doPrivileged(new PrivilegedAction<Class>()
-                {
-                    public Class run()
-                    {
-                        try
-                        {
-                            return Class.forName(className);
-                        }
-                        catch (Exception e)
-                        {
-                            // ignore - maybe log?
-                        }
-
-                        return null;
-                    }
-                });
-            }
-        }
-        catch (ClassNotFoundException e)
-        {
-            // ignore - maybe log?
-        }
-
-        return null;
-    }
-
     static BCSNIServerName convertSNIServerName(ServerName serverName)
     {
-        switch (serverName.getNameType())
+        short nameType = serverName.getNameType();
+        byte[] nameData = serverName.getNameData();
+
+        switch (nameType)
         {
         case BCStandardConstants.SNI_HOST_NAME:
-            return new BCSNIHostName(serverName.getHostName());
+            return new BCSNIHostName(nameData);
         default:
-            return null;
+            return new BCUnknownServerName(nameType, nameData);
         }
     }
 
-    static BCSNIServerName findMatchingSNIServerName(ServerNameList serverNameList,
-        Collection<BCSNIMatcher> sniMatchers)
+    static List<BCSNIServerName> convertSNIServerNames(Vector serverNameList)
     {
-        Enumeration serverNames = serverNameList.getServerNameList().elements();
+        if (null == serverNameList || serverNameList.isEmpty())
+        {
+            return Collections.emptyList();
+        }
+
+        ArrayList<BCSNIServerName> result = new ArrayList<BCSNIServerName>(serverNameList.size());
+
+        Enumeration serverNames = serverNameList.elements();
         while (serverNames.hasMoreElements())
         {
-            BCSNIServerName sniServerName = convertSNIServerName((ServerName)serverNames.nextElement());
+            result.add(convertSNIServerName((ServerName)serverNames.nextElement()));
+        }
 
+        return Collections.unmodifiableList(result);
+    }
+
+    static BCSNIServerName findMatchingSNIServerName(Vector serverNameList, Collection<BCSNIMatcher> sniMatchers)
+    {
+        if (!serverNameList.isEmpty())
+        {
+            List<BCSNIServerName> sniServerNames = convertSNIServerNames(serverNameList);
             for (BCSNIMatcher sniMatcher : sniMatchers)
             {
-                if (sniMatcher != null && sniMatcher.getType() == sniServerName.getType()
-                    && sniMatcher.matches(sniServerName))
+                if (null != sniMatcher)
                 {
-                    return sniServerName;
+                    int nameType = sniMatcher.getType();
+                    for (BCSNIServerName sniServerName : sniServerNames)
+                    {
+                        if (null == sniServerName || sniServerName.getType() != nameType)
+                        {
+                            continue;
+                        }
+                        if (sniMatcher.matches(sniServerName))
+                        {
+                            return sniServerName;
+                        }
+                        break;
+                    }
                 }
             }
         }
+
         return null;
     }
 
-    static String stripQuotes(String s)
+    static String stripDoubleQuotes(String s)
+    {
+        return stripOuterChars(s, '"', '"');
+    }
+
+    static String stripSquareBrackets(String s)
+    {
+        return stripOuterChars(s, '[', ']');
+    }
+
+    private static String stripOuterChars(String s, char openChar, char closeChar)
     {
         if (s != null)
         {
             int sLast = s.length() - 1;
-            if (sLast > 0 && s.charAt(0) == '"' && s.charAt(sLast) == '"')
+            if (sLast > 0 && s.charAt(0) == openChar && s.charAt(sLast) == closeChar)
             {
                 return s.substring(1, sLast);
             }

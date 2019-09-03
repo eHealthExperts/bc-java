@@ -20,8 +20,8 @@ public class BouncyCastleJsseProvider
 {
     public static final String PROVIDER_NAME = "BCJSSE";
 
-    private static final double PROVIDER_VERSION = 1.0004;
-    private static final String PROVIDER_INFO = "Bouncy Castle JSSE Provider Version 1.0.4";
+    private static final double PROVIDER_VERSION = 1.0009;
+    private static final String PROVIDER_INFO = "Bouncy Castle JSSE Provider Version 1.0.9";
 
     private Map<String, BcJsseService> serviceMap = new HashMap<String, BcJsseService>();
     private Map<String, EngineCreator> creatorMap = new HashMap<String, EngineCreator>();
@@ -85,7 +85,13 @@ public class BouncyCastleJsseProvider
 
         this.isInFipsMode = configure(fipsMode, tlsCryptoProvider);
     }
-    
+
+    // for Java 11
+    public Provider configure(String configArg)
+    {
+        return new BouncyCastleJsseProvider(configArg);
+    }
+
     private JcaTlsCryptoProvider createCryptoProvider(String cryptoName)
         throws GeneralSecurityException
     {
@@ -133,7 +139,7 @@ public class BouncyCastleJsseProvider
         }
     }
 
-    private boolean configure(final boolean fipsMode, final JcaTlsCryptoProvider baseCryptoProvider)
+    private boolean configure(final boolean fipsMode, final JcaTlsCryptoProvider cryptoProvider)
     {
         // TODO[jsse]: should X.509 be an alias.
         addAlgorithmImplementation("KeyManagerFactory.X.509", "org.bouncycastle.jsse.provider.KeyManagerFactory", new EngineCreator()
@@ -150,7 +156,7 @@ public class BouncyCastleJsseProvider
         {
             public Object createInstance(Object constructorParameter)
             {
-                return new ProvTrustManagerFactorySpi(baseCryptoProvider.getPkixProvider());
+                return new ProvTrustManagerFactorySpi(cryptoProvider.getPkixProvider());
             }
         });
         addAlias("Alg.Alias.TrustManagerFactory.X.509", "PKIX");
@@ -161,7 +167,7 @@ public class BouncyCastleJsseProvider
             {
                 public Object createInstance(Object constructorParameter)
                 {
-                    return new ProvSSLContextSpi(fipsMode, baseCryptoProvider, null);
+                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, null);
                 }
             });
         addAlgorithmImplementation("SSLContext.TLSV1", "org.bouncycastle.jsse.provider.SSLContext.TLSv1",
@@ -169,7 +175,9 @@ public class BouncyCastleJsseProvider
             {
                 public Object createInstance(Object constructorParameter)
                 {
-                    return new ProvSSLContextSpi(fipsMode, baseCryptoProvider, new String[]{ "TLSv1", "TLSv1.1", "TLSv1.2" });
+                    // TODO[tls13]
+//                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3" });
+                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1", "TLSv1.1", "TLSv1.2" });
                 }
             });
         addAlgorithmImplementation("SSLContext.TLSV1.1", "org.bouncycastle.jsse.provider.SSLContext.TLSv1_1",
@@ -177,7 +185,9 @@ public class BouncyCastleJsseProvider
             {
                 public Object createInstance(Object constructorParameter)
                 {
-                    return new ProvSSLContextSpi(fipsMode, baseCryptoProvider, new String[]{ "TLSv1.1", "TLSv1.2" });
+                    // TODO[tls13]
+//                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1.1", "TLSv1.2", "TLSv1.3" });
+                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1.1", "TLSv1.2" });
                 }
             });
         addAlgorithmImplementation("SSLContext.TLSV1.2", "org.bouncycastle.jsse.provider.SSLContext.TLSv1_2",
@@ -185,27 +195,29 @@ public class BouncyCastleJsseProvider
             {
                 public Object createInstance(Object constructorParameter)
                 {
-                    return new ProvSSLContextSpi(fipsMode, baseCryptoProvider, new String[]{ "TLSv1.2" });
+                    // TODO[tls13]
+//                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1.2", "TLSv1.3" });
+                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1.2" });
                 }
             });
+        // TODO[tls13]
+//        addAlgorithmImplementation("SSLContext.TLSV1.3", "org.bouncycastle.jsse.provider.SSLContext.TLSv1_3",
+//            new EngineCreator()
+//            {
+//                public Object createInstance(Object constructorParameter)
+//                {
+//                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1.3" });
+//                }
+//            });
         addAlgorithmImplementation("SSLContext.DEFAULT", "org.bouncycastle.jsse.provider.SSLContext.Default",
             new EngineCreator()
             {
-                public Object createInstance(Object constructorParameter)
+                public Object createInstance(Object constructorParameter) throws GeneralSecurityException
                 {
-                    try
-                    {
-                        ProvSSLContextSpi defaultSSLContextSpi = new ProvSSLContextSpi(fipsMode, baseCryptoProvider, null);
-                        defaultSSLContextSpi.engineInit(null, null, null);
-                        return defaultSSLContextSpi;
-                    }
-                    catch (GeneralSecurityException e)
-                    {
-                        // TODO[jsse] Log this exception
-                        return null;
-                    }
+                    return new DefaultSSLContextSpi(fipsMode, cryptoProvider);
                 }
             });
+        addAlias("Alg.Alias.SSLContext.SSL", "TLS");
 
         return fipsMode;
     }
@@ -377,13 +389,4 @@ public class BouncyCastleJsseProvider
             }
         }
     }
-
-//    private static final class FipsCapabilities
-//        extends TlsCryptoCapabilities
-//    {
-//        public FipsCapabilities()
-//        {
-//            super(new int[]{ NamedGroup.secp256r1, NamedGroup.secp384r1 });
-//        }
-//    }
 }

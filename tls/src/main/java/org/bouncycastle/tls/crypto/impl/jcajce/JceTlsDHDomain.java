@@ -2,14 +2,15 @@ package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Arrays;
 
-import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
@@ -32,6 +33,47 @@ import org.bouncycastle.util.BigIntegers;
 public class JceTlsDHDomain
     implements TlsDHDomain
 {
+    private static byte[] encodeValue(DHParameterSpec dh, boolean padded, BigInteger x)
+    {
+        return padded
+            ?   BigIntegers.asUnsignedByteArray(getValueLength(dh), x)
+            :   BigIntegers.asUnsignedByteArray(x);
+    }
+
+    private static int getValueLength(DHParameterSpec dh)
+    {
+        return (dh.getP().bitLength() + 7) / 8;
+    }
+
+    public static JceTlsSecret calculateDHAgreement(JcaTlsCrypto crypto, DHPrivateKey privateKey, DHPublicKey publicKey,
+        boolean padded) throws IOException
+    {
+        try
+        {
+            /*
+             * RFC 5246 8.1.2. Leading bytes of Z that contain all zero bits are stripped before it
+             * is used as the pre_master_secret. We use the convention established by the JSSE to
+             * signal this by asking for "TlsPremasterSecret".
+             */
+            byte[] secret = crypto.calculateKeyAgreement("DH", privateKey, publicKey, "TlsPremasterSecret");
+
+            if (padded)
+            {
+                int length = getValueLength(privateKey.getParams());
+                byte[] tmp = new byte[length];
+                System.arraycopy(secret, 0, tmp, length - secret.length, secret.length);
+                Arrays.fill(secret, (byte)0);
+                secret = tmp;
+            }
+
+            return crypto.adoptLocalSecret(secret);
+        }
+        catch (GeneralSecurityException e)
+        {
+            throw new TlsCryptoException("cannot calculate secret", e);
+        }
+    }
+
     public static DHParameterSpec getParameters(TlsDHConfig dhConfig)
     {
         DHGroup dhGroup = TlsDHUtils.getDHGroup(dhConfig);
@@ -60,30 +102,7 @@ public class JceTlsDHDomain
     public JceTlsSecret calculateDHAgreement(DHPrivateKey privateKey, DHPublicKey publicKey)
         throws IOException
     {
-        try
-        {
-            /*
-             * RFC 5246 8.1.2. Leading bytes of Z that contain all zero bits are stripped before it is
-             * used as the pre_master_secret. We use the convention established by the JSSE to signal this
-             * by asking for "TlsPremasterSecret".
-             */
-            SecretKey secretKey = crypto.calculateKeyAgreement("DH", privateKey, publicKey, "TlsPremasterSecret");
-
-            // TODO Need to consider cases where SecretKey may not be encodable
-            JceTlsSecret adoptLocalSecret = crypto.adoptLocalSecret(secretKey.getEncoded());
-
-            try {
-                secretKey.destroy();
-            } catch (DestroyFailedException e) {
-                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
-            }
-            
-            return adoptLocalSecret;
-        }
-        catch (GeneralSecurityException e)
-        {
-            throw new TlsCryptoException("cannot calculate secret", e);
-        }
+        return calculateDHAgreement(crypto, privateKey, publicKey, dhConfig.isPadded());
     }
 
     public TlsAgreement createDH()
@@ -91,8 +110,13 @@ public class JceTlsDHDomain
         return new JceTlsDH(this);
     }
 
-    public static BigInteger decodeParameter(byte[] encoding) throws IOException
+    public BigInteger decodeParameter(byte[] encoding) throws IOException
     {
+        if (dhConfig.isPadded() && getValueLength(dhParameterSpec) != encoding.length)
+        {
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+
         return new BigInteger(1, encoding);
     }
 
@@ -111,6 +135,10 @@ public class JceTlsDHDomain
 
             return (DHPublicKey)keyFactory.generatePublic(new DHPublicKeySpec(y, dhParameterSpec.getP(), dhParameterSpec.getG()));
         }
+        catch (IOException e)
+        {
+            throw e;
+        }
         catch (Exception e)
         {
             throw new TlsFatalAlert(AlertDescription.handshake_failure, e);
@@ -119,12 +147,12 @@ public class JceTlsDHDomain
 
     public byte[] encodeParameter(BigInteger x) throws IOException
     {
-        return BigIntegers.asUnsignedByteArray(x);
+        return encodeValue(dhParameterSpec, dhConfig.isPadded(), x);
     }
 
     public byte[] encodePublicKey(DHPublicKey publicKey) throws IOException
     {
-        return encodeParameter(publicKey.getY());
+        return encodeValue(dhParameterSpec, true, publicKey.getY());
     }
 
     public KeyPair generateKeyPair() throws IOException

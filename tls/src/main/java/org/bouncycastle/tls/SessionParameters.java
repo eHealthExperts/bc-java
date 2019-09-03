@@ -22,6 +22,7 @@ public final class SessionParameters
         private byte[] srpIdentity = null;
         private byte[] encodedServerExtensions = null;
         private byte[] encodedClientExtensions = null;
+        private boolean extendedMasterSecret = false;
 
         public Builder()
         {
@@ -33,7 +34,8 @@ public final class SessionParameters
             validate(this.compressionAlgorithm >= 0, "compressionAlgorithm");
             validate(this.masterSecret != null, "masterSecret");
             return new SessionParameters(cipherSuite, compressionAlgorithm, localCertificate, masterSecret,
-                negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions);
+                negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions,
+                extendedMasterSecret);
         }
 
         public Builder setCipherSuite(int cipherSuite)
@@ -45,6 +47,12 @@ public final class SessionParameters
         public Builder setCompressionAlgorithm(short compressionAlgorithm)
         {
             this.compressionAlgorithm = compressionAlgorithm;
+            return this;
+        }
+
+        public Builder setExtendedMasterSecret(boolean extendedMasterSecret)
+        {
+            this.extendedMasterSecret = extendedMasterSecret;
             return this;
         }
 
@@ -95,7 +103,7 @@ public final class SessionParameters
 
         public Builder setServerExtensions(Hashtable serverExtensions) throws IOException
         {
-            if (serverExtensions == null)
+            if (serverExtensions == null || serverExtensions.isEmpty())
             {
                 encodedServerExtensions = null;
             }
@@ -142,10 +150,11 @@ public final class SessionParameters
     private byte[] srpIdentity = null;
     private byte[] encodedServerExtensions;
     private byte[] encodedClientExtensions;
+    private boolean extendedMasterSecret;
 
     private SessionParameters(int cipherSuite, short compressionAlgorithm, Certificate localCertificate,
         TlsSecret masterSecret, ProtocolVersion negotiatedVersion, Certificate peerCertificate, byte[] pskIdentity,
-        byte[] srpIdentity, byte[] encodedServerExtensions, byte[] encodedClientExtensions)
+        byte[] srpIdentity, byte[] encodedServerExtensions, byte[] encodedClientExtensions, boolean extendedMasterSecret)
     {
         this.cipherSuite = cipherSuite;
         this.compressionAlgorithm = compressionAlgorithm;
@@ -157,6 +166,7 @@ public final class SessionParameters
         this.srpIdentity = Arrays.clone(srpIdentity);
         this.encodedServerExtensions = encodedServerExtensions;
         this.encodedClientExtensions = encodedClientExtensions;
+        this.extendedMasterSecret = extendedMasterSecret;
     }
 
     public void clear()
@@ -170,7 +180,8 @@ public final class SessionParameters
     public SessionParameters copy()
     {
         return new SessionParameters(cipherSuite, compressionAlgorithm, localCertificate, masterSecret,
-            negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions);
+            negotiatedVersion, peerCertificate, pskIdentity, srpIdentity, encodedServerExtensions, encodedClientExtensions,
+            extendedMasterSecret);
     }
 
     public int getCipherSuite()
@@ -219,6 +230,11 @@ public final class SessionParameters
     public byte[] getSRPIdentity()
     {
         return srpIdentity;
+    }
+
+    public boolean isExtendedMasterSecret()
+    {
+        return extendedMasterSecret;
     }
 
     public Hashtable readServerExtensions() throws IOException

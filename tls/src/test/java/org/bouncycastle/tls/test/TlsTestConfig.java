@@ -5,6 +5,7 @@ import java.util.Vector;
 import org.bouncycastle.tls.ConnectionEnd;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
+import org.bouncycastle.tls.TlsPeer;
 
 public class TlsTestConfig
 {
@@ -66,17 +67,12 @@ public class TlsTestConfig
      */
     public SignatureAndHashAlgorithm clientAuthSigAlgClaimed = null;
 
+    /**
+     * Control the result the client will return from {@link TlsPeer#shouldCheckSigAlgOfPeerCerts()}.
+     */
+    public boolean clientCheckSigAlgOfServerCerts = true;
+
     public int clientCrypto = CRYPTO_BC;
-
-    /**
-     * Configures the minimum protocol version the client will accept. If null, uses the library's default.
-     */
-    public ProtocolVersion clientMinimumVersion = null;
-
-    /**
-     * Configures the protocol version the client will offer. If null, uses the library's default.
-     */
-    public ProtocolVersion clientOfferVersion = null;
 
     /**
      * Configures whether the client will indicate version fallback via TLS_FALLBACK_SCSV.
@@ -87,6 +83,11 @@ public class TlsTestConfig
      * Configures whether a (TLS 1.2+) client will send the signature_algorithms extension in ClientHello.
      */
     public boolean clientSendSignatureAlgorithms = true;
+
+    /**
+     * Configures the supported protocol versions for the client. If null, uses the library's default.
+     */
+    public ProtocolVersion[] clientSupportedVersions = null;
 
     /**
      * If not null, and TLS 1.2 or higher is negotiated, selects a fixed signature/hash algorithm to
@@ -105,17 +106,22 @@ public class TlsTestConfig
      */
     public Vector serverCertReqSigAlgs = null;
 
+    /**
+     * Control the result the server will return from {@link TlsPeer#shouldCheckSigAlgOfPeerCerts()}.
+     */
+    public boolean serverCheckSigAlgOfClientCerts = true;
+
     public int serverCrypto = CRYPTO_BC;
 
     /**
-     * Configures the maximum protocol version the server will accept. If null, uses the library's default.
+     * Configures a protocol version the server will unconditionally negotiate. Ignored if null.
      */
-    public ProtocolVersion serverMaximumVersion = null;
+    public ProtocolVersion serverNegotiateVersion = null;
 
     /**
-     * Configures the minimum protocol version the server will accept. If null, uses the library's default.
+     * Configures the supported protocol versions for the server. If null, uses the library's default.
      */
-    public ProtocolVersion serverMinimumVersion = null;
+    public ProtocolVersion[] serverSupportedVersions = null;
 
     /**
      * Configures the connection end that a fatal alert is expected to be raised. Use ConnectionEnd.* constants.

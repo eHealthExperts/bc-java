@@ -7,7 +7,6 @@ import java.util.Vector;
 
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Certificate;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.AlertLevel;
 import org.bouncycastle.tls.CertificateRequest;
@@ -24,7 +23,6 @@ import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.tls.crypto.impl.bc.BcTlsCrypto;
-import org.bouncycastle.tls.crypto.impl.jcajce.JcaTlsCryptoProvider;
 import org.bouncycastle.util.encoders.Hex;
 
 class TlsTestServerImpl
@@ -55,35 +53,30 @@ class TlsTestServerImpl
         return firstFatalAlertDescription;
     }
 
+    public boolean shouldCheckSigAlgOfPeerCerts()
+    {
+        return config.serverCheckSigAlgOfClientCerts;
+    }
+
     public TlsCrypto getCrypto()
     {
         switch (config.serverCrypto)
         {
         case TlsTestConfig.CRYPTO_JCA:
-            return new JcaTlsCryptoProvider().setProvider(new BouncyCastleProvider()).create(new SecureRandom(), new SecureRandom());
+            return TlsTestSuite.JCA_CRYPTO;
         default:
-            return new BcTlsCrypto(new SecureRandom());
+            return TlsTestSuite.BC_CRYPTO;
         }
     }
 
-    protected ProtocolVersion getMaximumVersion()
+    public ProtocolVersion[] getSupportedVersions()
     {
-        if (config.serverMaximumVersion != null)
+        if (config.serverSupportedVersions != null)
         {
-            return config.serverMaximumVersion;
+            return config.serverSupportedVersions;
         }
 
-        return super.getMaximumVersion();
-    }
-
-    protected ProtocolVersion getMinimumVersion()
-    {
-        if (config.serverMinimumVersion != null)
-        {
-            return config.serverMinimumVersion;
-        }
-
-        return super.getMinimumVersion();
+        return super.getSupportedVersions();
     }
 
     public void notifyAlertRaised(short alertLevel, short alertDescription, String message, Throwable cause)
@@ -142,7 +135,9 @@ class TlsTestServerImpl
 
     public ProtocolVersion getServerVersion() throws IOException
     {
-        ProtocolVersion serverVersion = super.getServerVersion();
+        ProtocolVersion serverVersion = (null != config.serverNegotiateVersion)
+            ?   config.serverNegotiateVersion
+            :   super.getServerVersion();
 
         if (TlsTestConfig.DEBUG)
         {
@@ -163,7 +158,7 @@ class TlsTestServerImpl
             ClientCertificateType.dss_sign, ClientCertificateType.ecdsa_sign };
 
         Vector serverSigAlgs = null;
-        if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(serverVersion))
+        if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(context.getServerVersion()))
         {
             serverSigAlgs = config.serverCertReqSigAlgs;
             if (serverSigAlgs == null)
@@ -194,7 +189,11 @@ class TlsTestServerImpl
         }
         if (isEmpty && (config.serverCertReq == TlsTestConfig.SERVER_CERT_REQ_MANDATORY))
         {
-            throw new TlsFatalAlert(AlertDescription.handshake_failure);
+            short alertDescription = TlsUtils.isTLSv13(context)
+                ?   AlertDescription.certificate_required
+                :   AlertDescription.handshake_failure;
+
+            throw new TlsFatalAlert(alertDescription);
         }
 
         TlsCertificate[] chain = clientCertificate.getCertificateList();
@@ -212,7 +211,10 @@ class TlsTestServerImpl
         }
 
         if (!isEmpty && !TlsTestUtils.isCertificateOneOf(context.getCrypto(), chain[0],
-            new String[]{ "x509-client-dsa.pem", "x509-client-ecdsa.pem", "x509-client-rsa.pem"}))
+            new String[]
+            { "x509-client-dsa.pem", "x509-client-ecdh.pem", "x509-client-ecdsa.pem", "x509-client-ed25519.pem",
+                "x509-client-rsa_pss_256.pem", "x509-client-rsa_pss_384.pem", "x509-client-rsa_pss_512.pem",
+                "x509-client-rsa.pem" }))
         {
             throw new TlsFatalAlert(AlertDescription.bad_certificate);
         }
@@ -227,19 +229,20 @@ class TlsTestServerImpl
             return signatureAlgorithms;
         }
 
-        return supportedSignatureAlgorithms;
+        return context.getSecurityParametersHandshake().getClientSigAlgs();
     }
 
     protected TlsCredentialedSigner getDSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentials(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.dsa,
-            "x509-server-dsa.pem", "x509-server-key-dsa.pem");
+        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.dsa);
     }
 
     protected TlsCredentialedSigner getECDSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentials(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.ecdsa,
-            "x509-server-ecdsa.pem", "x509-server-key-ecdsa.pem");
+        // TODO[RFC 8422] Code should choose based on client's supported sig algs?
+        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.ecdsa);
+//        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.ed25519);
+//        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.ed448);
     }
 
     protected TlsCredentialedDecryptor getRSAEncryptionCredentials() throws IOException
@@ -250,8 +253,7 @@ class TlsTestServerImpl
 
     protected TlsCredentialedSigner getRSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentials(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.rsa,
-            "x509-server-rsa-sign.pem", "x509-server-key-rsa-sign.pem");
+        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.rsa);
     }
 
     protected String hex(byte[] data)

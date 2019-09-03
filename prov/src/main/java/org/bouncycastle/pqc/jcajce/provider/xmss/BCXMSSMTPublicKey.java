@@ -1,16 +1,16 @@
 package org.bouncycastle.pqc.jcajce.provider.xmss;
 
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.security.PublicKey;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.CipherParameters;
-import org.bouncycastle.pqc.asn1.PQCObjectIdentifiers;
 import org.bouncycastle.pqc.asn1.XMSSMTKeyParams;
-import org.bouncycastle.pqc.asn1.XMSSPublicKey;
-import org.bouncycastle.pqc.crypto.xmss.XMSSMTParameters;
+import org.bouncycastle.pqc.crypto.util.PublicKeyFactory;
+import org.bouncycastle.pqc.crypto.util.SubjectPublicKeyInfoFactory;
 import org.bouncycastle.pqc.crypto.xmss.XMSSMTPublicKeyParameters;
 import org.bouncycastle.pqc.jcajce.interfaces.XMSSMTKey;
 import org.bouncycastle.util.Arrays;
@@ -18,8 +18,10 @@ import org.bouncycastle.util.Arrays;
 public class BCXMSSMTPublicKey
     implements PublicKey, XMSSMTKey
 {
-    private final ASN1ObjectIdentifier treeDigest;
-    private final XMSSMTPublicKeyParameters keyParams;
+    private static final long serialVersionUID = 3230324130542413475L;
+
+    private transient ASN1ObjectIdentifier treeDigest;
+    private transient XMSSMTPublicKeyParameters keyParams;
 
     public BCXMSSMTPublicKey(ASN1ObjectIdentifier treeDigest, XMSSMTPublicKeyParameters keyParams)
     {
@@ -30,15 +32,15 @@ public class BCXMSSMTPublicKey
     public BCXMSSMTPublicKey(SubjectPublicKeyInfo keyInfo)
         throws IOException
     {
+        init(keyInfo);
+    }
+
+    private void init(SubjectPublicKeyInfo keyInfo)
+        throws IOException
+    {
         XMSSMTKeyParams keyParams = XMSSMTKeyParams.getInstance(keyInfo.getAlgorithm().getParameters());
         this.treeDigest = keyParams.getTreeDigest().getAlgorithm();
-
-        XMSSPublicKey xmssMtPublicKey = XMSSPublicKey.getInstance(keyInfo.parsePublicKey());
-
-        this.keyParams = new XMSSMTPublicKeyParameters
-            .Builder(new XMSSMTParameters(keyParams.getHeight(), keyParams.getLayers(), DigestUtil.getDigest(treeDigest)))
-            .withPublicSeed(xmssMtPublicKey.getPublicSeed())
-            .withRoot(xmssMtPublicKey.getRoot()).build();
+        this.keyParams = (XMSSMTPublicKeyParameters)PublicKeyFactory.createKey(keyInfo);
     }
 
     public boolean equals(Object o)
@@ -73,11 +75,9 @@ public class BCXMSSMTPublicKey
 
     public byte[] getEncoded()
     {
-        SubjectPublicKeyInfo pki;
         try
         {
-            AlgorithmIdentifier algorithmIdentifier = new AlgorithmIdentifier(PQCObjectIdentifiers.xmss_mt, new XMSSMTKeyParams(keyParams.getParameters().getHeight(), keyParams.getParameters().getLayers(), new AlgorithmIdentifier(treeDigest)));
-            pki = new SubjectPublicKeyInfo(algorithmIdentifier, new XMSSPublicKey(keyParams.getPublicSeed(), keyParams.getRoot()));
+            SubjectPublicKeyInfo pki = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(keyParams);
 
             return pki.getEncoded();
         }
@@ -110,5 +110,25 @@ public class BCXMSSMTPublicKey
     public String getTreeDigest()
     {
         return DigestUtil.getXMSSDigestName(treeDigest);
+    }
+
+    private void readObject(
+        ObjectInputStream in)
+        throws IOException, ClassNotFoundException
+    {
+        in.defaultReadObject();
+
+        byte[] enc = (byte[])in.readObject();
+
+        init(SubjectPublicKeyInfo.getInstance(enc));
+    }
+
+    private void writeObject(
+        ObjectOutputStream out)
+        throws IOException
+    {
+        out.defaultWriteObject();
+
+        out.writeObject(this.getEncoded());
     }
 }

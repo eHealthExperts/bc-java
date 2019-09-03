@@ -13,6 +13,16 @@ public final class Arrays
         // static class, hide constructor
     }
 
+    public static boolean areAllZeroes(byte[] buf, int off, int len)
+    {
+        int bits = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            bits |= buf[off + i];
+        }
+        return bits == 0;
+    }
+
     public static boolean areEqual(
         boolean[]  a,
         boolean[]  b)
@@ -146,26 +156,27 @@ public final class Arrays
         byte[]  expected,
         byte[]  supplied)
     {
-        if (expected == supplied)
-        {
-            return true;
-        }
-
         if (expected == null || supplied == null)
         {
             return false;
         }
 
-        if (expected.length != supplied.length)
+        if (expected == supplied)
         {
-            return !Arrays.constantTimeAreEqual(expected, expected);
+            return true;
         }
 
-        int nonEqual = 0;
+        int len = (expected.length < supplied.length) ? expected.length : supplied.length;
 
-        for (int i = 0; i != expected.length; i++)
+        int nonEqual = expected.length ^ supplied.length;
+
+        for (int i = 0; i != len; i++)
         {
             nonEqual |= (expected[i] ^ supplied[i]);
+        }
+        for (int i = len; i < supplied.length; i++)
+        {
+            nonEqual |= (supplied[i] ^ ~supplied[i]);
         }
 
         return nonEqual == 0;
@@ -330,6 +341,18 @@ public final class Arrays
         byte value)
     {
         for (int i = 0; i < array.length; i++)
+        {
+            array[i] = value;
+        }
+    }
+
+    public static void fill(
+        byte[] array,
+        int start,
+        int finish,
+        byte value)
+    {
+        for (int i = start; i < finish; i++)
         {
             array[i] = value;
         }

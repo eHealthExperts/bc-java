@@ -1,11 +1,21 @@
 package org.bouncycastle.jsse;
 
+import javax.net.ssl.SSLEngine;
+
 /**
  * A BCJSSE-specific interface to expose extended functionality on {@link javax.net.ssl.SSLEngine}
  * implementations.
  */
 public interface BCSSLEngine
 {
+    String getApplicationProtocol();
+
+    BCApplicationProtocolSelector<SSLEngine> getBCHandshakeApplicationProtocolSelector();
+
+    void setBCHandshakeApplicationProtocolSelector(BCApplicationProtocolSelector<SSLEngine> selector);
+
+    BCExtendedSSLSession getBCHandshakeSession();
+
     /**
      * Returns an accessor for extended SSL connection data. Unlike
      * {@link BCSSLSocket#getConnection} this method does not block until handshaking is complete.
@@ -14,6 +24,8 @@ public interface BCSSLEngine
      * @return A {@link BCSSLConnection} instance.
      */
     BCSSLConnection getConnection();
+
+    String getHandshakeApplicationProtocol();
 
     /**
      * Returns a {@link BCSSLParameters} with properties reflecting the current configuration.

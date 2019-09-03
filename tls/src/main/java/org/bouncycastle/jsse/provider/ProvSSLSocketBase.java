@@ -3,6 +3,8 @@ package org.bouncycastle.jsse.provider;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.channels.SocketChannel;
@@ -19,6 +21,9 @@ abstract class ProvSSLSocketBase
     extends SSLSocket
     implements BCSSLSocket
 {
+    protected static final boolean provJdkTlsTrustNameService = PropertyUtils
+        .getBooleanSystemProperty("jdk.tls.trustNameService", false);
+
     protected final Closeable socketCloser = new Closeable()
     {
         public void close() throws IOException
@@ -32,29 +37,6 @@ abstract class ProvSSLSocketBase
 
     protected ProvSSLSocketBase()
     {
-        super();
-    }
-
-    protected ProvSSLSocketBase(InetAddress address, int port, InetAddress clientAddress, int clientPort)
-        throws IOException
-    {
-        super(address, port, clientAddress, clientPort);
-    }
-
-    protected ProvSSLSocketBase(InetAddress address, int port) throws IOException
-    {
-        super(address, port);
-    }
-
-    protected ProvSSLSocketBase(String host, int port, InetAddress clientAddress, int clientPort)
-        throws IOException, UnknownHostException
-    {
-        super(host, port, clientAddress, clientPort);
-    }
-
-    protected ProvSSLSocketBase(String host, int port) throws IOException, UnknownHostException
-    {
-        super(host, port);
     }
 
     @Override
@@ -132,4 +114,28 @@ abstract class ProvSSLSocketBase
 //    {
 //        return super.toString();
 //    }
+
+    protected void implBind(InetAddress clientAddress, int clientPort) throws IOException
+    {
+        InetSocketAddress socketAddress = new InetSocketAddress(clientAddress, clientPort);
+
+        bind(socketAddress);
+    }
+
+    protected void implConnect(InetAddress address, int port) throws IOException
+    {
+        SocketAddress socketAddress = new InetSocketAddress(address, port);
+
+        connect(socketAddress, 0);
+    }
+
+    protected void implConnect(String host, int port) throws IOException, UnknownHostException
+    {
+        SocketAddress socketAddress =
+                null == host
+            ?   new InetSocketAddress(InetAddress.getByName(null), port)
+            :   new InetSocketAddress(host, port);
+
+        connect(socketAddress, 0);
+    }
 }

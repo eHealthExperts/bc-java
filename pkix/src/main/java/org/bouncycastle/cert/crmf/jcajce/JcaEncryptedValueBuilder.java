@@ -40,7 +40,7 @@ public class JcaEncryptedValueBuilder
      * Build an EncryptedValue structure containing the private key details contained in
      * the passed PrivateKey.
      *
-     * @param privateKey  a PKCS#8 private key info structure.
+     * @param privateKey the asymmetric private key.
      * @return an EncryptedValue containing an EncryptedPrivateKeyInfo structure.
      * @throws CRMFException on a failure to encrypt the data, or wrap the symmetric key for this value.
      */

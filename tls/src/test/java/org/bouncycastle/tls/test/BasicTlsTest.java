@@ -6,15 +6,19 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.Socket;
 import java.security.SecureRandom;
+import java.util.Vector;
 
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.AlertLevel;
 import org.bouncycastle.tls.Certificate;
 import org.bouncycastle.tls.CipherSuite;
 import org.bouncycastle.tls.DefaultTlsClient;
+import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.SecurityParameters;
 import org.bouncycastle.tls.ServerOnlyTlsAuthentication;
+import org.bouncycastle.tls.SignatureAlgorithm;
+import org.bouncycastle.tls.SignatureAndHashAlgorithm;
 import org.bouncycastle.tls.TlsAuthentication;
 import org.bouncycastle.tls.TlsClient;
 import org.bouncycastle.tls.TlsClientContext;
@@ -136,54 +140,6 @@ public class BasicTlsTest
         assertTrue(Arrays.areEqual(expected, tmp));
     }
 
-    public void testRSAConnectionClient()
-        throws Exception
-    {
-        MyTlsClient client = new MyTlsClient(null);
-
-        checkConnectionClient(client, CipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA, TlsTestUtils.rsaCertData);
-        checkConnectionClient(client, CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA, TlsTestUtils.rsaCertData);
-        checkConnectionClient(client, CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA, TlsTestUtils.rsaCertData);
-        checkConnectionClient(client, CipherSuite.TLS_RSA_WITH_RC4_128_SHA, TlsTestUtils.rsaCertData);
-
-        try
-        {
-            checkConnectionClient(client, CipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA, TlsTestUtils.dudRsaCertData);
-
-            fail("dud certificate not caught");
-        }
-        catch (TlsFatalAlert e)
-        {
-            assertEquals(AlertDescription.certificate_unknown, e.getAlertDescription());
-        }
-
-        try
-        {
-            checkConnectionClient(client, CipherSuite.TLS_DH_anon_EXPORT_WITH_DES40_CBC_SHA, TlsTestUtils.rsaCertData);
-
-            fail("wrong certificate not caught");
-        }
-        catch (TlsFatalAlert e)
-        {
-            assertEquals(AlertDescription.internal_error, e.getAlertDescription());
-        }
-    }
-
-    private void checkConnectionClient(TlsClient client, int cipherSuite, byte[] encCert)
-        throws Exception
-    {
-        TlsCrypto crypto = client.getCrypto();
-
-        client.notifySelectedCipherSuite(cipherSuite);
-
-        TlsKeyExchange keyExchange = client.getKeyExchange();
-        keyExchange.init(new MyTlsClientContext(crypto));
-
-        keyExchange
-            .processServerCertificate(new Certificate(
-                new TlsCertificate[]{ crypto.createCertificate(encCert) }));
-    }
-
     public static TestSuite suite()
     {
         return new TestSuite(BasicTlsTest.class);
@@ -225,88 +181,17 @@ public class BasicTlsTest
             super(new BcTlsCrypto(new SecureRandom()));
 
             this.authentication = authentication;
+
+            this.supportedSignatureAlgorithms = new Vector();
+            this.supportedSignatureAlgorithms.addElement(new SignatureAndHashAlgorithm(HashAlgorithm.md5, SignatureAlgorithm.rsa));
+            this.supportedSignatureAlgorithms.addElement(new SignatureAndHashAlgorithm(HashAlgorithm.sha1, SignatureAlgorithm.rsa));
+            this.supportedSignatureAlgorithms.addElement(new SignatureAndHashAlgorithm(HashAlgorithm.sha256, SignatureAlgorithm.rsa));
         }
 
         public TlsAuthentication getAuthentication()
             throws IOException
         {
             return authentication;
-        }
-    }
-
-    static class MyTlsClientContext
-        implements TlsClientContext
-    {
-        TlsCrypto crypto;
-
-        MyTlsClientContext(TlsCrypto crypto)
-        {
-            this.crypto = crypto;
-        }
-
-        public TlsCrypto getCrypto()
-        {
-            return crypto;
-        }
-
-        public TlsNonceGenerator getNonceGenerator()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        public SecureRandom getSecureRandom()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        public SecurityParameters getSecurityParameters()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        public boolean isServer()
-        {
-            return false;
-        }
-
-        public ProtocolVersion getClientVersion()
-        {
-            return ProtocolVersion.TLSv12;
-        }
-
-        public ProtocolVersion getServerVersion()
-        {
-            return ProtocolVersion.TLSv12;
-        }
-
-        public TlsSession getResumableSession()
-        {
-            return null;
-        }
-
-        public TlsSession getSession()
-        {
-            return null;
-        }
-
-        public Object getUserObject()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        public void setUserObject(Object userObject)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        public byte[] exportChannelBinding(int channelBinding)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        public byte[] exportKeyingMaterial(String asciiLabel, byte[] context_value, int length)
-        {
-            throw new UnsupportedOperationException();
         }
     }
 }

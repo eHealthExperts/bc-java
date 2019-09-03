@@ -1,6 +1,7 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.io.IOException;
+
 import java.security.GeneralSecurityException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -8,7 +9,6 @@ import java.security.interfaces.ECPrivateKey;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.security.auth.DestroyFailedException;
 
@@ -30,7 +30,7 @@ public class JceDefaultTlsCredentialedAgreement
         {
             return "DH";
         }
-        if (privateKey instanceof ECPrivateKey)
+        if (ECUtil.isECPrivateKey(privateKey))
         {
             return "ECDH";
         }
@@ -93,18 +93,8 @@ public class JceDefaultTlsCredentialedAgreement
              */
             PublicKey publicKey = JcaTlsCertificate.convert(crypto, peerCertificate).getPublicKey();
 
-            SecretKey secretKey = crypto.calculateKeyAgreement(agreementAlgorithm, privateKey, publicKey, "TlsPremasterSecret");
-
-            // TODO Need to consider cases where SecretKey may not be encodable
-            JceTlsSecret adoptLocalSecret = crypto.adoptLocalSecret(secretKey.getEncoded());
-
-            try {
-                secretKey.destroy();
-            } catch (DestroyFailedException e) {
-                LOG.log(Level.FINE, "Could not destroy calculate SecretKey", e);
-            }  
-            
-            return adoptLocalSecret;
+            byte[] secret = crypto.calculateKeyAgreement(agreementAlgorithm, privateKey, publicKey, "TlsPremasterSecret");
+            return crypto.adoptLocalSecret(secret);
         }
         catch (GeneralSecurityException e)
         {

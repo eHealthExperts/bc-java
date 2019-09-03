@@ -4,39 +4,32 @@ import java.io.IOException;
 import java.util.Hashtable;
 
 import org.bouncycastle.tls.crypto.TlsCrypto;
-import org.bouncycastle.util.Arrays;
 
 public class SRPTlsClient
     extends AbstractTlsClient
 {
-    // TODO[tls] Perhaps not ideal to keep this in a writable array
-    public static final int[] BASE_CIPHER_SUITES = new int[]
+    private static final int[] DEFAULT_CIPHER_SUITES = new int[]
     {
         CipherSuite.TLS_SRP_SHA_RSA_WITH_AES_128_CBC_SHA
     };
 
-    protected TlsSRPConfigVerifier srpConfigVerifier;
-
-    protected byte[] identity;
-    protected byte[] password;
-
-    protected int[] supportedCipherSuites;
-
-    // TODO[tls-ops] Need to restore a single-arg constructor here
+    protected TlsSRPIdentity srpIdentity;
 
     public SRPTlsClient(TlsCrypto crypto, byte[] identity, byte[] password)
     {
-        this(crypto, new DefaultTlsKeyExchangeFactory(), new DefaultTlsSRPConfigVerifier(), identity, password);
+        this(crypto, new BasicTlsSRPIdentity(identity, password));
     }
 
-    public SRPTlsClient(TlsCrypto crypto, TlsKeyExchangeFactory keyExchangeFactory, TlsSRPConfigVerifier srpConfigVerifier,
-        byte[] identity, byte[] password)
+    public SRPTlsClient(TlsCrypto crypto, TlsSRPIdentity srpIdentity)
     {
-        super(crypto, keyExchangeFactory);
-        this.srpConfigVerifier = srpConfigVerifier;
-        this.identity = Arrays.clone(identity);
-        this.password = Arrays.clone(password);
-        this.supportedCipherSuites = TlsUtils.getSupportedCipherSuites(crypto, BASE_CIPHER_SUITES);
+        super(crypto);
+
+        this.srpIdentity = srpIdentity;
+    }
+
+    protected int[] getSupportedCipherSuites()
+    {
+        return TlsUtils.getSupportedCipherSuites(context.getCrypto(), DEFAULT_CIPHER_SUITES);
     }
 
     protected boolean requireSRPServerExtension()
@@ -45,16 +38,17 @@ public class SRPTlsClient
         return false;
     }
 
-    public int[] getCipherSuites()
+    public ProtocolVersion getClientVersion()
     {
-        return Arrays.clone(supportedCipherSuites);
+        // TODO[tls13] Consider whether this class should offer TLSv13
+        return ProtocolVersion.TLSv12;
     }
 
     public Hashtable getClientExtensions()
         throws IOException
     {
         Hashtable clientExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(super.getClientExtensions());
-        TlsSRPUtils.addSRPExtension(clientExtensions, this.identity);
+        TlsSRPUtils.addSRPExtension(clientExtensions, srpIdentity.getSRPIdentity());
         return clientExtensions;
     }
 
@@ -73,26 +67,9 @@ public class SRPTlsClient
         super.processServerExtensions(serverExtensions);
     }
 
-    public TlsKeyExchange getKeyExchange()
-        throws IOException
+    public TlsSRPIdentity getSRPIdentity()
     {
-        int keyExchangeAlgorithm = TlsUtils.getKeyExchangeAlgorithm(selectedCipherSuite);
-
-        switch (keyExchangeAlgorithm)
-        {
-        case KeyExchangeAlgorithm.SRP:
-        case KeyExchangeAlgorithm.SRP_DSS:
-        case KeyExchangeAlgorithm.SRP_RSA:
-            return createSRPKeyExchange(keyExchangeAlgorithm);
-
-        default:
-            /*
-             * Note: internal error here; the TlsProtocol implementation verifies that the
-             * server-selected cipher suite was in the list of client-offered cipher suites, so if
-             * we now can't produce an implementation, we shouldn't have offered it!
-             */
-            throw new TlsFatalAlert(AlertDescription.internal_error);
-        }
+        return srpIdentity;
     }
 
     public TlsAuthentication getAuthentication() throws IOException
@@ -102,11 +79,5 @@ public class SRPTlsClient
          * case e.g. for SRP_DSS or SRP_RSA key exchange.
          */
         throw new TlsFatalAlert(AlertDescription.internal_error);
-    }
-
-    protected TlsKeyExchange createSRPKeyExchange(int keyExchange) throws IOException
-    {
-        return keyExchangeFactory.createSRPKeyExchangeClient(keyExchange, supportedSignatureAlgorithms,
-            srpConfigVerifier, identity, password);
     }
 }

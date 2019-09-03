@@ -41,7 +41,8 @@ class DeferredHash
         this.sealed = true;
     }
 
-    public void copyBufferTo(OutputStream output) throws IOException
+    public void copyBufferTo(OutputStream output)
+        throws IOException
     {
         if (buf == null)
         {
@@ -64,15 +65,15 @@ class DeferredHash
 
     public TlsHandshakeHash notifyPRFDetermined()
     {
-        int prfAlgorithm = context.getSecurityParameters().getPrfAlgorithm();
+        int prfAlgorithm = context.getSecurityParametersHandshake().getPrfAlgorithm();
         if (prfAlgorithm == PRFAlgorithm.tls_prf_legacy)
         {
-            checkTrackingHash(HashAlgorithm.md5);
-            checkTrackingHash(HashAlgorithm.sha1);
+            checkTrackingHash(Shorts.valueOf(HashAlgorithm.md5));
+            checkTrackingHash(Shorts.valueOf(HashAlgorithm.sha1));
         }
         else
         {
-            checkTrackingHash(TlsUtils.getHashAlgorithmForPRFAlgorithm(prfAlgorithm));
+            checkTrackingHash(Shorts.valueOf(TlsUtils.getHashAlgorithmForPRFAlgorithm(prfAlgorithm)));
         }
         return this;
     }
@@ -99,7 +100,7 @@ class DeferredHash
     public TlsHandshakeHash stopTracking()
     {
         Hashtable newHashes = new Hashtable();
-        int prfAlgorithm = context.getSecurityParameters().getPrfAlgorithm();
+        int prfAlgorithm = context.getSecurityParametersHandshake().getPrfAlgorithm();
         if (prfAlgorithm == PRFAlgorithm.tls_prf_legacy)
         {
             cloneHash(newHashes, HashAlgorithm.md5);
@@ -118,7 +119,7 @@ class DeferredHash
 
         TlsHash prfHash;
 
-        int prfAlgorithm = context.getSecurityParameters().getPrfAlgorithm();
+        int prfAlgorithm = context.getSecurityParametersHandshake().getPrfAlgorithm();
         if (prfAlgorithm == PRFAlgorithm.tls_prf_legacy)
         {
             prfHash = new CombinedHash(context, cloneHash(HashAlgorithm.md5), cloneHash(HashAlgorithm.sha1));
@@ -222,9 +223,19 @@ class DeferredHash
         }
     }
 
+    protected TlsHash cloneHash(short hashAlgorithm)
+    {
+        return cloneHash(Shorts.valueOf(hashAlgorithm));
+    }
+
     protected TlsHash cloneHash(Short hashAlgorithm)
     {
-        return (TlsHash)hashes.get(hashAlgorithm).clone();
+        return (TlsHash)(((TlsHash)hashes.get(hashAlgorithm)).clone());
+    }
+
+    protected void cloneHash(Hashtable newHashes, short hashAlgorithm)
+    {
+        cloneHash(newHashes, Shorts.valueOf(hashAlgorithm));
     }
 
     protected void cloneHash(Hashtable newHashes, Short hashAlgorithm)

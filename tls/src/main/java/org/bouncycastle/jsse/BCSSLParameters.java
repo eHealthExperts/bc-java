@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.bouncycastle.jsse.java.security.BCAlgorithmConstraints;
+
 /**
  * A BCJSSE-specific interface providing access to extended SSL parameters in earlier JDKs.
  */
@@ -30,12 +32,16 @@ public final class BCSSLParameters
         return Collections.unmodifiableList(new ArrayList<T>(list));
     }
 
+    private String[] applicationProtocols = new String[0];
     private String[] cipherSuites;
     private String[] protocols;
     private boolean wantClientAuth;
     private boolean needClientAuth;
+    private String endpointIdentificationAlgorithm;
+    private BCAlgorithmConstraints algorithmConstraints;
     private List<BCSNIServerName> serverNames;
     private List<BCSNIMatcher> sniMatchers;
+    private boolean useCipherSuitesOrder;
 
     public BCSSLParameters()
     {
@@ -50,6 +56,30 @@ public final class BCSSLParameters
     {
         setCipherSuites(cipherSuites);
         setProtocols(protocols);
+    }
+
+    public String[] getApplicationProtocols()
+    {
+        return applicationProtocols.clone();
+    }
+
+    public void setApplicationProtocols(String[] applicationProtocols)
+    {
+        if (null == applicationProtocols)
+        {
+            throw new NullPointerException("'applicationProtocols' cannot be null");
+        }
+
+        String[] check = applicationProtocols.clone();
+        for (String entry : check)
+        {
+            if (null == entry || entry.length() < 1)
+            {
+                throw new IllegalArgumentException("'applicationProtocols' entries cannot be null or empty strings");
+            }
+        }
+
+        this.applicationProtocols = check;
     }
 
     public String[] getCipherSuites()
@@ -92,6 +122,26 @@ public final class BCSSLParameters
     {
         this.needClientAuth = needClientAuth;
         this.wantClientAuth = false;
+    }
+
+    public String getEndpointIdentificationAlgorithm()
+    {
+        return endpointIdentificationAlgorithm;
+    }
+
+    public void setEndpointIdentificationAlgorithm(String endpointIdentificationAlgorithm)
+    {
+        this.endpointIdentificationAlgorithm = endpointIdentificationAlgorithm;
+    }
+
+    public BCAlgorithmConstraints getAlgorithmConstraints()
+    {
+        return algorithmConstraints;
+    }
+
+    public void setAlgorithmConstraints(BCAlgorithmConstraints algorithmConstraints)
+    {
+        this.algorithmConstraints = algorithmConstraints;
     }
 
     public void setServerNames(List<BCSNIServerName> serverNames)
@@ -150,5 +200,15 @@ public final class BCSSLParameters
     public Collection<BCSNIMatcher> getSNIMatchers()
     {
         return copyList(this.sniMatchers);
+    }
+
+    public void setUseCipherSuitesOrder(boolean useCipherSuitesOrder)
+    {
+        this.useCipherSuitesOrder = useCipherSuitesOrder;
+    }
+
+    public boolean getUseCipherSuitesOrder()
+    {
+        return useCipherSuitesOrder;
     }
 }
