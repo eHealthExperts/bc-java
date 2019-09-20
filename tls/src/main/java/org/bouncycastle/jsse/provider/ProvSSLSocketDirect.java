@@ -482,12 +482,6 @@ class ProvSSLSocketDirect
 
         this.handshakeSession = null;
         this.connection = connection;
-    }
-    
-
-    public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
-    {
-        this.connection = connection;
         
         if (!listeners.isEmpty())
         {
@@ -500,6 +494,11 @@ class ProvSSLSocketDirect
         		}
         	}
         }
+    }
+    
+
+    public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
+    {
         this.handshakeSession = handshakeSession;
     }
 
