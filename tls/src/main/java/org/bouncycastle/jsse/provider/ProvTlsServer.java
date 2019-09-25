@@ -488,7 +488,7 @@ class ProvTlsServer
          * - endpoint ID algorithm consistency
          * - SNI consistency
          */
-        return false;
+        return availableSSLSession != null;
     }
 
     protected boolean selectCredentials(int cipherSuite) throws IOException
