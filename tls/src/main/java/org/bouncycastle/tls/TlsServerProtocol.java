@@ -175,9 +175,8 @@ public class TlsServerProtocol
                 this.resumedSession = sessionParameters != null;
                 if(!this.resumedSession) 
                 {
-                    this.tlsSession = TlsUtils.importSession(TlsUtils.generateSessionID(tlsServerContext.getCrypto().getSecureRandom()), null);
-                    securityParameters.sessionID = TlsUtils.EMPTY_BYTES;
-
+                    securityParameters.sessionID = TlsUtils.generateSessionID(this.tlsServerContext.getCrypto().getSecureRandom());
+                    
                     this.tlsSession = TlsUtils.importSession(securityParameters.getSessionID(), null);
                     this.sessionParameters = null;
                 }
