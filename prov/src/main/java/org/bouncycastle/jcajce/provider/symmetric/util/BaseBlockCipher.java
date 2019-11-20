@@ -23,6 +23,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.RC2ParameterSpec;
 import javax.crypto.spec.RC5ParameterSpec;
+import javax.security.auth.DestroyFailedException;
 
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.cms.GCMParameters;
@@ -1166,7 +1167,13 @@ public class BaseBlockCipher
         {
             throw new IllegalBlockSizeException(e.getMessage());
         }
-
+        finally {
+        	try {
+				baseEngine.destroy();
+			} catch (DestroyFailedException e) {
+			}
+        }
+        
         if (len == tmp.length)
         {
             return tmp;

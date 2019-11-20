@@ -444,7 +444,12 @@ private static final int[] Tinv0 =
     {
         if (params instanceof KeyParameter)
         {
-            WorkingKey = generateWorkingKey(((KeyParameter)params).getKey(), forEncryption);
+            KeyParameter keyParameter = (KeyParameter)params;
+			WorkingKey = generateWorkingKey(keyParameter.getKey(), forEncryption);
+			try {
+				keyParameter.destroy();
+			} catch (DestroyFailedException e) {
+			}
             this.forEncryption = forEncryption;
             if (forEncryption)
             {
