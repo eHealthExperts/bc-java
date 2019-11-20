@@ -62,7 +62,7 @@ class ProvTlsClient
         super(manager.getContextData().getCrypto());
 
         this.manager = manager;
-        this.sslParameters = sslParameters;
+        this.sslParameters = sslParameters.copyForConnection();
     }
 
     @Override
@@ -128,14 +128,19 @@ class ProvTlsClient
     @Override
     protected int[] getSupportedCipherSuites()
     {
-        return TlsUtils.getSupportedCipherSuites(manager.getContextData().getCrypto(),
-            manager.getContext().convertCipherSuites(sslParameters.getCipherSuites()));
+        return manager.getContext().getActiveCipherSuites(getCrypto(), sslParameters, getProtocolVersions());
     }
 
     @Override
     protected Vector getSupportedSignatureAlgorithms()
     {
         return JsseUtils.getSupportedSignatureAlgorithms(getCrypto());
+    }
+
+    @Override
+    protected ProtocolVersion[] getSupportedVersions()
+    {
+        return manager.getContext().getActiveProtocolVersions(sslParameters);
     }
 
     public synchronized boolean isHandshakeComplete()
@@ -257,19 +262,13 @@ class ProvTlsClient
                     throw new TlsFatalAlert(AlertDescription.handshake_failure);
                 }
 
-                X509Certificate[] chain = JsseUtils.getX509CertificateChain(manager.getContextData().getCrypto(), serverCertificate.getCertificate());
+                X509Certificate[] chain = JsseUtils.getX509CertificateChain(getCrypto(), serverCertificate.getCertificate());
                 int selectedCipherSuite = context.getSecurityParametersHandshake().getCipherSuite();
                 String authType = JsseUtils.getAuthTypeServer(TlsUtils.getKeyExchangeAlgorithm(selectedCipherSuite));
 
                 manager.checkServerTrusted(chain, authType);
             }
         };
-    }
-
-    @Override
-    public ProtocolVersion[] getSupportedVersions()
-    {
-        return manager.getContext().getSupportedVersions(sslParameters.getProtocols());
     }
 
     @Override
@@ -362,7 +361,8 @@ class ProvTlsClient
     {
         if (!secureRenegotiation)
         {
-            boolean allowLegacyHelloMessages = PropertyUtils.getBooleanSystemProperty("sun.security.ssl.allowLegacyHelloMessages", true);
+            boolean allowLegacyHelloMessages = PropertyUtils.getBooleanSystemProperty(
+                "sun.security.ssl.allowLegacyHelloMessages", true);
             if (!allowLegacyHelloMessages)
             {
                 /*
@@ -377,9 +377,11 @@ class ProvTlsClient
     @Override
     public void notifySelectedCipherSuite(int selectedCipherSuite)
     {
-        manager.getContext().validateNegotiatedCipherSuite(selectedCipherSuite);
+        manager.getContext().validateNegotiatedCipherSuite(sslParameters, selectedCipherSuite);
 
-        LOG.fine("Client notified of selected cipher suite: " + manager.getContext().getCipherSuiteString(selectedCipherSuite));
+        String selectedCipherSuiteName = ProvSSLContextSpi.getCipherSuiteName(selectedCipherSuite);
+
+        LOG.fine("Client notified of selected cipher suite: " + selectedCipherSuiteName);
 
         super.notifySelectedCipherSuite(selectedCipherSuite);
     }
@@ -387,9 +389,11 @@ class ProvTlsClient
     @Override
     public void notifyServerVersion(ProtocolVersion serverVersion) throws IOException
     {
-        String protocolString = manager.getContext().getProtocolString(serverVersion);
+        manager.getContext().validateNegotiatedProtocol(sslParameters, serverVersion);
 
-        LOG.fine("Client notified of selected protocol version: " + protocolString);
+        String serverVersionName = ProvSSLContextSpi.getProtocolVersionName(serverVersion);
+
+        LOG.fine("Client notified of selected protocol version: " + serverVersionName);
 
         super.notifyServerVersion(serverVersion);
     }

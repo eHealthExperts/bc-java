@@ -2,9 +2,28 @@ package org.bouncycastle.crypto.tls;
 
 import java.io.IOException;
 
+/**
+ * @deprecated Migrate to the (D)TLS API in org.bouncycastle.tls (bctls jar).
+ */
 public abstract class AbstractTlsPeer
     implements TlsPeer
 {
+    private volatile TlsCloseable closeHandle;
+
+    public void cancel() throws IOException
+    {
+        TlsCloseable closeHandle = this.closeHandle;
+        if (null != closeHandle)
+        {
+            closeHandle.close();
+        }
+    }
+
+    public void notifyCloseHandle(TlsCloseable closeHandle)
+    {
+        this.closeHandle = closeHandle;
+    }
+
     public boolean requiresExtendedMasterSecret()
     {
         return false;

@@ -3,6 +3,7 @@ package org.bouncycastle.math.ec.custom.sec;
 import java.math.BigInteger;
 
 import org.bouncycastle.math.raw.Interleave;
+import org.bouncycastle.math.raw.Nat;
 import org.bouncycastle.math.raw.Nat256;
 
 public class SecT193Field
@@ -37,11 +38,32 @@ public class SecT193Field
         z[3] = x[3];
     }
 
+    private static void addTo(long[] x, long[] z)
+    {
+        z[0] ^= x[0];
+        z[1] ^= x[1];
+        z[2] ^= x[2];
+        z[3] ^= x[3];
+    }
+
     public static long[] fromBigInteger(BigInteger x)
     {
-        long[] z = Nat256.fromBigInteger64(x);
-        reduce63(z, 0);
-        return z;
+        return Nat.fromBigInteger64(193, x);
+    }
+
+    public static void halfTrace(long[] x, long[] z)
+    {
+        long[] tt = Nat256.createExt64();
+
+        Nat256.copy64(x, z);
+        for (int i = 1; i < 193; i += 2)
+        {
+            implSquare(z, tt);
+            reduce(tt, z);
+            implSquare(z, tt);
+            reduce(tt, z);
+            addTo(x, z);
+        }
     }
 
     public static void invert(long[] x, long[] z)

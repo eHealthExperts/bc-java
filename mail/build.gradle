@@ -14,6 +14,6 @@ cobertura {
        "${rootProject.projectDir}/prov/build/classes/main",
        "${rootProject.projectDir}/pkix/build/classes/main",
        "${rootProject.projectDir}/mail/build/classes/main"
-  ] 
+  ]
 }
 

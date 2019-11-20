@@ -74,6 +74,7 @@ find $jdk12src -name "*.java" -exec scripts/usejcecert.sh \{\} \;
     rm org/bouncycastle/pkix/jcajce/Revocation*.java
     rm org/bouncycastle/pkix/jcajce/X509RevocationChecker.java
     rm org/bouncycastle/pkix/jcajce/RFC3280*.java
+    rm org/bouncycastle/cms/jcajce/JceKeyTransAuthEnvelopedRecipient.java
     rm -rf org/bouncycastle/sasn1/test
     rm -rf org/bouncycastle/i18n/test
     rm -rf org/bouncycastle/i18n/filter/test
@@ -98,6 +99,7 @@ find $jdk12src -name "*.java" -exec scripts/usejcecert.sh \{\} \;
     rm -rf org/bouncycastle/jce/provider/test/MQVTest*.java
     rm -rf org/bouncycastle/jce/provider/test/AlgorithmParametersTest.java
     rm -rf org/bouncycastle/jce/provider/test/GOST3410KeyPairTest.java
+    rm -rf org/bouncycastle/jce/provider/test/ChaCha20Poly1305Test.java
     rm -rf org/bouncycastle/jce/spec/ECNamedCurveSpec.java
     rm -rf org/bouncycastle/util/encoders/test/*.java
     rm -rf org/bouncycastle/x509/PKIXCertPathReviewer.java
@@ -139,6 +141,7 @@ find $jdk12src -name "*.java" -exec scripts/usejcecert.sh \{\} \;
     rm -rf org/bouncycastle/jcajce/provider/asymmetric/util/EC5*.java
     rm org/bouncycastle/asn1/test/EnumeratedTest.java
     rm -rf org/bouncycastle/pqc/crypto/test/QT*.java
+    rm -rf org/bouncycastle/pqc/crypto/qtesla/QT*Tests.java
     rm -rf org/bouncycastle/pqc/jcajce/provider/test
     rm -r org/bouncycastle/crypto/test/speedy
     rm -r org/bouncycastle/crypto/test/cavp
@@ -463,6 +466,7 @@ then
     tar cf - index.html LICENSE.html CONTRIBUTORS.html docs | (cd $artifacts/bcpg-jdk12-$base; tar xf -)
     ((cd pg/src/main/java && tar cf - * ) | (cd $artifacts/bcpg-jdk12-$base/src && tar xf -))
     ((cd pg/src/main/jdk1.4 && tar cf - * ) | (cd $artifacts/bcpg-jdk12-$base/src && tar xf -))
+    ((cd pg/src/main/jdk1.3 && tar cf - * ) | (cd $artifacts/bcpg-jdk12-$base/src && tar xf -))
     ((cd pg/src/test/java && tar cf - * ) | (cd $artifacts/bcpg-jdk12-$base/src && tar xf -))
     ((cd pg/src/test/jdk1.4 && tar cf - * ) | (cd $artifacts/bcpg-jdk12-$base/src && tar xf -))
     ((cd pg/src/test/jdk1.3 && tar cf - * ) | (cd $artifacts/bcpg-jdk12-$base/src && tar xf -))

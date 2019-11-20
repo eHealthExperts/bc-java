@@ -41,11 +41,35 @@ public class SecT409Field
         z[6] = x[6];
     }
 
+    private static void addTo(long[] x, long[] z)
+    {
+        z[0] ^= x[0];
+        z[1] ^= x[1];
+        z[2] ^= x[2];
+        z[3] ^= x[3];
+        z[4] ^= x[4];
+        z[5] ^= x[5];
+        z[6] ^= x[6];
+    }
+
     public static long[] fromBigInteger(BigInteger x)
     {
-        long[] z = Nat448.fromBigInteger64(x);
-        reduce39(z, 0);
-        return z;
+        return Nat.fromBigInteger64(409, x);
+    }
+
+    public static void halfTrace(long[] x, long[] z)
+    {
+        long[] tt = Nat.create64(13);
+
+        Nat448.copy64(x, z);
+        for (int i = 1; i < 409; i += 2)
+        {
+            implSquare(z, tt);
+            reduce(tt, z);
+            implSquare(z, tt);
+            reduce(tt, z);
+            addTo(x, z);
+        }
     }
 
     public static void invert(long[] x, long[] z)
@@ -324,10 +348,12 @@ public class SecT409Field
 
     protected static void implSquare(long[] x, long[] zz)
     {
-        for (int i = 0; i < 6; ++i)
-        {
-            Interleave.expand64To128(x[i], zz, i << 1);
-        }
+        Interleave.expand64To128(x[0], zz,  0);
+        Interleave.expand64To128(x[1], zz,  2);
+        Interleave.expand64To128(x[2], zz,  4);
+        Interleave.expand64To128(x[3], zz,  6);
+        Interleave.expand64To128(x[4], zz,  8);
+        Interleave.expand64To128(x[5], zz, 10);
         zz[12] = Interleave.expand32to64((int)x[6]);
     }
 }

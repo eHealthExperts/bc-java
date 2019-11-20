@@ -3,6 +3,7 @@ package org.bouncycastle.math.ec.custom.sec;
 import java.math.BigInteger;
 
 import org.bouncycastle.math.raw.Interleave;
+import org.bouncycastle.math.raw.Nat;
 import org.bouncycastle.math.raw.Nat256;
 
 public class SecT239Field
@@ -38,11 +39,32 @@ public class SecT239Field
         z[3] = x[3];
     }
 
+    private static void addTo(long[] x, long[] z)
+    {
+        z[0] ^= x[0];
+        z[1] ^= x[1];
+        z[2] ^= x[2];
+        z[3] ^= x[3];
+    }
+
     public static long[] fromBigInteger(BigInteger x)
     {
-        long[] z = Nat256.fromBigInteger64(x);
-        reduce17(z, 0);
-        return z;
+        return Nat.fromBigInteger64(239, x);
+    }
+
+    public static void halfTrace(long[] x, long[] z)
+    {
+        long[] tt = Nat256.createExt64();
+
+        Nat256.copy64(x, z);
+        for (int i = 1; i < 239; i += 2)
+        {
+            implSquare(z, tt);
+            reduce(tt, z);
+            implSquare(z, tt);
+            reduce(tt, z);
+            addTo(x, z);
+        }
     }
 
     public static void invert(long[] x, long[] z)
@@ -321,9 +343,6 @@ public class SecT239Field
         Interleave.expand64To128(x[0], zz, 0);
         Interleave.expand64To128(x[1], zz, 2);
         Interleave.expand64To128(x[2], zz, 4);
-
-        long x3 = x[3];
-        zz[6] = Interleave.expand32to64((int)x3);
-        zz[7] = Interleave.expand16to32((int)(x3 >>> 32)) & 0xFFFFFFFFL;
+        Interleave.expand64To128(x[3], zz, 6);
     }
 }

@@ -122,7 +122,7 @@ class ProvSSLSocketWrap
     {
         try
         {
-            contextData.getX509TrustManager().checkClientTrusted(chain, authType, this);
+            contextData.getX509TrustManager().checkClientTrusted(chain.clone(), authType, this);
         }
         catch (CertificateException e)
         {
@@ -134,7 +134,7 @@ class ProvSSLSocketWrap
     {
         try
         {
-            contextData.getX509TrustManager().checkServerTrusted(chain, authType, this);
+            contextData.getX509TrustManager().checkServerTrusted(chain.clone(), authType, this);
         }
         catch (CertificateException e)
         {
@@ -597,7 +597,7 @@ class ProvSSLSocketWrap
                 this.protocol = clientProtocol;
                 this.protocol.setSoTimeout(getSoTimeout());
 
-                ProvTlsClient client = new ProvTlsClient(this, sslParameters.copy());
+                ProvTlsClient client = new ProvTlsClient(this, sslParameters);
                 this.protocolPeer = client;
 
                 clientProtocol.connect(client);
@@ -608,8 +608,8 @@ class ProvSSLSocketWrap
                 serverProtocol.setResumableHandshake(resumable);
                 this.protocol = serverProtocol;
                 this.protocol.setSoTimeout(getSoTimeout());
-                
-                ProvTlsServer server = new ProvTlsServer(this, sslParameters.copy());
+
+                ProvTlsServer server = new ProvTlsServer(this, sslParameters);
                 this.protocolPeer = server;
 
                 serverProtocol.accept(server);

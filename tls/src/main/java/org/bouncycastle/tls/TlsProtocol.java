@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class TlsProtocol
+    implements TlsCloseable
 {
     private static final Logger LOG = LoggerFactory.getLogger(TlsProtocol.class);
     

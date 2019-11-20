@@ -16,7 +16,11 @@ import org.bouncycastle.crypto.prng.RandomGenerator;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
 
+/**
+ * @deprecated Migrate to the (D)TLS API in org.bouncycastle.tls (bctls jar).
+ */
 public abstract class TlsProtocol
+    implements TlsCloseable
 {
     protected static final Integer EXT_RenegotiationInfo = Integers.valueOf(ExtensionType.renegotiation_info);
     protected static final Integer EXT_SessionTicket = Integers.valueOf(ExtensionType.session_ticket);

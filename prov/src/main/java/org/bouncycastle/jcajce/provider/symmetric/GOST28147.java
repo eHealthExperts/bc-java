@@ -36,6 +36,7 @@ import org.bouncycastle.jcajce.provider.symmetric.util.BaseMac;
 import org.bouncycastle.jcajce.provider.symmetric.util.BaseWrapCipher;
 import org.bouncycastle.jcajce.provider.util.AlgorithmProvider;
 import org.bouncycastle.jcajce.spec.GOST28147ParameterSpec;
+import org.bouncycastle.util.Strings;
 
 public final class GOST28147
 {
@@ -44,18 +45,18 @@ public final class GOST28147
 
     static
     {
-        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_TestParamSet, "E-TEST");
-        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_A_ParamSet, "E-A");
-        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_B_ParamSet, "E-B");
-        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_C_ParamSet, "E-C");
-        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_D_ParamSet, "E-D");
-        oidMappings.put(RosstandartObjectIdentifiers.id_tc26_gost_28147_param_Z, "Param-Z");
+        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_TestParamSet,  "E-TEST");
+        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_A_ParamSet,    "E-A");
+        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_B_ParamSet,    "E-B");
+        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_C_ParamSet,    "E-C");
+        oidMappings.put(CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_D_ParamSet,    "E-D");
+        oidMappings.put(RosstandartObjectIdentifiers.id_tc26_gost_28147_param_Z,            "PARAM-Z");
         
-        nameMappings.put("E-A", CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_A_ParamSet);
-        nameMappings.put("E-B", CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_B_ParamSet);
-        nameMappings.put("E-C", CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_C_ParamSet);
-        nameMappings.put("E-D", CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_D_ParamSet);
-        nameMappings.put("Param-Z", RosstandartObjectIdentifiers.id_tc26_gost_28147_param_Z);
+        nameMappings.put("E-A",     CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_A_ParamSet);
+        nameMappings.put("E-B",     CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_B_ParamSet);
+        nameMappings.put("E-C",     CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_C_ParamSet);
+        nameMappings.put("E-D",     CryptoProObjectIdentifiers.id_Gost28147_89_CryptoPro_D_ParamSet);
+        nameMappings.put("PARAM-Z", RosstandartObjectIdentifiers.id_tc26_gost_28147_param_Z);
     }
 
     private GOST28147()
@@ -291,7 +292,12 @@ public final class GOST28147
 
         protected static ASN1ObjectIdentifier getSBoxOID(String name)
         {
-            ASN1ObjectIdentifier oid = (ASN1ObjectIdentifier)nameMappings.get(name);
+            ASN1ObjectIdentifier oid = null;
+
+            if (name != null)
+            {
+                oid = (ASN1ObjectIdentifier)nameMappings.get(Strings.toUpperCase(name));
+            }
 
             if (oid == null)
             {

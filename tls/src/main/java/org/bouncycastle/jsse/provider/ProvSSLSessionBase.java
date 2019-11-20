@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLPermission;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSessionBindingEvent;
 import javax.net.ssl.SSLSessionBindingListener;
@@ -18,6 +19,7 @@ import org.bouncycastle.jsse.BCExtendedSSLSession;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.RecordFormat;
 import org.bouncycastle.tls.TlsUtils;
+import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.util.Arrays;
 
 abstract class ProvSSLSessionBase
@@ -25,7 +27,8 @@ abstract class ProvSSLSessionBase
 {
     protected final Map<String, Object> valueMap = Collections.synchronizedMap(new HashMap<String, Object>());
 
-    protected final ProvSSLSessionContext sslSessionContext;
+    protected ProvSSLSessionContext sslSessionContext;
+    protected final TlsCrypto tlsCrypto;
     protected final String peerHost;
     protected final int peerPort;
     protected final long creationTime;
@@ -37,6 +40,7 @@ abstract class ProvSSLSessionBase
     ProvSSLSessionBase(ProvSSLSessionContext sslSessionContext, String peerHost, int peerPort)
     {
         this.sslSessionContext = sslSessionContext;
+        this.tlsCrypto = (null == sslSessionContext) ? null : sslSessionContext.getCrypto();
         this.peerHost = peerHost;
         this.peerPort = peerPort;
         this.creationTime = System.currentTimeMillis();
@@ -91,7 +95,7 @@ abstract class ProvSSLSessionBase
 
     public String getCipherSuite()
     {
-        return sslSessionContext.getSSLContext().getCipherSuiteString(getCipherSuiteTLS());
+        return ProvSSLContextSpi.getCipherSuiteName(getCipherSuiteTLS());
     }
 
     public long getCreationTime()
@@ -112,10 +116,13 @@ abstract class ProvSSLSessionBase
 
     public Certificate[] getLocalCertificates()
     {
-        X509Certificate[] chain = JsseUtils.getX509CertificateChain(sslSessionContext.getCrypto(), getLocalCertificateTLS());
-        if (null != chain && chain.length > 0)
+        if (null != tlsCrypto)
         {
-            return chain;
+            X509Certificate[] chain = JsseUtils.getX509CertificateChain(tlsCrypto, getLocalCertificateTLS());
+            if (null != chain && chain.length > 0)
+            {
+                return chain;
+            }
         }
 
         return null;
@@ -123,7 +130,12 @@ abstract class ProvSSLSessionBase
 
     public Principal getLocalPrincipal()
     {
-        return JsseUtils.getSubject(sslSessionContext.getCrypto(), getLocalCertificateTLS());
+        if (null != tlsCrypto)
+        {
+            return JsseUtils.getSubject(tlsCrypto, getLocalCertificateTLS());
+        }
+
+        return null;
     }
 
     public int getPacketBufferSize()
@@ -166,10 +178,13 @@ abstract class ProvSSLSessionBase
 
     public Certificate[] getPeerCertificates() throws SSLPeerUnverifiedException
     {
-        X509Certificate[] chain = JsseUtils.getX509CertificateChain(sslSessionContext.getCrypto(), getPeerCertificateTLS());
-        if (null != chain && chain.length > 0)
+        if (null != tlsCrypto)
         {
-            return chain;
+            X509Certificate[] chain = JsseUtils.getX509CertificateChain(tlsCrypto, getPeerCertificateTLS());
+            if (null != chain && chain.length > 0)
+            {
+                return chain;
+            }
         }
 
         throw new SSLPeerUnverifiedException("No peer identity established");
@@ -177,10 +192,13 @@ abstract class ProvSSLSessionBase
 
     public Principal getPeerPrincipal() throws SSLPeerUnverifiedException
     {
-        X500Principal principal = JsseUtils.getSubject(sslSessionContext.getCrypto(), getPeerCertificateTLS());
-        if (null != principal)
+        if (null != tlsCrypto)
         {
-            return principal;
+            X500Principal principal = JsseUtils.getSubject(tlsCrypto, getPeerCertificateTLS());
+            if (null != principal)
+            {
+                return principal;
+            }
         }
 
         throw new SSLPeerUnverifiedException("No peer identity established");
@@ -198,11 +216,17 @@ abstract class ProvSSLSessionBase
 
     public String getProtocol()
     {
-        return sslSessionContext.getSSLContext().getProtocolString(getProtocolTLS());
+        return ProvSSLContextSpi.getProtocolVersionName(getProtocolTLS());
     }
 
     public SSLSessionContext getSessionContext()
     {
+        SecurityManager sm = System.getSecurityManager();
+        if (null != sm)
+        {
+            sm.checkPermission(new SSLPermission("getSSLSessionContext"));
+        }
+
         return sslSessionContext;
     }
 
@@ -225,14 +249,20 @@ abstract class ProvSSLSessionBase
         return Arrays.hashCode(getIDArray());
     }
 
-    public void invalidate()
+    public synchronized void invalidate()
     {
-        sslSessionContext.removeSession(getIDArray());
+        // NOTE: The NULL_SESSION never actually gets invalidated (consistent with SunJSSE)
 
-        this.invalidated = true;
+        if (null != sslSessionContext)
+        {
+            sslSessionContext.removeSession(getIDArray());
+
+            this.sslSessionContext = null;
+            this.invalidated = true;
+        }
     }
 
-    public boolean isValid()
+    public synchronized boolean isValid()
     {
         byte[] sessionID = getIDArray();
 

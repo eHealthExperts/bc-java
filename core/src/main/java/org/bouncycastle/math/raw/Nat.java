@@ -160,6 +160,31 @@ public abstract class Nat
         return (int)c;
     }
 
+    public static int addTo(int len, int[] x, int xOff, int[] z, int zOff, int cIn)
+    {
+        long c = cIn & M;
+        for (int i = 0; i < len; ++i)
+        {
+            c += (x[xOff + i] & M) + (z[zOff + i] & M);
+            z[zOff + i] = (int)c;
+            c >>>= 32;
+        }
+        return (int)c;
+    }
+
+    public static int addToEachOther(int len, int[] u, int uOff, int[] v, int vOff)
+    {
+        long c = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            c += (u[uOff + i] & M) + (v[vOff + i] & M);
+            u[uOff + i] = (int)c;
+            v[vOff + i] = (int)c;
+            c >>>= 32;
+        }
+        return (int)c;
+    }
+
     public static int addWordAt(int len, int x, int[] z, int zPos)
     {
         // assert zPos <= (len - 1);
@@ -246,6 +271,23 @@ public abstract class Nat
         System.arraycopy(x, xOff, z, zOff, len);
     }
 
+    public static long[] copy64(int len, long[] x)
+    {
+        long[] z = new long[len];
+        System.arraycopy(x, 0, z, 0, len);
+        return z;
+    }
+
+    public static void copy64(int len, long[] x, long[] z)
+    {
+        System.arraycopy(x, 0, z, 0, len);
+    }
+
+    public static void copy64(int len, long[] x, int xOff, long[] z, int zOff)
+    {
+        System.arraycopy(x, xOff, z, zOff, len);
+    }
+
     public static int[] create(int len)
     {
         return new int[len];
@@ -264,6 +306,19 @@ public abstract class Nat
         {
             c += (x[i] & M) - (y[i] & MASK);
             z[i] = (int)c;
+            c >>= 32;
+        }
+        return (int)c;
+    }
+
+    public static int csub(int len, int mask, int[] x, int xOff, int[] y, int yOff, int[] z, int zOff)
+    {
+        long MASK = -(mask & 1) & M;
+        long c = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            c += (x[xOff + i] & M) - (y[yOff + i] & MASK);
+            z[zOff + i] = (int)c;
             c >>= 32;
         }
         return (int)c;
@@ -328,6 +383,20 @@ public abstract class Nat
         return -1;
     }
 
+    public static boolean diff(int len, int[] x, int xOff, int[] y, int yOff, int[] z, int zOff)
+    {
+        boolean pos = gte(len, x, xOff, y, yOff);
+        if (pos)
+        {
+            sub(len, x, xOff, y, yOff, z, zOff);
+        }
+        else
+        {
+            sub(len, y, yOff, x, xOff, z, zOff);
+        }
+        return pos;
+    }
+
     public static boolean eq(int len, int[] x, int[] y)
     {
         for (int i = len - 1; i >= 0; --i)
@@ -358,6 +427,24 @@ public abstract class Nat
         return z;
     }
 
+    public static long[] fromBigInteger64(int bits, BigInteger x)
+    {
+        if (x.signum() < 0 || x.bitLength() > bits)
+        {
+            throw new IllegalArgumentException();
+        }
+
+        int len = (bits + 63) >> 6;
+        long[] z = create64(len);
+        int i = 0;
+        while (x.signum() != 0)
+        {
+            z[i++] = x.longValue();
+            x = x.shiftRight(64);
+        }
+        return z;
+    }
+
     public static int getBit(int[] x, int bit)
     {
         if (bit == 0)
@@ -379,6 +466,20 @@ public abstract class Nat
         {
             int x_i = x[i] ^ Integer.MIN_VALUE;
             int y_i = y[i] ^ Integer.MIN_VALUE;
+            if (x_i < y_i)
+                return false;
+            if (x_i > y_i)
+                return true;
+        }
+        return true;
+    }
+
+    public static boolean gte(int len, int[] x, int xOff, int[] y, int yOff)
+    {
+        for (int i = len - 1; i >= 0; --i)
+        {
+            int x_i = x[xOff + i] ^ Integer.MIN_VALUE;
+            int y_i = y[yOff + i] ^ Integer.MIN_VALUE;
             if (x_i < y_i)
                 return false;
             if (x_i > y_i)
@@ -509,10 +610,10 @@ public abstract class Nat
         long zc = 0;
         for (int i = 0; i < len; ++i)
         {
-            long c = mulWordAddTo(len, x[i], y, 0, zz, i) & M;
-            c += zc + (zz[i + len] & M);
-            zz[i + len] = (int)c;
-            zc = c >>> 32;
+            zc += mulWordAddTo(len, x[i], y, 0, zz, i) & M;
+            zc += zz[i + len] & M;
+            zz[i + len] = (int)zc;
+            zc >>>= 32;
         }
         return (int)zc;
     }
@@ -522,10 +623,10 @@ public abstract class Nat
         long zc = 0;
         for (int i = 0; i < len; ++i)
         {
-            long c = mulWordAddTo(len, x[xOff + i], y, yOff, zz, zzOff) & M;
-            c += zc + (zz[zzOff + len] & M);
-            zz[zzOff + len] = (int)c;
-            zc = c >>> 32;
+            zc += mulWordAddTo(len, x[xOff + i], y, yOff, zz, zzOff) & M;
+            zc += zz[zzOff + len] & M;
+            zz[zzOff + len] = (int)zc;
+            zc >>>= 32;
             ++zzOff;
         }
         return (int)zc;
@@ -857,11 +958,18 @@ public abstract class Nat
         }
         while (j > 0);
 
+        long d = 0L;
+        int zzPos = 2;
+
         for (int i = 1; i < len; ++i)
         {
-            c = squareWordAdd(x, i, zz);
-            addWordAt(extLen, c, zz, i << 1);
+            d += squareWordAddTo(x, i, zz) & M;
+            d += zz[zzPos] & M;
+            zz[zzPos++] = (int)d; d >>>= 32;
+            d += zz[zzPos] & M;
+            zz[zzPos++] = (int)d; d >>>= 32;
         }
+//        assert 0L == d;
 
         shiftUpBit(extLen, zz, x[0] << 31);
     }
@@ -881,15 +989,25 @@ public abstract class Nat
         }
         while (j > 0);
 
+        long d = 0L;
+        int zzPos = zzOff + 2;
+
         for (int i = 1; i < len; ++i)
         {
-            c = squareWordAdd(x, xOff, i, zz, zzOff);
-            addWordAt(extLen, c, zz, zzOff, i << 1);
+            d += squareWordAddTo(x, xOff, i, zz, zzOff) & M;
+            d += zz[zzPos] & M;
+            zz[zzPos++] = (int)d; d >>>= 32;
+            d += zz[zzPos] & M;
+            zz[zzPos++] = (int)d; d >>>= 32;
         }
+//        assert 0L == d;
 
         shiftUpBit(extLen, zz, zzOff, x[xOff] << 31);
     }
 
+    /**
+     * @deprecated Use {@link #squareWordAddTo(int[], int, int[])} instead.
+     */
     public static int squareWordAdd(int[] x, int xPos, int[] z)
     {
         long c = 0, xVal = x[xPos] & M;
@@ -904,7 +1022,39 @@ public abstract class Nat
         return (int)c;
     }
 
+    /**
+     * @deprecated Use {@link #squareWordAddTo(int[], int, int, int[], int) instead.
+     */
     public static int squareWordAdd(int[] x, int xOff, int xPos, int[] z, int zOff)
+    {
+        long c = 0, xVal = x[xOff + xPos] & M;
+        int i = 0;
+        do
+        {
+            c += xVal * (x[xOff + i] & M) + (z[xPos + zOff] & M);
+            z[xPos + zOff] = (int)c;
+            c >>>= 32;
+            ++zOff;
+        }
+        while (++i < xPos);
+        return (int)c;
+    }
+
+    public static int squareWordAddTo(int[] x, int xPos, int[] z)
+    {
+        long c = 0, xVal = x[xPos] & M;
+        int i = 0;
+        do
+        {
+            c += xVal * (x[i] & M) + (z[xPos + i] & M);
+            z[xPos + i] = (int)c;
+            c >>>= 32;
+        }
+        while (++i < xPos);
+        return (int)c;
+    }
+
+    public static int squareWordAddTo(int[] x, int xOff, int xPos, int[] z, int zOff)
     {
         long c = 0, xVal = x[xOff + xPos] & M;
         int i = 0;
@@ -1136,6 +1286,14 @@ public abstract class Nat
         for (int i = 0; i < len; ++i)
         {
             z[i] = 0;
+        }
+    }
+
+    public static void zero(int len, int[] z, int zOff)
+    {
+        for (int i = 0; i < len; ++i)
+        {
+            z[zOff + i] = 0;
         }
     }
 

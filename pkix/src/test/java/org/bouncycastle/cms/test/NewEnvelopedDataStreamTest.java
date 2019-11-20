@@ -17,8 +17,8 @@ import java.util.Iterator;
 
 import javax.crypto.SecretKey;
 
+import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.DEROutputStream;
 import org.bouncycastle.asn1.DERSet;
 import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.asn1.cms.Attribute;
@@ -399,9 +399,7 @@ public class NewEnvelopedDataStreamTest
 
         bOut.reset();
 
-        DEROutputStream dOut = new DEROutputStream(bOut);
-
-        dOut.writeObject(aIn.readObject());
+        aIn.readObject().encodeTo(bOut, ASN1Encoding.DER);
 
         verifyData(bOut, CMSEnvelopedDataGenerator.AES128_CBC, data);
     }

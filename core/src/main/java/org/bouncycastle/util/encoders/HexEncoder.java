@@ -31,7 +31,7 @@ public class HexEncoder
         {
             decodingTable[encodingTable[i]] = (byte)i;
         }
-        
+
         decodingTable['A'] = decodingTable['a'];
         decodingTable['B'] = decodingTable['b'];
         decodingTable['C'] = decodingTable['c'];
@@ -39,12 +39,12 @@ public class HexEncoder
         decodingTable['E'] = decodingTable['e'];
         decodingTable['F'] = decodingTable['f'];
     }
-    
+
     public HexEncoder()
     {
         initialiseDecodingTable();
     }
-    
+
     /**
      * encode the input data producing a Hex output stream.
      *
@@ -89,19 +89,19 @@ public class HexEncoder
     {
         byte    b1, b2;
         int     outLen = 0;
-        
+
         int     end = off + length;
-        
+
         while (end > off)
         {
             if (!ignore((char)data[end - 1]))
             {
                 break;
             }
-            
+
             end--;
         }
-        
+
         int i = off;
         while (i < end)
         {
@@ -109,14 +109,14 @@ public class HexEncoder
             {
                 i++;
             }
-            
+
             b1 = decodingTable[data[i++]];
-            
+
             while (i < end && ignore((char)data[i]))
             {
                 i++;
             }
-            
+
             b2 = decodingTable[data[i++]];
 
             if ((b1 | b2) < 0)
@@ -125,13 +125,13 @@ public class HexEncoder
             }
 
             out.write((b1 << 4) | b2);
-            
+
             outLen++;
         }
 
         return outLen;
     }
-    
+
     /**
      * decode the Hex encoded String data writing it to the given output stream,
      * whitespace characters will be ignored.
@@ -145,19 +145,19 @@ public class HexEncoder
     {
         byte    b1, b2;
         int     length = 0;
-        
+
         int     end = data.length();
-        
+
         while (end > 0)
         {
             if (!ignore(data.charAt(end - 1)))
             {
                 break;
             }
-            
+
             end--;
         }
-        
+
         int i = 0;
         while (i < end)
         {
@@ -165,14 +165,14 @@ public class HexEncoder
             {
                 i++;
             }
-            
+
             b1 = decodingTable[data.charAt(i++)];
-            
+
             while (i < end && ignore(data.charAt(i)))
             {
                 i++;
             }
-            
+
             b2 = decodingTable[data.charAt(i++)];
 
             if ((b1 | b2) < 0)
@@ -181,10 +181,45 @@ public class HexEncoder
             }
 
             out.write((b1 << 4) | b2);
-            
+
             length++;
         }
 
         return length;
+    }
+
+    byte[] decodeStrict(String str, int off, int len) throws IOException
+    {
+        if (null == str)
+        {
+            throw new NullPointerException("'str' cannot be null");
+        }
+        if (off < 0 || len < 0 || off > (str.length() - len))
+        {
+            throw new IndexOutOfBoundsException("invalid offset and/or length specified");
+        }
+        if (0 != (len & 1))
+        {
+            throw new IOException("a hexadecimal encoding must have an even number of characters");
+        }
+
+        int resultLen = len >>> 1;
+        byte[] result = new byte[resultLen];
+
+        int strPos = off;
+        for (int i = 0; i < resultLen; ++i)
+        {
+            byte b1 = decodingTable[str.charAt(strPos++)];
+            byte b2 = decodingTable[str.charAt(strPos++)];
+
+            int n = (b1 << 4) | b2;
+            if (n < 0)
+            {
+                throw new IOException("invalid characters encountered in Hex string");
+            }
+
+            result[i] = (byte)n;
+        }
+        return result;
     }
 }

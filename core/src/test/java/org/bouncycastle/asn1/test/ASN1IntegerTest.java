@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import org.bouncycastle.asn1.ASN1Enumerated;
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1Sequence;
+import org.bouncycastle.util.BigIntegers;
 import org.bouncycastle.util.Properties;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
@@ -47,7 +48,7 @@ public class ASN1IntegerTest
 
         new ASN1Integer(Hex.decode("ffda47bfc776bcd269da4832626ac332adfca6dd835e8ecd83cd1ebe7d709b0e"));
 
-        new ASN1Enumerated(Hex.decode("ffda47bfc776bcd269da4832626ac332adfca6dd835e8ecd83cd1ebe7d709b0e"));
+        new ASN1Enumerated(Hex.decode("005a47bfc776bcd269da4832626ac332adfca6dd835e8ecd83cd1ebe7d709b0e"));
 
         System.setProperty("org.bouncycastle.asn1.allow_unsafe_integer", "false");
         
@@ -100,6 +101,17 @@ public class ASN1IntegerTest
         {
             isEquals("malformed enumerated", e.getMessage());
         }
+
+        try
+        {
+            new ASN1Enumerated(Hex.decode("005a47bfc776bcd269da4832626ac332adfca6dd835e8ecd83cd1ebe7d709b0e"));
+
+            fail("no exception");
+        }
+        catch (IllegalArgumentException e)
+        {
+            isEquals("malformed enumerated", e.getMessage());
+        }
     }
 
     /**
@@ -115,6 +127,7 @@ public class ASN1IntegerTest
         byte[] rawInt = Hex.decode("10");
         ASN1Integer i = new ASN1Integer(rawInt);
         isEquals(i.getValue().intValue(), 16);
+        isEquals(i.intValueExact(), 16);
 
         //
         // With property set.
@@ -124,7 +137,7 @@ public class ASN1IntegerTest
         rawInt = Hex.decode("10");
         i = new ASN1Integer(rawInt);
         isEquals(i.getValue().intValue(), 16);
-
+        isEquals(i.intValueExact(), 16);
     }
 
     public void testValidEncodingMultiByte()
@@ -137,6 +150,7 @@ public class ASN1IntegerTest
         byte[] rawInt = Hex.decode("10FF");
         ASN1Integer i = new ASN1Integer(rawInt);
         isEquals(i.getValue().intValue(), 4351);
+        isEquals(i.intValueExact(), 4351);
 
         //
         // With property set.
@@ -146,7 +160,7 @@ public class ASN1IntegerTest
         rawInt = Hex.decode("10FF");
         i = new ASN1Integer(rawInt);
         isEquals(i.getValue().intValue(), 4351);
-
+        isEquals(i.intValueExact(), 4351);
     }
 
     public void testInvalidEncoding_00()
@@ -156,8 +170,7 @@ public class ASN1IntegerTest
         try
         {
             byte[] rawInt = Hex.decode("0010FF");
-            ASN1Integer i = new ASN1Integer(rawInt);
-            isEquals(i.getValue().intValue(), 4351);
+            new ASN1Integer(rawInt);
             fail("Expecting illegal argument exception.");
         }
         catch (IllegalArgumentException e)
@@ -173,7 +186,7 @@ public class ASN1IntegerTest
         try
         {
             byte[] rawInt = Hex.decode("FF81FF");
-            ASN1Integer i = new ASN1Integer(rawInt);
+            new ASN1Integer(rawInt);
             fail("Expecting illegal argument exception.");
         }
         catch (IllegalArgumentException e)
@@ -192,8 +205,7 @@ public class ASN1IntegerTest
         try
         {
             byte[] rawInt = Hex.decode("0000000010FF");
-            ASN1Integer i = new ASN1Integer(rawInt);
-            isEquals(i.getValue().intValue(), 4351);
+            new ASN1Integer(rawInt);
             fail("Expecting illegal argument exception.");
         }
         catch (IllegalArgumentException e)
@@ -212,7 +224,7 @@ public class ASN1IntegerTest
         try
         {
             byte[] rawInt = Hex.decode("FFFFFFFF01FF");
-            ASN1Integer i = new ASN1Integer(rawInt);
+            new ASN1Integer(rawInt);
             fail("Expecting illegal argument exception.");
         }
         catch (IllegalArgumentException e)
@@ -277,8 +289,7 @@ public class ASN1IntegerTest
         System.getProperties().put("org.bouncycastle.asn1.allow_unsafe_integer", "true");
         byte[] rawInt = Hex.decode("00000010FF000000");
         ASN1Integer i = new ASN1Integer(rawInt);
-        isEquals(72997666816L, i.getValue().longValue());
-
+        isEquals(72997666816L, BigIntegers.longValueExact(i.getValue()));
     }
 
     public void testLooseValidEncoding_FF_32BAligned()
@@ -291,8 +302,7 @@ public class ASN1IntegerTest
         System.getProperties().put("org.bouncycastle.asn1.allow_unsafe_integer", "true");
         byte[] rawInt = Hex.decode("FFFFFF10FF000000");
         ASN1Integer i = new ASN1Integer(rawInt);
-        isEquals(-1026513960960L, i.getValue().longValue());
-
+        isEquals(-1026513960960L, BigIntegers.longValueExact(i.getValue()));
     }
 
     public void testLooseValidEncoding_FF_32BAligned_1not0()
@@ -306,8 +316,7 @@ public class ASN1IntegerTest
         System.getProperties().put("org.bouncycastle.asn1.allow_unsafe_integer", "true");
         byte[] rawInt = Hex.decode("FFFEFF10FF000000");
         ASN1Integer i = new ASN1Integer(rawInt);
-        isEquals(-282501490671616L, i.getValue().longValue());
-
+        isEquals(-282501490671616L, BigIntegers.longValueExact(i.getValue()));
     }
 
     public void testLooseValidEncoding_FF_32BAligned_2not0()
@@ -321,7 +330,7 @@ public class ASN1IntegerTest
         System.getProperties().put("org.bouncycastle.asn1.allow_unsafe_integer", "true");
         byte[] rawInt = Hex.decode("FFFFFE10FF000000");
         ASN1Integer i = new ASN1Integer(rawInt);
-        isEquals(-2126025588736L, i.getValue().longValue());
+        isEquals(-2126025588736L, BigIntegers.longValueExact(i.getValue()));
     }
 
     public void testOversizedEncoding()

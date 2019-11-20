@@ -57,10 +57,7 @@ public class GOST3410PublicKeyAlgParameters
         this.encryptionParamSet = encryptionParamSet;
     }
 
-    /**
-     * @deprecated use getInstance()
-     */
-    public GOST3410PublicKeyAlgParameters(
+    private GOST3410PublicKeyAlgParameters(
         ASN1Sequence  seq)
     {
         this.publicKeyParamSet = (ASN1ObjectIdentifier)seq.getObjectAt(0);
@@ -89,7 +86,7 @@ public class GOST3410PublicKeyAlgParameters
 
     public ASN1Primitive toASN1Primitive()
     {
-        ASN1EncodableVector  v = new ASN1EncodableVector();
+        ASN1EncodableVector v = new ASN1EncodableVector(3);
 
         v.add(publicKeyParamSet);
         v.add(digestParamSet);

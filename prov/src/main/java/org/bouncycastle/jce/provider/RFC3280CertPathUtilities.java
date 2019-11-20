@@ -30,7 +30,6 @@ import java.util.TimeZone;
 
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1EncodableVector;
-import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Primitive;
@@ -504,7 +503,7 @@ class RFC3280CertPathUtilities
             }
             try
             {
-                PKIXCertPathBuilderSpi builder = new PKIXCertPathBuilderSpi();
+                PKIXCertPathBuilderSpi builder = new PKIXCertPathBuilderSpi(true);
                 X509CertSelector tmpCertSelector = new X509CertSelector();
                 tmpCertSelector.setCertificate(signingCert);
 
@@ -707,7 +706,7 @@ class RFC3280CertPathUtilities
         {
             crlselect.addIssuerName(PrincipalUtils.getIssuerPrincipal(crl).getEncoded());
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             throw new AnnotatedException("Cannot extract issuer from CRL." + e, e);
         }
@@ -761,6 +760,12 @@ class RFC3280CertPathUtilities
         {
             return;
         }
+
+        if (deltaCRL.hasUnsupportedCriticalExtension())
+        {
+            throw new AnnotatedException("delta CRL has unsupported critical extensions");
+        }
+
         IssuingDistributionPoint completeidp = null;
         try
         {
@@ -1123,7 +1128,7 @@ class RFC3280CertPathUtilities
                 if (RFC3280CertPathUtilities.ANY_POLICY.equals(subjectDomainPolicy.getId()))
                 {
 
-                    throw new CertPathValidatorException("SubjectDomainPolicy is anyPolicy,", null, certPath, index);
+                    throw new CertPathValidatorException("SubjectDomainPolicy is anyPolicy", null, certPath, index);
                 }
             }
         }
@@ -1178,7 +1183,8 @@ class RFC3280CertPathUtilities
     protected static void processCertBC(
         CertPath certPath,
         int index,
-        PKIXNameConstraintValidator nameConstraintValidator)
+        PKIXNameConstraintValidator nameConstraintValidator,
+        boolean isForCRLCheck)
         throws CertPathValidatorException
     {
         List certs = certPath.getCertificates();
@@ -1189,7 +1195,12 @@ class RFC3280CertPathUtilities
         //
         // (b), (c) permitted and excluded subtree checking.
         //
-        if (!(CertPathValidatorUtilities.isSelfIssued(cert) && (i < n)))
+        // 4.2.1.10  Name constraints are not applied to self-issued certificates (unless
+         //   the certificate is the final certificate in the path)
+        // as we use the validator for path CRL checking, we need to flag when the
+        // certificate is self issued, but not really the last one in the path we are actually
+        // checking.
+        if (!(CertPathValidatorUtilities.isSelfIssued(cert) && ((i < n) || isForCRLCheck)))
         {
             X500Name principal = PrincipalUtils.getSubjectPrincipal(cert);
             ASN1Sequence dns;
@@ -1279,7 +1290,8 @@ class RFC3280CertPathUtilities
         Set acceptablePolicies,
         PKIXPolicyNode validPolicyTree,
         List[] policyNodes,
-        int inhibitAnyPolicy)
+        int inhibitAnyPolicy,
+        boolean isForCRLCheck)
         throws CertPathValidatorException
     {
         List certs = certPath.getCertificates();
@@ -1365,7 +1377,7 @@ class RFC3280CertPathUtilities
             //
             // (d) (2)
             //
-            if ((inhibitAnyPolicy > 0) || ((i < n) && CertPathValidatorUtilities.isSelfIssued(cert)))
+            if ((inhibitAnyPolicy > 0) || ((i < n || isForCRLCheck) && CertPathValidatorUtilities.isSelfIssued(cert)))
             {
                 e = certPolicies.getObjects();
 
@@ -1591,11 +1603,10 @@ class RFC3280CertPathUtilities
             {
                 try
                 {
-
                     ASN1TaggedObject constraint = ASN1TaggedObject.getInstance(policyConstraints.nextElement());
                     if (constraint.getTagNo() == 0)
                     {
-                        tmpInt = ASN1Integer.getInstance(constraint, false).getValue().intValue();
+                        tmpInt = ASN1Integer.getInstance(constraint, false).intValueExact();
                         if (tmpInt < explicitPolicy)
                         {
                             return tmpInt;
@@ -1649,7 +1660,7 @@ class RFC3280CertPathUtilities
                     ASN1TaggedObject constraint = ASN1TaggedObject.getInstance(policyConstraints.nextElement());
                     if (constraint.getTagNo() == 1)
                     {
-                        tmpInt = ASN1Integer.getInstance(constraint, false).getValue().intValue();
+                        tmpInt = ASN1Integer.getInstance(constraint, false).intValueExact();
                         if (tmpInt < policyMapping)
                         {
                             return tmpInt;
@@ -1852,7 +1863,7 @@ class RFC3280CertPathUtilities
                         throw new AnnotatedException("No valid CRL for current time found.");
                     }
                 }
-
+                
                 RFC3280CertPathUtilities.processCRLB1(dp, cert, crl);
 
                 // (b) (2)
@@ -2015,13 +2026,12 @@ class RFC3280CertPathUtilities
                  * omitted and a distribution point name of the certificate
                  * issuer.
                  */
-                ASN1Primitive issuer = null;
+                X500Name issuer;
                 try
                 {
-                    issuer = new ASN1InputStream(PrincipalUtils.getEncodedIssuerPrincipal(cert).getEncoded())
-                        .readObject();
+                    issuer = PrincipalUtils.getEncodedIssuerPrincipal(cert);
                 }
-                catch (Exception e)
+                catch (RuntimeException e)
                 {
                     throw new AnnotatedException("Issuer from certificate for CRL could not be reencoded.", e);
                 }
@@ -2090,7 +2100,7 @@ class RFC3280CertPathUtilities
 
         if (iap != null)
         {
-            int _inhibitAnyPolicy = iap.getValue().intValue();
+            int _inhibitAnyPolicy = iap.intValueExact();
 
             if (_inhibitAnyPolicy < inhibitAnyPolicy)
             {
@@ -2125,12 +2135,12 @@ class RFC3280CertPathUtilities
         {
             if (!(bc.isCA()))
             {
-                throw new CertPathValidatorException("Not a CA certificate");
+                throw new CertPathValidatorException("Not a CA certificate", null, certPath, index);
             }
         }
         else
         {
-            throw new CertPathValidatorException("Intermediate certificate lacks BasicConstraints");
+            throw new CertPathValidatorException("Intermediate certificate lacks BasicConstraints", null, certPath, index);
         }
     }
 
@@ -2382,7 +2392,7 @@ class RFC3280CertPathUtilities
                     case 0:
                         try
                         {
-                            tmpInt = ASN1Integer.getInstance(constraint, false).getValue().intValue();
+                            tmpInt = ASN1Integer.getInstance(constraint, false).intValueExact();
                         }
                         catch (Exception e)
                         {

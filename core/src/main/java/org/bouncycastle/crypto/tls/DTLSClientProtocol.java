@@ -10,6 +10,9 @@ import java.util.Vector;
 
 import org.bouncycastle.util.Arrays;
 
+/**
+ * @deprecated Migrate to the (D)TLS API in org.bouncycastle.tls (bctls jar).
+ */
 public class DTLSClientProtocol
     extends DTLSProtocol
 {
@@ -43,6 +46,7 @@ public class DTLSClientProtocol
         client.init(state.clientContext);
 
         DTLSRecordLayer recordLayer = new DTLSRecordLayer(transport, state.clientContext, client, ContentType.handshake);
+        client.notifyCloseHandle(recordLayer);
 
         TlsSession sessionToResume = state.client.getSessionToResume();
         if (sessionToResume != null && sessionToResume.isResumable())

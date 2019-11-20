@@ -457,7 +457,7 @@ public class AEADTest extends SimpleTest
             eax.init(Cipher.ENCRYPT_MODE, new RepeatedSecretKeySpec("AES"), spec);
             fail("no exception");
         }
-        catch (InvalidKeyException e)
+        catch (InvalidAlgorithmParameterException e)
         {
             isTrue("wrong message", "cannot reuse nonce for GCM encryption".equals(e.getMessage()));
         }
@@ -467,7 +467,7 @@ public class AEADTest extends SimpleTest
             eax.init(Cipher.ENCRYPT_MODE, new RepeatedSecretKeySpec("AES"), new IvParameterSpec(spec.getIV()));
             fail("no exception");
         }
-        catch (InvalidKeyException e)
+        catch (InvalidAlgorithmParameterException e)
         {
             isTrue("wrong message", "cannot reuse nonce for GCM encryption".equals(e.getMessage()));
         }
@@ -477,7 +477,7 @@ public class AEADTest extends SimpleTest
             eax.init(Cipher.ENCRYPT_MODE, new DestroyableSecretKeySpec(K, "AES"), new IvParameterSpec(spec.getIV()));
             fail("no exception");
         }
-        catch (InvalidKeyException e)
+        catch (InvalidAlgorithmParameterException e)
         {
             isTrue("wrong message", "cannot reuse nonce for GCM encryption".equals(e.getMessage()));
         }

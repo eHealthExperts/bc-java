@@ -11,6 +11,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +26,7 @@ import org.bouncycastle.jsse.BCSNIHostName;
 import org.bouncycastle.jsse.BCSNIMatcher;
 import org.bouncycastle.jsse.BCSNIServerName;
 import org.bouncycastle.jsse.BCStandardConstants;
+import org.bouncycastle.jsse.java.security.BCCryptoPrimitive;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.AlertLevel;
 import org.bouncycastle.tls.Certificate;
@@ -36,6 +38,7 @@ import org.bouncycastle.tls.SecurityParameters;
 import org.bouncycastle.tls.ServerName;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
+import org.bouncycastle.tls.SignatureScheme;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCertificate;
@@ -45,6 +48,9 @@ import org.bouncycastle.tls.crypto.impl.jcajce.JcaTlsCrypto;
 
 abstract class JsseUtils
 {
+    static final Set<BCCryptoPrimitive> TLS_CRYPTO_PRIMITIVES_BC =
+        Collections.unmodifiableSet(EnumSet.of(BCCryptoPrimitive.KEY_AGREEMENT));
+
     protected static X509Certificate[] EMPTY_CHAIN = new X509Certificate[0];
 
     static class BCUnknownServerName extends BCSNIServerName
@@ -67,11 +73,20 @@ abstract class JsseUtils
         return false;
     }
 
-    public static String[] copyOf(String[] data, int newLength)
+    static String[] copyOf(String[] data, int newLength)
     {
         String[] tmp = new String[newLength];
         System.arraycopy(data, 0, tmp, 0, Math.min(data.length, newLength));
         return tmp;
+    }
+
+    static String[] resize(String[] data, int count)
+    {
+        if (count < data.length)
+        {
+            data = copyOf(data, count);
+        }
+        return data;
     }
 
     static String getApplicationProtocol(SecurityParameters securityParameters)
@@ -194,6 +209,27 @@ abstract class JsseUtils
         return new Certificate(certificateList);
     }
 
+    public static String getHashAlgorithmName(short hashAlgorithm)
+    {
+        switch (hashAlgorithm)
+        {
+        case HashAlgorithm.md5:
+            return "MD5";
+        case HashAlgorithm.sha1:
+            return "SHA1";
+        case HashAlgorithm.sha224:
+            return "SHA224";
+        case HashAlgorithm.sha256:
+            return "SHA256";
+        case HashAlgorithm.sha384:
+            return "SHA384";
+        case HashAlgorithm.sha512:
+            return "SHA512";
+        default:
+            return null;
+        }
+    }
+
     public static Vector getProtocolNames(String[] applicationProtocols)
     {
         if (null == applicationProtocols || applicationProtocols.length < 1)
@@ -223,6 +259,93 @@ abstract class JsseUtils
             protocolNames .add(protocolName.getUtf8Decoding());
         }
         return protocolNames;
+    }
+
+    public static String getSignatureAlgorithmName(short signatureAlgorithm)
+    {
+        switch (signatureAlgorithm)
+        {
+        case SignatureAlgorithm.dsa:
+            return "DSA";
+        case SignatureAlgorithm.ecdsa:
+            return "ECDSA";
+        case SignatureAlgorithm.rsa:
+            return "RSA";
+        default:
+            return null;
+        }
+    }
+
+    public static String getSignatureSchemeName(SignatureAndHashAlgorithm sigAndHashAlg)
+    {
+        short hashAlgorithm = sigAndHashAlg.getHash(), signatureAlgorithm = sigAndHashAlg.getSignature();
+
+        int signatureScheme = ((hashAlgorithm & 0xFF) << 8) | (signatureAlgorithm & 0xFF);
+        switch (signatureScheme)
+        {
+        case SignatureScheme.ecdsa_secp256r1_sha256:
+            return "SHA256withECDSA";
+        case SignatureScheme.ecdsa_secp384r1_sha384:
+            return "SHA384withECDSA";
+        case SignatureScheme.ecdsa_secp521r1_sha512:
+            return "SHA512withECDSA";
+        case SignatureScheme.ecdsa_sha1:
+            return "SHA1withECDSA";
+        case SignatureScheme.ed25519:
+            return "ed25519";
+        case SignatureScheme.ed448:
+            return "ed448";
+        case SignatureScheme.rsa_pkcs1_sha1:
+            return "SHA1withRSA";
+        case SignatureScheme.rsa_pkcs1_sha256:
+            return "SHA256withRSA";
+        case SignatureScheme.rsa_pkcs1_sha384:
+            return "SHA384withRSA";
+        case SignatureScheme.rsa_pkcs1_sha512:
+            return "SHA512withRSA";
+        case SignatureScheme.rsa_pss_pss_sha256:
+        case SignatureScheme.rsa_pss_pss_sha384:
+        case SignatureScheme.rsa_pss_pss_sha512:
+        case SignatureScheme.rsa_pss_rsae_sha256:
+        case SignatureScheme.rsa_pss_rsae_sha384:
+        case SignatureScheme.rsa_pss_rsae_sha512:
+            return "RSASSA-PSS";
+        default:
+            break;
+        }
+
+        String hashName = getHashAlgorithmName(hashAlgorithm);
+        if (null != hashName)
+        {
+            String signatureName = getSignatureAlgorithmName(signatureAlgorithm);
+            if (null != signatureName)
+            {
+                // TODO[jsse] Consider caching/precomputing these
+                return hashName + "with" + signatureName;
+            }
+        }
+
+        return null;
+    }
+
+    public static String[] getSignatureSchemeNames(Vector sigAndHashAlgs)
+    {
+        if (null == sigAndHashAlgs)
+        {
+            return new String[0];
+        }
+
+        int count = sigAndHashAlgs.size();
+        ArrayList<String> result = new ArrayList<String>(count);
+        for (int i = 0; i < count; ++i)
+        {
+            String name = getSignatureSchemeName((SignatureAndHashAlgorithm)sigAndHashAlgs.elementAt(i));
+            if (null != name)
+            {
+                result.add(name);
+            }
+        }
+        return result.toArray(new String[result.size()]);
     }
 
     public static X509Certificate[] getX509CertificateChain(TlsCrypto crypto, Certificate certificateMessage)

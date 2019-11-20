@@ -27,7 +27,7 @@ import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.ASN1StreamParser;
 import org.bouncycastle.asn1.DERBMPString;
 import org.bouncycastle.asn1.DERNull;
-import org.bouncycastle.asn1.DERSequenceParser;
+import org.bouncycastle.asn1.DLSequenceParser;
 import org.bouncycastle.asn1.cryptopro.CryptoProObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.ContentInfo;
 import org.bouncycastle.asn1.pkcs.EncryptedData;
@@ -553,6 +553,24 @@ public class PKCS12StoreTest
       + "MDEwITAJBgUrDgMCGgUABBT3iAwuHw7KQXrl09gBkHaUVbOoBAQIIm90qua1"
       + "2i4CAggA");
 
+    private static byte[] certsOnly = Base64.decode(
+        "MIICnwIBAzCCApgGCSqGSIb3DQEHAaCCAokEggKFMIICgTCCAn0GCSqGSIb3" +
+            "DQEHAaCCAm4EggJqMIICZjCCAmIGCyqGSIb3DQEMCgEDoIICHDCCAhgGCiq" +
+            "GSIb3DQEJFgGgggIIBIICBDCCAgAwggFpoAMCAQICBHcheqIwDQYJKoZIhv" +
+            "cNAQELBQAwMjENMAsGA1UEChMERGVtbzENMAsGA1UECxMERGVtbzESMBAGA" +
+            "1UEAxMJRGVtbyBjZXJ0MCAXDTE5MDgzMTEzMDgzNloYDzIxMDkwNTE5MTMw" +
+            "ODM2WjAyMQ0wCwYDVQQKEwREZW1vMQ0wCwYDVQQLEwREZW1vMRIwEAYDVQQ" +
+            "DEwlEZW1vIGNlcnQwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAKOVC4" +
+            "Qeg0KPAPRB9WcZdvXitiJ+E6rd3czQGNzEFC6FesAllH3PHSWuUZ2YjhiVM" +
+            "YJyzwVP1II04iCRaIc65R45oVrHZ2ybWAOda2hBtySjQ2pIQQpoKE7nvL3j" +
+            "JcHoCIBJVf3c3xpfh7RucCOGiZDjU9CYPG8yznsazb5+fPF/AgMBAAGjITA" +
+            "fMB0GA1UdDgQWBBR/7wUDwa7T0vNzNgjOKdjz2Up9RzANBgkqhkiG9w0BAQ" +
+            "sFAAOBgQADzPFsaLhVYD/k9qMueYKi8Ftwijr37niF98cgAHEtq6TGsh3Se" +
+            "8gEK3dNJL18vm7NXgGsl8jUWsE9hCF9ar+/cDZ+KrZlZ5PLfifXJJKFqVAh" +
+            "sOORef0NRIVcTCoyQTW4pNpNZP9Ul5LJ3iIDjafgJMyEkRbavqdyfSqVTvY" +
+            "NpjEzMBkGCSqGSIb3DQEJFDEMHgoAYQBsAGkAYQBzMBYGDGCGSAGG+Watyn" +
+            "sBATEGBgRVHSUA");
+
     /**
      * we generate a self signed certificate for the sake of testing - RSA
      */
@@ -585,6 +603,41 @@ public class PKCS12StoreTest
         return TestUtils.createCert(issuerBldr.build(), privKey, subjectBldr.build(), "SHA1withRSA", null, pubKey);
     }
 
+    private void testCertsOnly()
+        throws Exception
+    {
+        KeyStore pkcs12 = KeyStore.getInstance("PKCS12", "BC");
+
+        pkcs12.load(new ByteArrayInputStream(certsOnly), null);
+
+        isTrue(pkcs12.containsAlias("alias"));
+
+        ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+
+        pkcs12.store(bOut, null);
+
+        pkcs12 = KeyStore.getInstance("PKCS12", "BC");
+
+        pkcs12.load(new ByteArrayInputStream(bOut.toByteArray()), null);
+
+        isTrue(pkcs12.containsAlias("alias"));
+
+        try
+        {
+            pkcs12.load(new ByteArrayInputStream(certsOnly), "1".toCharArray());
+            fail("no exception");
+        }
+        catch (IOException e)
+        {
+            isEquals("password supplied for keystore that does not require one", e.getMessage());
+        }
+
+        System.setProperty("org.bouncycastle.pkcs12.ignore_useless_passwd", "true");
+        
+        pkcs12.load(new ByteArrayInputStream(certsOnly), "1".toCharArray());
+
+        System.setProperty("org.bouncycastle.pkcs12.ignore_useless_passwd", "false");
+    }
     private void testGOSTStore()
         throws Exception
     {
@@ -763,7 +816,7 @@ public class PKCS12StoreTest
         }
 
         ASN1Encodable outer = new ASN1StreamParser(data).readObject();
-        if (!(outer instanceof DERSequenceParser))
+        if (!(outer instanceof DLSequenceParser))
         {
             fail("Failed DER encoding test.");
         }
@@ -791,7 +844,7 @@ public class PKCS12StoreTest
         }
 
         outer = new ASN1StreamParser(data).readObject();
-        if (!(outer instanceof DERSequenceParser))
+        if (!(outer instanceof DLSequenceParser))
         {
             fail("Failed DER encoding test.");
         }
@@ -821,7 +874,7 @@ public class PKCS12StoreTest
         }
 
         outer = new ASN1StreamParser(data).readObject();
-        if (!(outer instanceof DERSequenceParser))
+        if (!(outer instanceof DLSequenceParser))
         {
             fail("Failed DER encoding test.");
         }
@@ -1493,6 +1546,7 @@ public class PKCS12StoreTest
         testGOSTStore();
         testChainCycle();
         testBCFKSLoad();
+        testCertsOnly();
 
         // converter tests
 
@@ -1502,7 +1556,7 @@ public class PKCS12StoreTest
         kS.load(new ByteArrayInputStream(data), passwd);     // check MAC
 
         ASN1Encodable obj = new ASN1StreamParser(data).readObject();
-        if (!(obj instanceof DERSequenceParser))
+        if (!(obj instanceof DLSequenceParser))
         {
             fail("Failed DER conversion test.");
         }
@@ -1511,7 +1565,7 @@ public class PKCS12StoreTest
         kS.load(new ByteArrayInputStream(data), passwd); //check MAC
 
         obj = new ASN1StreamParser(data).readObject();
-        if (!(obj instanceof DERSequenceParser))
+        if (!(obj instanceof DLSequenceParser))
         {
             fail("Failed deep DER conversion test - outer.");
         }
@@ -1519,7 +1573,7 @@ public class PKCS12StoreTest
         Pfx pfx = Pfx.getInstance(obj);
 
         obj = new ASN1StreamParser(ASN1OctetString.getInstance(pfx.getAuthSafe().getContent()).getOctets()).readObject();
-        if (!(obj instanceof DERSequenceParser))
+        if (!(obj instanceof DLSequenceParser))
         {
             fail("Failed deep DER conversion test - inner.");
         }

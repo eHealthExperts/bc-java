@@ -6,6 +6,7 @@ import java.security.SecureRandom;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.SecurityParameters;
 import org.bouncycastle.tls.TlsFatalAlert;
+import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCipher;
 import org.bouncycastle.tls.crypto.TlsCrypto;
 import org.bouncycastle.tls.crypto.TlsCryptoParameters;
@@ -289,7 +290,7 @@ public class TlsBlockCipher
         if (encryptThenMAC)
         {
             int end = offset + len;
-            byte[] receivedMac = Arrays.copyOfRange(ciphertext, end - macSize, end);
+            byte[] receivedMac = TlsUtils.copyOfRangeExact(ciphertext, end - macSize, end);
             byte[] calculatedMac = readMac.calculateMac(seqNo, type, ciphertext, offset, len - macSize);
 
             boolean badMac = !Arrays.constantTimeAreEqual(calculatedMac, receivedMac);
@@ -328,7 +329,7 @@ public class TlsBlockCipher
             dec_output_length -= macSize;
             int macInputLen = dec_output_length;
             int macOff = offset + macInputLen;
-            byte[] receivedMac = Arrays.copyOfRange(ciphertext, macOff, macOff + macSize);
+            byte[] receivedMac = TlsUtils.copyOfRangeExact(ciphertext, macOff, macOff + macSize);
             byte[] calculatedMac = readMac.calculateMacConstantTime(seqNo, type, ciphertext, offset, macInputLen,
                 blocks_length - macSize, randomData);
 
@@ -340,7 +341,7 @@ public class TlsBlockCipher
             throw new TlsFatalAlert(AlertDescription.bad_record_mac);
         }
 
-        return Arrays.copyOfRange(ciphertext, offset, offset + dec_output_length);
+        return TlsUtils.copyOfRangeExact(ciphertext, offset, offset + dec_output_length);
     }
 
     protected int checkPaddingConstantTime(byte[] buf, int off, int len, int blockSize, int macSize)

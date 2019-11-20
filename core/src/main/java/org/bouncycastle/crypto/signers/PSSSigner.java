@@ -12,6 +12,7 @@ import org.bouncycastle.crypto.Signer;
 import org.bouncycastle.crypto.params.ParametersWithRandom;
 import org.bouncycastle.crypto.params.RSABlindingParameters;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
+import org.bouncycastle.util.Arrays;
 
 /**
  * RSA-PSS as described in PKCS# 1 v 2.1.
@@ -250,10 +251,11 @@ public class PSSSigner
             block[i] ^= dbMask[i];
         }
 
-        block[0] &= (0xff >> ((block.length * 8) - emBits));
-
         System.arraycopy(h, 0, block, block.length - hLen - 1, hLen);
 
+        int firstByteMask = 0xff >>> ((block.length * 8) - emBits);
+
+        block[0] &= firstByteMask;
         block[block.length - 1] = trailer;
 
         byte[]  b = cipher.processBlock(block, 0, block.length);
@@ -275,6 +277,7 @@ public class PSSSigner
         try
         {
             byte[] b = cipher.processBlock(signature, 0, signature.length);
+            Arrays.fill(block, 0, block.length - b.length, (byte)0);
             System.arraycopy(b, 0, block, block.length - b.length, b.length);
         }
         catch (Exception e)
@@ -282,7 +285,10 @@ public class PSSSigner
             return false;
         }
 
-        if (block[block.length - 1] != trailer)
+        int firstByteMask = 0xff >>> ((block.length * 8) - emBits);
+
+        if ((block[0] & 0xff) != (block[0] & firstByteMask)
+            || block[block.length - 1] != trailer)
         {
             clearBlock(block);
             return false;
@@ -295,7 +301,7 @@ public class PSSSigner
             block[i] ^= dbMask[i];
         }
 
-        block[0] &= (0xff >> ((block.length * 8) - emBits));
+        block[0] &= firstByteMask;
 
         for (int i = 0; i != block.length - hLen - sLen - 2; i++)
         {

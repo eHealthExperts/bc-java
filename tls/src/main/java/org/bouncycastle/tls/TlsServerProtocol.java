@@ -79,6 +79,8 @@ public class TlsServerProtocol
         this.tlsServer.init(tlsServerContext);
         this.recordStream.init(tlsServerContext);
 
+        tlsServer.notifyCloseHandle(this);
+
         beginHandshake(false);
 
         if (blocking)
@@ -618,7 +620,9 @@ public class TlsServerProtocol
          * master secret [..]. (and see 5.2, 5.3)
          */
         securityParameters.extendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(clientExtensions);
-        if (!securityParameters.isExtendedMasterSecret() && tlsServer.requiresExtendedMasterSecret())
+
+        if (!securityParameters.isExtendedMasterSecret()
+            && (resumedSession || tlsServer.requiresExtendedMasterSecret()))
         {
             throw new TlsFatalAlert(AlertDescription.handshake_failure);
         }
@@ -849,7 +853,7 @@ public class TlsServerProtocol
         }
 
         securityParameters.serverRandom = createRandomBlock(tlsServer.shouldUseGMTUnixTime(), tlsServerContext);
-        if (!server_version.equals(ProtocolVersion.getLatestTLS(tlsServer.getSupportedVersions())))
+        if (!server_version.equals(ProtocolVersion.getLatestTLS(tlsServer.getProtocolVersions())))
         {
             TlsUtils.writeDowngradeMarker(server_version, securityParameters.getServerRandom());
         }

@@ -1102,6 +1102,65 @@ public final class Arrays
         }
     }
 
+    public static void clear(int[] array)
+    {
+        if (array != null)
+        {
+            for (int i = 0; i < array.length; i++)
+            {
+                array[i] = 0;
+            }
+        }
+    }
+
+    public static boolean isNullOrContainsNull(Object[] array)
+    {
+        if (null == array)
+        {
+            return true;
+        }
+        int count = array.length;
+        for (int i = 0; i < count; ++i)
+        {
+            if (null == array[i])
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean constantTimeAreEqual(int len, byte[] a, int aOff, byte[] b, int bOff)
+    {
+        if (null == a)
+        {
+            throw new NullPointerException("'a' cannot be null");
+        }
+        if (null == b)
+        {
+            throw new NullPointerException("'b' cannot be null");
+        }
+        if (len < 0)
+        {
+            throw new IllegalArgumentException("'len' cannot be negative");
+        }
+        if (aOff > (a.length - len))
+        {
+            throw new IndexOutOfBoundsException("'aOff' value invalid for specified length");
+        }
+        if (bOff > (b.length - len))
+        {
+            throw new IndexOutOfBoundsException("'bOff' value invalid for specified length");
+        }
+
+        int d = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            d |= (a[aOff + i] ^ b[bOff + i]);
+        }
+        return 0 == d;
+    }
+
     /**
      * Iterator backed by a specific array.
      */

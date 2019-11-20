@@ -30,7 +30,7 @@ public class Argon2BytesGenerator
 
     /* Minimum and maximum digest size in bytes */
     private static final int MIN_OUTLEN = 4;
-    
+
     /* Minimum and maximum number of passes */
     private static final int MIN_ITERATIONS = 1;
 
@@ -125,7 +125,6 @@ public class Argon2BytesGenerator
         }
         memory = null;
         Arrays.fill(result, (byte)0);
-        doInit(parameters);
     }
 
     private void doInit(Argon2Parameters parameters)
@@ -159,71 +158,24 @@ public class Argon2BytesGenerator
         }
     }
 
-    private void fillBlock(Block X, Block Y, Block currentBlock, boolean withXor)
-    {
-        Block R = new Block();
-        Block Z = new Block();
-
-        R.xor(X, Y);
-        Z.copyBlock(R);
-
-        /* Apply Blake2 on columns of 64-bit words: (0,1,...,15) , then
-        (16,17,..31)... finally (112,113,...127) */
-        for (int i = 0; i < 8; i++)
-        {
-
-            roundFunction(Z,
-                16 * i, 16 * i + 1, 16 * i + 2,
-                16 * i + 3, 16 * i + 4, 16 * i + 5,
-                16 * i + 6, 16 * i + 7, 16 * i + 8,
-                16 * i + 9, 16 * i + 10, 16 * i + 11,
-                16 * i + 12, 16 * i + 13, 16 * i + 14,
-                16 * i + 15
-            );
-        }
-
-        /* Apply Blake2 on rows of 64-bit words: (0,1,16,17,...112,113), then
-        (2,3,18,19,...,114,115).. finally (14,15,30,31,...,126,127) */
-        for (int i = 0; i < 8; i++)
-        {
-
-            roundFunction(Z,
-                2 * i, 2 * i + 1, 2 * i + 16,
-                2 * i + 17, 2 * i + 32, 2 * i + 33,
-                2 * i + 48, 2 * i + 49, 2 * i + 64,
-                2 * i + 65, 2 * i + 80, 2 * i + 81,
-                2 * i + 96, 2 * i + 97, 2 * i + 112,
-                2 * i + 113
-            );
-
-        }
-
-        if (withXor)
-        {
-            currentBlock.xor(R, Z, currentBlock);
-        }
-        else
-        {
-            currentBlock.xor(R, Z);
-        }
-    }
-
     private void fillMemoryBlocks()
     {
+        FillBlock filler = new FillBlock();
+        Position position = new Position();
         for (int i = 0; i < parameters.getIterations(); i++)
         {
             for (int j = 0; j < ARGON2_SYNC_POINTS; j++)
             {
                 for (int k = 0; k < parameters.getLanes(); k++)
                 {
-                    Position position = new Position(i, k, j, 0);
-                    fillSegment(position);
+                    position.update(i, k, j, 0);
+                    fillSegment(filler, position);
                 }
             }
         }
     }
 
-    private void fillSegment(Position position)
+    private void fillSegment(FillBlock filler, Position position)
     {
 
         Block addressBlock = null, inputBlock = null, zeroBlock = null;
@@ -235,18 +187,18 @@ public class Argon2BytesGenerator
 
         if (dataIndependentAddressing)
         {
-            addressBlock = new Block();
-            zeroBlock = new Block();
-            inputBlock = new Block();
+            addressBlock = filler.addressBlock.clear();
+            zeroBlock = filler.zeroBlock.clear();
+            inputBlock = filler.inputBlock.clear();
 
-            initAddressBlocks(position, zeroBlock, inputBlock, addressBlock);
+            initAddressBlocks(filler, position, zeroBlock, inputBlock, addressBlock);
         }
 
         for (position.index = startingIndex; position.index < segmentLength; position.index++, currentOffset++, prevOffset++)
         {
             prevOffset = rotatePrevOffset(currentOffset, prevOffset);
 
-            long pseudoRandom = getPseudoRandom(position, addressBlock, inputBlock, zeroBlock, prevOffset, dataIndependentAddressing);
+            long pseudoRandom = getPseudoRandom(filler, position, addressBlock, inputBlock, zeroBlock, prevOffset, dataIndependentAddressing);
             int refLane = getRefLane(position, pseudoRandom);
             int refColumn = getRefColumn(position, pseudoRandom, refLane == position.lane);
 
@@ -255,8 +207,14 @@ public class Argon2BytesGenerator
             Block refBlock = memory[((laneLength) * refLane + refColumn)];
             Block currentBlock = memory[currentOffset];
 
-            boolean withXor = isWithXor(position);
-            fillBlock(prevBlock, refBlock, currentBlock, withXor);
+            if (isWithXor(position))
+            {
+                filler.fillBlockWithXor(prevBlock, refBlock, currentBlock);
+            }
+            else
+            {
+                filler.fillBlock(prevBlock, refBlock, currentBlock);
+            }
         }
     }
 
@@ -269,7 +227,7 @@ public class Argon2BytesGenerator
             );
     }
 
-    private void initAddressBlocks(Position position, Block zeroBlock, Block inputBlock, Block addressBlock)
+    private void initAddressBlocks(FillBlock filler, Position position, Block zeroBlock, Block inputBlock, Block addressBlock)
     {
         inputBlock.v[0] = intToLong(position.pass);
         inputBlock.v[1] = intToLong(position.lane);
@@ -281,7 +239,7 @@ public class Argon2BytesGenerator
         if ((position.pass == 0) && (position.slice == 0))
         {
             /* Don't forget to generate the first block of addresses: */
-            nextAddresses(zeroBlock, inputBlock, addressBlock);
+            nextAddresses(filler, zeroBlock, inputBlock, addressBlock);
         }
     }
 
@@ -325,22 +283,22 @@ public class Argon2BytesGenerator
         }
     }
 
-    private void nextAddresses(Block zeroBlock, Block inputBlock, Block addressBlock)
+    private void nextAddresses(FillBlock filler, Block zeroBlock, Block inputBlock, Block addressBlock)
     {
         inputBlock.v[6]++;
-        fillBlock(zeroBlock, inputBlock, addressBlock, false);
-        fillBlock(zeroBlock, addressBlock, addressBlock, false);
+        filler.fillBlock(zeroBlock, inputBlock, addressBlock);
+        filler.fillBlock(zeroBlock, addressBlock, addressBlock);
     }
 
     /* 1.2 Computing the index of the reference block */
     /* 1.2.1 Taking pseudo-random value from the previous block */
-    private long getPseudoRandom(Position position, Block addressBlock, Block inputBlock, Block zeroBlock, int prevOffset, boolean dataIndependentAddressing)
+    private long getPseudoRandom(FillBlock filler, Position position, Block addressBlock, Block inputBlock, Block zeroBlock, int prevOffset, boolean dataIndependentAddressing)
     {
         if (dataIndependentAddressing)
         {
             if (position.index % ARGON2_ADDRESSES_IN_BLOCK == 0)
             {
-                nextAddresses(zeroBlock, inputBlock, addressBlock);
+                nextAddresses(filler, zeroBlock, inputBlock, addressBlock);
             }
             return addressBlock.v[position.index % ARGON2_ADDRESSES_IN_BLOCK];
         }
@@ -504,11 +462,11 @@ public class Argon2BytesGenerator
         return result;
     }
 
-    private void roundFunction(Block block,
-                               int v0, int v1, int v2, int v3,
-                               int v4, int v5, int v6, int v7,
-                               int v8, int v9, int v10, int v11,
-                               int v12, int v13, int v14, int v15)
+    private static void roundFunction(Block block,
+                                      int v0, int v1, int v2, int v3,
+                                      int v4, int v5, int v6, int v7,
+                                      int v8, int v9, int v10, int v11,
+                                      int v12, int v13, int v14, int v15)
     {
 
         F(block, v0, v4, v8, v12);
@@ -522,7 +480,7 @@ public class Argon2BytesGenerator
         F(block, v3, v4, v9, v14);
     }
 
-    private void F(Block block, int a, int b, int c, int d)
+    private static void F(Block block, int a, int b, int c, int d)
     {
         fBlaMka(block, a, b);
         rotr64(block, d, a, 32);
@@ -541,7 +499,7 @@ public class Argon2BytesGenerator
     /* a <- a + b + 2*aL*bL
      * + == addition modulo 2^64
      * aL = least 32 bit */
-    private void fBlaMka(Block block, int x, int y)
+    private static void fBlaMka(Block block, int x, int y)
     {
         final long m = 0xFFFFFFFFL;
         final long xy = (block.v[x] & m) * (block.v[y] & m);
@@ -549,7 +507,7 @@ public class Argon2BytesGenerator
         block.v[x] = block.v[x] + block.v[y] + 2 * xy;
     }
 
-    private void rotr64(Block block, int v, int w, long c)
+    private static void rotr64(Block block, int v, int w, long c)
     {
         final long temp = block.v[v] ^ block.v[w];
         block.v[v] = (temp >>> c) | (temp << (64 - c));
@@ -558,14 +516,14 @@ public class Argon2BytesGenerator
     private void initialize(byte[] password, int outputLength)
     {
         byte[] initialHash = initialHash(parameters, outputLength, password);
-        
+
         fillFirstBlocks(initialHash);
     }
 
     private static void addIntToLittleEndian(Digest digest, int n)
     {
-        digest.update((byte)(n       ));
-        digest.update((byte)(n >>>  8));
+        digest.update((byte)(n));
+        digest.update((byte)(n >>> 8));
         digest.update((byte)(n >>> 16));
         digest.update((byte)(n >>> 24));
     }
@@ -622,15 +580,85 @@ public class Argon2BytesGenerator
     {
         return (long)(x & 0xffffffffL);
     }
-    
+
+    private static class FillBlock
+    {
+        Block R = new Block();
+        Block Z = new Block();
+
+        Block addressBlock = new Block();
+        Block zeroBlock = new Block();
+        Block inputBlock = new Block();
+
+        private void applyBlake()
+        {
+            /* Apply Blake2 on columns of 64-bit words: (0,1,...,15) , then
+            (16,17,..31)... finally (112,113,...127) */
+            for (int i = 0; i < 8; i++)
+            {
+
+                int i16 = 16 * i;
+                roundFunction(Z,
+                    i16, i16 + 1, i16 + 2,
+                    i16 + 3, i16 + 4, i16 + 5,
+                    i16 + 6, i16 + 7, i16 + 8,
+                    i16 + 9, i16 + 10, i16 + 11,
+                    i16 + 12, i16 + 13, i16 + 14,
+                    i16 + 15
+                );
+            }
+
+            /* Apply Blake2 on rows of 64-bit words: (0,1,16,17,...112,113), then
+            (2,3,18,19,...,114,115).. finally (14,15,30,31,...,126,127) */
+            for (int i = 0; i < 8; i++)
+            {
+
+                int i2 = 2 * i;
+                roundFunction(Z,
+                    i2, i2 + 1, i2 + 16,
+                    i2 + 17, i2 + 32, i2 + 33,
+                    i2 + 48, i2 + 49, i2 + 64,
+                    i2 + 65, i2 + 80, i2 + 81,
+                    i2 + 96, i2 + 97, i2 + 112,
+                    i2 + 113
+                );
+            }
+        }
+
+        private void fillBlock(Block X, Block Y, Block currentBlock)
+        {
+            if (X == zeroBlock)
+            {
+                R.copyBlock(Y);
+            }
+            else
+            {
+                R.xor(X, Y);
+            }
+            Z.copyBlock(R);
+            applyBlake();
+            currentBlock.xor(R, Z);
+        }
+
+        private void fillBlockWithXor(Block X, Block Y, Block currentBlock)
+        {
+            R.xor(X, Y);
+            Z.copyBlock(R);
+            applyBlake();
+            currentBlock.xor(R, Z, currentBlock);
+        }
+    }
+
     private static class Block
     {
+        private static final int SIZE = ARGON2_QWORDS_IN_BLOCK;
+
         /* 128 * 8 Byte QWords */
-        private long[] v;
+        private final long[] v;
 
         private Block()
         {
-            v = new long[ARGON2_QWORDS_IN_BLOCK];
+            v = new long[SIZE];
         }
 
         void fromBytes(byte[] input)
@@ -640,7 +668,7 @@ public class Argon2BytesGenerator
                 throw new IllegalArgumentException("input shorter than blocksize");
             }
 
-            for (int i = 0; i < v.length; i++)
+            for (int i = 0; i < SIZE; i++)
             {
                 v[i] = Pack.littleEndianToLong(input, i * 8);
             }
@@ -650,7 +678,7 @@ public class Argon2BytesGenerator
         {
             byte[] result = new byte[ARGON2_BLOCK_SIZE];
 
-            for (int i = 0; i < v.length; i++)
+            for (int i = 0; i < SIZE; i++)
             {
                 Pack.longToLittleEndian(v[i], result, i * 8);
             }
@@ -660,12 +688,12 @@ public class Argon2BytesGenerator
 
         private void copyBlock(Block other)
         {
-            System.arraycopy(other.v, 0, v, 0, v.length);
+            System.arraycopy(other.v, 0, v, 0, SIZE);
         }
 
         private void xor(Block b1, Block b2)
         {
-            for (int i = 0; i < v.length; i++)
+            for (int i = 0; i < SIZE; i++)
             {
                 v[i] = b1.v[i] ^ b2.v[i];
             }
@@ -673,7 +701,7 @@ public class Argon2BytesGenerator
 
         public void xor(Block b1, Block b2, Block b3)
         {
-            for (int i = 0; i < v.length; i++)
+            for (int i = 0; i < SIZE; i++)
             {
                 v[i] = b1.v[i] ^ b2.v[i] ^ b3.v[i];
             }
@@ -686,11 +714,11 @@ public class Argon2BytesGenerator
                 v[i] = v[i] ^ other.v[i];
             }
         }
-        
+
         public String toString()
         {
             StringBuffer result = new StringBuffer();
-            for (int i = 0; i < v.length; i++)
+            for (int i = 0; i < SIZE; i++)
             {
                 result.append(Hex.toHexString(Pack.longToLittleEndian(v[i])));
             }
@@ -698,9 +726,10 @@ public class Argon2BytesGenerator
             return result.toString();
         }
 
-        public void clear()
+        public Block clear()
         {
             Arrays.fill(v, 0);
+            return this;
         }
     }
 
@@ -711,7 +740,12 @@ public class Argon2BytesGenerator
         int slice;
         int index;
 
-        Position(int pass, int lane, int slice, int index)
+        Position()
+        {
+
+        }
+
+        void update(int pass, int lane, int slice, int index)
         {
             this.pass = pass;
             this.lane = lane;

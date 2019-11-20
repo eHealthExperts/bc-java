@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import javax.security.auth.DestroyFailedException;
 
-import org.bouncycastle.util.Arrays;
+import org.bouncycastle.tls.TlsUtils;
 
 /**
  * The cipher for TLS_NULL_WITH_NULL_NULL.
@@ -25,13 +25,13 @@ public class TlsNullNullCipher
     public byte[] encodePlaintext(long seqNo, short type, byte[] plaintext, int offset, int len)
         throws IOException
     {
-        return Arrays.copyOfRange(plaintext, offset, offset + len);
+        return TlsUtils.copyOfRangeExact(plaintext, offset, offset + len);
     }
 
     public byte[] decodeCiphertext(long seqNo, short type, byte[] ciphertext, int offset, int len)
         throws IOException
     {
-        return Arrays.copyOfRange(ciphertext, offset, offset + len);
+        return TlsUtils.copyOfRangeExact(ciphertext, offset, offset + len);
     }
     
     public void destroy() throws DestroyFailedException {

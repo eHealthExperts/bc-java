@@ -57,7 +57,7 @@ public class GOST3410ParamSetParameters
     {
         Enumeration     e = seq.getObjects();
 
-        keySize = ((ASN1Integer)e.nextElement()).getValue().intValue();
+        keySize = ((ASN1Integer)e.nextElement()).intValueExact();
         p = (ASN1Integer)e.nextElement();
         q = (ASN1Integer)e.nextElement();
         a = (ASN1Integer)e.nextElement();
@@ -93,7 +93,7 @@ public class GOST3410ParamSetParameters
 
     public ASN1Primitive toASN1Primitive()
     {
-        ASN1EncodableVector  v = new ASN1EncodableVector();
+        ASN1EncodableVector v = new ASN1EncodableVector(4);
 
         v.add(new ASN1Integer(keySize));
         v.add(p);
