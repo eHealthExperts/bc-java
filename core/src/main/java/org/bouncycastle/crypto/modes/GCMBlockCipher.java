@@ -36,7 +36,6 @@ public class GCMBlockCipher
     private boolean             forEncryption;
     private boolean             initialised;
     private int                 macSize;
-    private byte[]              lastKey;
     private byte[]              nonce;
     private byte[]              initialAssociatedText;
     private byte[]              H;
@@ -147,23 +146,14 @@ public class GCMBlockCipher
                 {
                     throw new IllegalArgumentException("cannot reuse nonce for GCM encryption");
                 }
-                if (lastKey != null && Arrays.areEqual(lastKey, keyParam.getKey()))
-                {
-                    throw new IllegalArgumentException("cannot reuse nonce for GCM encryption");
-                }
             }
         }
 
         nonce = newNonce;
-        if (keyParam != null)
-        {
-            lastKey = keyParam.getKey();
-        }
 
         // TODO Restrict macSize to 16 if nonce length not 12?
 
         // Cipher always used in forward mode
-        // if keyParam is null we're reusing the last key.
         if (keyParam != null)
         {
             cipher.init(true, keyParam);
