@@ -297,14 +297,14 @@ public class BCECPrivateKey
             return null;
         }
         
-        return EC5Util.convertSpec(ecSpec, withCompression);
+        return EC5Util.convertSpec(ecSpec);
     }
 
     org.bouncycastle.jce.spec.ECParameterSpec engineGetSpec()
     {
         if (ecSpec != null)
         {
-            return EC5Util.convertSpec(ecSpec, withCompression);
+            return EC5Util.convertSpec(ecSpec);
         }
 
         return configuration.getEcImplicitlyCa();
@@ -363,11 +363,6 @@ public class BCECPrivateKey
     public String toString()
     {
         return ECUtil.privateKeyToString("EC", d, engineGetSpec());
-    }
-
-    private org.bouncycastle.math.ec.ECPoint calculateQ(org.bouncycastle.jce.spec.ECParameterSpec spec)
-    {
-        return spec.getG().multiply(d).normalize();
     }
 
     private DERBitString getPublicKeyDetails(BCECPublicKey pub)

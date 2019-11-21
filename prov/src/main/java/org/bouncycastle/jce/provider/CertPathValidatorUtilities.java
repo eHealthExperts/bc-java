@@ -162,16 +162,11 @@ class CertPathValidatorUtilities
         Exception invalidKeyEx = null;
 
         X509CertSelector certSelectX509 = new X509CertSelector();
-        X500Name certIssuer = PrincipalUtils.getEncodedIssuerPrincipal(cert);
 
-        try
-        {
-            certSelectX509.setSubject(certIssuer.getEncoded());
-        }
-        catch (IOException ex)
-        {
-            throw new AnnotatedException("Cannot set subject search criteria for trust anchor.", ex);
-        }
+        final X500Principal certIssuerPrincipal = cert.getIssuerX500Principal();
+        certSelectX509.setSubject(certIssuerPrincipal);
+
+        X500Name certIssuerName = null;
 
         Iterator iter = trustAnchors.iterator();
         while (iter.hasNext() && trust == null)
@@ -188,13 +183,20 @@ class CertPathValidatorUtilities
                     trust = null;
                 }
             }
-            else if (trust.getCAName() != null
+            else if (trust.getCA() != null
+                && trust.getCAName() != null
                 && trust.getCAPublicKey() != null)
             {
+                if (certIssuerName == null)
+                {
+                    certIssuerName = X500Name.getInstance(certIssuerPrincipal.getEncoded());
+                }
+
                 try
                 {
-                    X500Name caName = PrincipalUtils.getCA(trust);
-                    if (certIssuer.equals(caName))
+                    X500Name caName = X500Name.getInstance(trust.getCA().getEncoded());
+
+                    if (certIssuerName.equals(caName))
                     {
                         trustPublicKey = trust.getCAPublicKey();
                     }
@@ -333,10 +335,9 @@ class CertPathValidatorUtilities
         try
         {
             ASN1InputStream aIn = new ASN1InputStream(ext);
-            ASN1OctetString octs = (ASN1OctetString)aIn.readObject();
+            ASN1OctetString octs = ASN1OctetString.getInstance(aIn.readObject());
 
-            aIn = new ASN1InputStream(octs.getOctets());
-            return aIn.readObject();
+            return ASN1Primitive.fromByteArray(octs.getOctets());
         }
         catch (Exception e)
         {
@@ -380,10 +381,9 @@ class CertPathValidatorUtilities
         }
 
         ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-        ASN1OutputStream aOut = new ASN1OutputStream(bOut);
+        ASN1OutputStream aOut = ASN1OutputStream.create(bOut);
 
         Enumeration e = qualifiers.getObjects();
-
         while (e.hasMoreElements())
         {
             try
@@ -915,7 +915,7 @@ class CertPathValidatorUtilities
             }
             else
             {
-                certIssuer = X500Name.getInstance(certificateIssuer.getEncoded());
+                certIssuer = PrincipalUtils.getX500Name(certificateIssuer);
             }
 
             if (! PrincipalUtils.getEncodedIssuerPrincipal(cert).equals(certIssuer))
@@ -940,6 +940,12 @@ class CertPathValidatorUtilities
         ASN1Enumerated reasonCode = null;
         if (crl_entry.hasExtensions())
         {
+            if (crl_entry.hasUnsupportedCriticalExtension())
+            {
+                throw new AnnotatedException(
+                      "CRL entry has unsupported critical extensions.");
+            }
+
             try
             {
                 reasonCode = ASN1Enumerated
@@ -955,26 +961,19 @@ class CertPathValidatorUtilities
             }
         }
 
-        // for reason keyCompromise, caCompromise, aACompromise or
-        // unspecified
-        if (!(validDate.getTime() < crl_entry.getRevocationDate().getTime())
-            || reasonCode == null
-            || reasonCode.getValue().intValue() == 0
-            || reasonCode.getValue().intValue() == 1
-            || reasonCode.getValue().intValue() == 2
-            || reasonCode.getValue().intValue() == 8)
-        {
+        int reasonCodeValue = (null == reasonCode)
+            ?   CRLReason.unspecified
+            :   reasonCode.intValueExact();
 
-            // (i) or (j) (1)
-            if (reasonCode != null)
-            {
-                certStatus.setCertStatus(reasonCode.getValue().intValue());
-            }
-            // (i) or (j) (2)
-            else
-            {
-                certStatus.setCertStatus(CRLReason.unspecified);
-            }
+        // for reason keyCompromise, caCompromise, aACompromise or unspecified
+        if (!(validDate.getTime() < crl_entry.getRevocationDate().getTime())
+            || reasonCodeValue == CRLReason.unspecified
+            || reasonCodeValue == CRLReason.keyCompromise
+            || reasonCodeValue == CRLReason.cACompromise
+            || reasonCodeValue == CRLReason.aACompromise)
+        {
+            // (i) or (j)
+            certStatus.setCertStatus(reasonCodeValue);
             certStatus.setRevocationDate(crl_entry.getRevocationDate());
         }
     }
@@ -1282,10 +1281,10 @@ class CertPathValidatorUtilities
         {
             selector.setSubject(PrincipalUtils.getIssuerPrincipal(cert).getEncoded());
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             throw new AnnotatedException(
-                           "Subject criteria for certificate selector to find issuer certificate could not be set.", e);
+                "Subject criteria for certificate selector to find issuer certificate could not be set.", e);
         }
 
         try

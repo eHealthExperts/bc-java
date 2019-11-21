@@ -15,6 +15,7 @@ public abstract class AbstractTlsClient
     implements TlsClient
 {
     protected TlsClientContext context;
+    protected ProtocolVersion[] protocolVersions;
     protected int[] cipherSuites;
 
     protected Vector supportedGroups;
@@ -111,8 +112,6 @@ public abstract class AbstractTlsClient
         return null;
     }
 
-    protected abstract int[] getSupportedCipherSuites();
-
     /**
      * The default {@link #getClientExtensions()} implementation calls this to determine which named
      * groups to include in the supported_groups extension for the ClientHello.
@@ -157,7 +156,18 @@ public abstract class AbstractTlsClient
     {
         this.context = context;
 
+        this.protocolVersions = getSupportedVersions();
         this.cipherSuites = getSupportedCipherSuites();
+    }
+
+    public ProtocolVersion[] getProtocolVersions()
+    {
+        return protocolVersions;
+    }
+
+    public int[] getCipherSuites()
+    {
+        return cipherSuites;
     }
 
     public void notifyHandshakeBeginning() throws IOException
@@ -183,11 +193,6 @@ public abstract class AbstractTlsClient
         return false;
     }
 
-    public int[] getCipherSuites()
-    {
-        return cipherSuites;
-    }
-
     public Hashtable getClientExtensions()
         throws IOException
     {
@@ -195,7 +200,7 @@ public abstract class AbstractTlsClient
 
         boolean offeringPreTLSv13 = false;
         {
-            ProtocolVersion[] supportedVersions = getSupportedVersions();
+            ProtocolVersion[] supportedVersions = getProtocolVersions();
             for (int i = 0; i < supportedVersions.length; ++i)
             {
                 if (!TlsUtils.isTLSv13(supportedVersions[i]))

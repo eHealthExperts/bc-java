@@ -13,6 +13,7 @@ import org.bouncycastle.asn1.bc.BCObjectIdentifiers;
 import org.bouncycastle.asn1.bsi.BSIObjectIdentifiers;
 import org.bouncycastle.asn1.cryptopro.CryptoProObjectIdentifiers;
 import org.bouncycastle.asn1.eac.EACObjectIdentifiers;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.gm.GMObjectIdentifiers;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
@@ -128,6 +129,9 @@ public class DefaultSignatureAlgorithmIdentifierFinder
         algorithms.put("SHA3-512WITHSPHINCS256", BCObjectIdentifiers.sphincs256_with_SHA3_512);
         algorithms.put("SHA512WITHSPHINCS256", BCObjectIdentifiers.sphincs256_with_SHA512);
 
+        algorithms.put("ED25519", EdECObjectIdentifiers.id_Ed25519);
+        algorithms.put("ED448", EdECObjectIdentifiers.id_Ed448);
+
 //        algorithms.put("RIPEMD160WITHSM2", GMObjectIdentifiers.sm2sign_with_rmd160);
 //        algorithms.put("SHA1WITHSM2", GMObjectIdentifiers.sm2sign_with_sha1);
 //        algorithms.put("SHA224WITHSM2", GMObjectIdentifiers.sm2sign_with_sha224);
@@ -166,9 +170,6 @@ public class DefaultSignatureAlgorithmIdentifierFinder
         algorithms.put("XMSSMT-SHAKE128", BCObjectIdentifiers.xmss_mt_SHAKE128);
         algorithms.put("XMSSMT-SHAKE256", BCObjectIdentifiers.xmss_mt_SHAKE256);
 
-        algorithms.put("QTESLA-I", BCObjectIdentifiers.qTESLA_I);
-        algorithms.put("QTESLA-III-SIZE", BCObjectIdentifiers.qTESLA_III_size);
-        algorithms.put("QTESLA-III-SPEED", BCObjectIdentifiers.qTESLA_III_speed);
         algorithms.put("QTESLA-P-I", BCObjectIdentifiers.qTESLA_p_I);
         algorithms.put("QTESLA-P-III", BCObjectIdentifiers.qTESLA_p_III);
 
@@ -233,9 +234,6 @@ public class DefaultSignatureAlgorithmIdentifierFinder
         //
         // qTESLA
         //
-        noParams.add(BCObjectIdentifiers.qTESLA_I);
-        noParams.add(BCObjectIdentifiers.qTESLA_III_size);
-        noParams.add(BCObjectIdentifiers.qTESLA_III_speed);
         noParams.add(BCObjectIdentifiers.qTESLA_p_I);
         noParams.add(BCObjectIdentifiers.qTESLA_p_III);
 
@@ -249,6 +247,10 @@ public class DefaultSignatureAlgorithmIdentifierFinder
 //        noParams.add(GMObjectIdentifiers.sm2sign_with_sha384);
 //        noParams.add(GMObjectIdentifiers.sm2sign_with_sha512);
         noParams.add(GMObjectIdentifiers.sm2sign_with_sm3);
+
+        // EdDSA
+        noParams.add(EdECObjectIdentifiers.id_Ed25519);
+        noParams.add(EdECObjectIdentifiers.id_Ed448);
 
         //
         // PKCS 1.5 encrypted  algorithms

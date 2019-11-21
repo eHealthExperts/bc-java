@@ -60,7 +60,7 @@ public class DeclarationOfMajority
         }
         else
         {
-            ASN1EncodableVector v = new ASN1EncodableVector();
+            ASN1EncodableVector v = new ASN1EncodableVector(2);
 
             v.add(ASN1Boolean.FALSE);
             v.add(new DERPrintableString(country, true));
@@ -138,7 +138,7 @@ public class DeclarationOfMajority
             return -1;
         }
 
-        return ASN1Integer.getInstance(declaration, false).getValue().intValue();
+        return ASN1Integer.getInstance(declaration, false).intValueExact();
     }
 
     public ASN1Sequence fullAgeAtCountry()

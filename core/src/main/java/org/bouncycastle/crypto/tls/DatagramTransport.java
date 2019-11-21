@@ -4,8 +4,11 @@ import java.io.IOException;
 
 /**
  * Base interface for an object sending and receiving DTLS data.
+ *
+ * @deprecated Migrate to the (D)TLS API in org.bouncycastle.tls (bctls jar).
  */
 public interface DatagramTransport
+    extends TlsCloseable
 {
     int getReceiveLimit()
         throws IOException;
@@ -17,8 +20,5 @@ public interface DatagramTransport
         throws IOException;
 
     void send(byte[] buf, int off, int len)
-        throws IOException;
-
-    void close()
         throws IOException;
 }

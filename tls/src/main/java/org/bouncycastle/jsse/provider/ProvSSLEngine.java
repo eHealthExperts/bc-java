@@ -112,7 +112,7 @@ class ProvSSLEngine
                 TlsClientProtocol clientProtocol = new TlsClientProtocol();
                 this.protocol = clientProtocol;
 
-                ProvTlsClient client = new ProvTlsClient(this, sslParameters.copy());
+                ProvTlsClient client = new ProvTlsClient(this, sslParameters);
                 this.protocolPeer = client;
 
                 clientProtocol.connect(client);
@@ -123,7 +123,7 @@ class ProvSSLEngine
                 TlsServerProtocol serverProtocol = new TlsServerProtocol();
                 this.protocol = serverProtocol;
 
-                ProvTlsServer server = new ProvTlsServer(this, sslParameters.copy());
+                ProvTlsServer server = new ProvTlsServer(this, sslParameters);
                 this.protocolPeer = server;
 
                 serverProtocol.accept(server);
@@ -144,7 +144,7 @@ class ProvSSLEngine
     {
         try
         {
-            contextData.getX509TrustManager().checkClientTrusted(chain, authType, this);
+            contextData.getX509TrustManager().checkClientTrusted(chain.clone(), authType, this);
         }
         catch (CertificateException e)
         {
@@ -156,7 +156,7 @@ class ProvSSLEngine
     {
         try
         {
-            contextData.getX509TrustManager().checkServerTrusted(chain, authType, this);
+            contextData.getX509TrustManager().checkServerTrusted(chain.clone(), authType, this);
         }
         catch (CertificateException e)
         {

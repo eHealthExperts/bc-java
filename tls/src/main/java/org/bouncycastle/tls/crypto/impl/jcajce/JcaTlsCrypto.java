@@ -74,7 +74,9 @@ public class JcaTlsCrypto
     private final SecureRandom entropySource;
     private final SecureRandom nonceEntropySource;
 
-    private final Hashtable supportedGroups = new Hashtable();
+    private final Hashtable supportedEncryptionAlgorithms = new Hashtable();
+    private final Hashtable supportedNamedGroups = new Hashtable();
+    private final Hashtable supportedOther = new Hashtable();
 
     /**
      * Base constructor.
@@ -209,6 +211,13 @@ public class JcaTlsCrypto
                 return createNullCipher(cryptoParams, macAlgorithm);
             case EncryptionAlgorithm.SEED_CBC:
                 return createSEEDCipher(cryptoParams, macAlgorithm);
+
+            case EncryptionAlgorithm.DES40_CBC:
+            case EncryptionAlgorithm.DES_CBC:
+            case EncryptionAlgorithm.IDEA_CBC:
+            case EncryptionAlgorithm.RC2_CBC_40:
+            case EncryptionAlgorithm.RC4_128:
+            case EncryptionAlgorithm.RC4_40:
             default:
                 throw new TlsFatalAlert(AlertDescription.internal_error);
             }
@@ -341,6 +350,17 @@ public class JcaTlsCrypto
 
     public boolean hasEncryptionAlgorithm(int encryptionAlgorithm)
     {
+        final Integer key = Integers.valueOf(encryptionAlgorithm);
+        synchronized (supportedEncryptionAlgorithms)
+        {
+            Boolean cached = (Boolean)supportedEncryptionAlgorithms.get(key);
+            if (cached != null)
+            {
+                return cached.booleanValue();
+            }
+        }
+
+        boolean result = true;
         try
         {
             switch (encryptionAlgorithm)
@@ -349,6 +369,17 @@ public class JcaTlsCrypto
             {
                 helper.createCipher("ChaCha7539");
                 helper.createMac("Poly1305");
+                break;
+            }
+            case EncryptionAlgorithm._3DES_EDE_CBC:
+            {
+                helper.createCipher("DESede/CBC/NoPadding");
+                break;
+            }
+            case EncryptionAlgorithm.AES_128_CBC:
+            case EncryptionAlgorithm.AES_256_CBC:
+            {
+                helper.createCipher("AES/CBC/NoPadding");
                 break;
             }
             case EncryptionAlgorithm.AES_128_CCM:
@@ -365,16 +396,43 @@ public class JcaTlsCrypto
                 helper.createCipher("AES/GCM/NoPadding");
                 break;
             }
+            case EncryptionAlgorithm.AES_128_OCB_TAGLEN96:
+            case EncryptionAlgorithm.AES_256_OCB_TAGLEN96:
+            {
+                helper.createCipher("AES/OCB/NoPadding");
+                break;
+            }
+            case EncryptionAlgorithm.ARIA_128_CBC:
+            case EncryptionAlgorithm.ARIA_256_CBC:
+            {
+                helper.createCipher("ARIA/CBC/NoPadding");
+                break;
+            }
             case EncryptionAlgorithm.ARIA_128_GCM:
             case EncryptionAlgorithm.ARIA_256_GCM:
             {
                 helper.createCipher("ARIA/GCM/NoPadding");
                 break;
             }
+            case EncryptionAlgorithm.CAMELLIA_128_CBC:
+            case EncryptionAlgorithm.CAMELLIA_256_CBC:
+            {
+                helper.createCipher("Camellia/CBC/NoPadding");
+                break;
+            }
             case EncryptionAlgorithm.CAMELLIA_128_GCM:
             case EncryptionAlgorithm.CAMELLIA_256_GCM:
             {
-                helper.createCipher("CAMELLIA/GCM/NoPadding");
+                helper.createCipher("Camellia/GCM/NoPadding");
+                break;
+            }
+            case EncryptionAlgorithm.SEED_CBC:
+            {
+                helper.createCipher("SEED/CBC/NoPadding");
+                break;
+            }
+            case EncryptionAlgorithm.NULL:
+            {
                 break;
             }
 
@@ -384,14 +442,24 @@ public class JcaTlsCrypto
             case EncryptionAlgorithm.RC2_CBC_40:
             case EncryptionAlgorithm.RC4_128:
             case EncryptionAlgorithm.RC4_40:
-                return false;
+            default:
+            {
+                result = false;
+                break;
+            }
             }
         }
         catch (GeneralSecurityException e)
         {
-            return false;
+            result = false;
         }
-        return true;
+
+        synchronized (supportedEncryptionAlgorithms)
+        {
+            supportedEncryptionAlgorithms.put(key, Boolean.valueOf(result));
+        }
+
+        return result;
     }
 
     public boolean hasHashAlgorithm(short hashAlgorithm)
@@ -425,11 +493,10 @@ public class JcaTlsCrypto
             return false;
         }
 
-        Integer key = Integers.valueOf(namedGroup);
-
-        synchronized (supportedGroups)
+        final Integer key = Integers.valueOf(namedGroup);
+        synchronized (supportedNamedGroups)
         {
-            Boolean cached = (Boolean)supportedGroups.get(key);
+            Boolean cached = (Boolean)supportedNamedGroups.get(key);
             if (cached != null)
             {
                 return cached.booleanValue();
@@ -443,16 +510,18 @@ public class JcaTlsCrypto
             {
             case NamedGroup.x25519:
             {
+//                helper.createAlgorithmParameters("X25519");
+                helper.createKeyAgreement("X25519");
                 helper.createKeyFactory("X25519");
                 helper.createKeyPairGenerator("X25519");
-                helper.createKeyAgreement("X25519");
                 break;
             }
             case NamedGroup.x448:
             {
+//                helper.createAlgorithmParameters("X448");
+                helper.createKeyAgreement("X448");
                 helper.createKeyFactory("X448");
                 helper.createKeyPairGenerator("X448");
-                helper.createKeyAgreement("X448");
                 break;
             }
             default:
@@ -467,9 +536,9 @@ public class JcaTlsCrypto
             result = false;
         }
 
-        synchronized (supportedGroups)
+        synchronized (supportedNamedGroups)
         {
-            supportedGroups.put(key, Boolean.valueOf(result));
+            supportedNamedGroups.put(key, Boolean.valueOf(result));
         }
 
         return result;
@@ -482,15 +551,32 @@ public class JcaTlsCrypto
 
     public boolean hasRSAEncryption()
     {
+        final String key = "KE_RSA";
+        synchronized (supportedOther)
+        {
+            Boolean cached = (Boolean)supportedOther.get(key);
+            if (cached != null)
+            {
+                return cached.booleanValue();
+            }
+        }
+
+        boolean result = true;
         try
         {
             createRSAEncryptionCipher();
-            return true;
         }
         catch (GeneralSecurityException e)
         {
-            return false;
+            result = false;
         }
+
+        synchronized (supportedOther)
+        {
+            supportedOther.put(key, Boolean.valueOf(result));
+        }
+
+        return result;
     }
 
     public boolean hasSignatureAlgorithm(short signatureAlgorithm)

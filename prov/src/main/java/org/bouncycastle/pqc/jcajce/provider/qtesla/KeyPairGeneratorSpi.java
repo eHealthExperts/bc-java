@@ -24,9 +24,6 @@ public class KeyPairGeneratorSpi
 
     static
     {
-        catLookup.put(QTESLASecurityCategory.getName(QTESLASecurityCategory.HEURISTIC_I), Integers.valueOf(QTESLASecurityCategory.HEURISTIC_I));
-        catLookup.put(QTESLASecurityCategory.getName(QTESLASecurityCategory.HEURISTIC_III_SIZE), Integers.valueOf(QTESLASecurityCategory.HEURISTIC_III_SIZE));
-        catLookup.put(QTESLASecurityCategory.getName(QTESLASecurityCategory.HEURISTIC_III_SPEED), Integers.valueOf(QTESLASecurityCategory.HEURISTIC_III_SPEED));
         catLookup.put(QTESLASecurityCategory.getName(QTESLASecurityCategory.PROVABLY_SECURE_I), Integers.valueOf(QTESLASecurityCategory.PROVABLY_SECURE_I));
         catLookup.put(QTESLASecurityCategory.getName(QTESLASecurityCategory.PROVABLY_SECURE_III), Integers.valueOf(QTESLASecurityCategory.PROVABLY_SECURE_III));
     }
@@ -71,7 +68,7 @@ public class KeyPairGeneratorSpi
     {
         if (!initialised)
         {
-            param = new QTESLAKeyGenerationParameters(QTESLASecurityCategory.PROVABLY_SECURE_I, random);
+            param = new QTESLAKeyGenerationParameters(QTESLASecurityCategory.PROVABLY_SECURE_III, random);
 
             engine.init(param);
             initialised = true;

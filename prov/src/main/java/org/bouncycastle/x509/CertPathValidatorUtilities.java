@@ -226,7 +226,7 @@ class CertPathValidatorUtilities
         }
 
         ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-        ASN1OutputStream aOut = new ASN1OutputStream(bOut);
+        ASN1OutputStream aOut = ASN1OutputStream.create(bOut);
 
         Enumeration e = qualifiers.getObjects();
 
@@ -733,26 +733,19 @@ class CertPathValidatorUtilities
             }
         }
 
-        // for reason keyCompromise, caCompromise, aACompromise or
-        // unspecified
-        if (!(validDate.getTime() < crl_entry.getRevocationDate().getTime())
-            || reasonCode == null
-            || reasonCode.getValue().intValue() == 0
-            || reasonCode.getValue().intValue() == 1
-            || reasonCode.getValue().intValue() == 2
-            || reasonCode.getValue().intValue() == 8)
-        {
+        int reasonCodeValue = (null == reasonCode)
+            ?   CRLReason.unspecified
+            :   reasonCode.intValueExact();
 
-            // (i) or (j) (1)
-            if (reasonCode != null)
-            {
-                certStatus.setCertStatus(reasonCode.getValue().intValue());
-            }
-            // (i) or (j) (2)
-            else
-            {
-                certStatus.setCertStatus(CRLReason.unspecified);
-            }
+        // for reason keyCompromise, caCompromise, aACompromise or unspecified
+        if (!(validDate.getTime() < crl_entry.getRevocationDate().getTime())
+            || reasonCodeValue == CRLReason.unspecified
+            || reasonCodeValue == CRLReason.keyCompromise
+            || reasonCodeValue == CRLReason.cACompromise
+            || reasonCodeValue == CRLReason.aACompromise)
+        {
+            // (i) or (j)
+            certStatus.setCertStatus(reasonCodeValue);
             certStatus.setRevocationDate(crl_entry.getRevocationDate());
         }
     }

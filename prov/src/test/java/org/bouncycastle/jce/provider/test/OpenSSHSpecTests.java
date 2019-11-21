@@ -7,9 +7,9 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 
+import org.bouncycastle.jcajce.spec.OpenSSHPrivateKeySpec;
+import org.bouncycastle.jcajce.spec.OpenSSHPublicKeySpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jce.spec.OpenSSHPrivateKeySpec;
-import org.bouncycastle.jce.spec.OpenSSHPublicKeySpec;
 import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Base64;
 import org.bouncycastle.util.encoders.Hex;
@@ -181,9 +181,12 @@ public class OpenSSHSpecTests
 
         isTrue("EDPublic key not same", Arrays.areEqual(rawPub, edDsaPublicKeySpec.getEncoded()));
 
-        isTrue("EDPrivate key not same", Arrays.areEqual(
-            Hex.decode("6f70656e7373682d6b65792d763100000000046e6f6e65000000046e6f6e650000000000000001000000330000000b7373682d6564323535313900000020ce02695ed641ccb4961b7485c9605dfe0e972bf3befd9f9d4bd0dc9f0862c5850000008300ff00ff00ff00ff0000000b7373682d6564323535313900000020ce02695ed641ccb4961b7485c9605dfe0e972bf3befd9f9d4bd0dc9f0862c58500000040f80531de477603ec2150aaeb33b5f2f92be6120f899118b0706fb8c7897c4824ce02695ed641ccb4961b7485c9605dfe0e972bf3befd9f9d4bd0dc9f0862c58500000000"),
-            edDsaPrivateKeySpec.getEncoded()));
+        // EdEc private keys include a random check int, so we check around it.
+        byte[] enc = edDsaPrivateKeySpec.getEncoded();
+        byte[] base = Hex.decode("6f70656e7373682d6b65792d763100000000046e6f6e65000000046e6f6e650000000000000001000000330000000b7373682d6564323535313900000020ce02695ed641ccb4961b7485c9605dfe0e972bf3befd9f9d4bd0dc9f0862c58500000088");
+        byte[] tail = Hex.decode("0000000b7373682d6564323535313900000020ce02695ed641ccb4961b7485c9605dfe0e972bf3befd9f9d4bd0dc9f0862c58500000040f80531de477603ec2150aaeb33b5f2f92be6120f899118b0706fb8c7897c4824ce02695ed641ccb4961b7485c9605dfe0e972bf3befd9f9d4bd0dc9f0862c585000000000102030405");
+        isTrue("EDPrivate key base not same", Arrays.areEqual(base, Arrays.copyOfRange(enc, 0, base.length)));
+        isTrue("EDPrivate key tail not same", Arrays.areEqual(tail, Arrays.copyOfRange(enc, base.length + 8, enc.length)));
 
         isEquals("ssh-ed25519", edDsaPublicKeySpec.getType());
     }

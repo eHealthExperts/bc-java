@@ -41,7 +41,7 @@ public class SignatureSpi
         if (publicKey instanceof BCqTESLAPublicKey)
         {
             CipherParameters param = ((BCqTESLAPublicKey)publicKey).getKeyParams();
-            
+
             digest.reset();
             signer.init(false, param);
         }
@@ -147,46 +147,20 @@ public class SignatureSpi
         }
     }
 
-    static public class HeuristicI
-        extends SignatureSpi
-    {
-        public HeuristicI()
-        {
-            super(QTESLASecurityCategory.getName(QTESLASecurityCategory.HEURISTIC_I), new NullDigest(), new QTESLASigner());
-        }
-    }
 
-    static public class HeuristicIIISize
+    static public class PI
         extends SignatureSpi
     {
-        public HeuristicIIISize()
-        {
-            super(QTESLASecurityCategory.getName(QTESLASecurityCategory.HEURISTIC_III_SIZE), new NullDigest(), new QTESLASigner());
-        }
-    }
-
-    static public class HeuristicIIISpeed
-        extends SignatureSpi
-    {
-        public HeuristicIIISpeed()
-        {
-            super(QTESLASecurityCategory.getName(QTESLASecurityCategory.HEURISTIC_III_SPEED), new NullDigest(), new QTESLASigner());
-        }
-    }
-
-    static public class ProvablySecureI
-        extends SignatureSpi
-    {
-        public ProvablySecureI()
+        public PI()
         {
             super(QTESLASecurityCategory.getName(QTESLASecurityCategory.PROVABLY_SECURE_I), new NullDigest(), new QTESLASigner());
         }
     }
 
-    static public class ProvablySecureIII
+    static public class PIII
         extends SignatureSpi
     {
-        public ProvablySecureIII()
+        public PIII()
         {
             super(QTESLASecurityCategory.getName(QTESLASecurityCategory.PROVABLY_SECURE_III), new NullDigest(), new QTESLASigner());
         }

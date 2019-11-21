@@ -926,7 +926,7 @@ public class X509Name
             
             for (int i = 0; i != ordering.size(); i++)
             {
-                ASN1EncodableVector     v = new ASN1EncodableVector();
+                ASN1EncodableVector     v = new ASN1EncodableVector(2);
                 ASN1ObjectIdentifier     oid = (ASN1ObjectIdentifier)ordering.elementAt(i);
 
                 v.add(oid);
@@ -943,8 +943,8 @@ public class X509Name
                 else
                 {
                     vec.add(new DERSet(sVec));
+
                     sVec = new ASN1EncodableVector();
-                    
                     sVec.add(new DERSequence(v));
                 }
                 
@@ -1186,7 +1186,7 @@ public class X509Name
     {
         try
         {
-            return ASN1Primitive.fromByteArray(Hex.decode(oValue.substring(1)));
+            return ASN1Primitive.fromByteArray(Hex.decodeStrict(oValue, 1, oValue.length() - 1));
         }
         catch (IOException e)
         {

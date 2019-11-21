@@ -26,12 +26,18 @@ class ConstructedOctetStream
                 return -1;
             }
 
-            ASN1OctetStringParser s = (ASN1OctetStringParser)_parser.readObject();
-
-            if (s == null)
+            ASN1Encodable asn1Obj = _parser.readObject();
+            if (asn1Obj == null)
             {
                 return -1;
             }
+
+            if (!(asn1Obj instanceof ASN1OctetStringParser))
+            {
+                throw new IOException("unknown object encountered: " + asn1Obj.getClass());
+            }
+
+            ASN1OctetStringParser s = (ASN1OctetStringParser)asn1Obj;
 
             _first = false;
             _currentStream = s.getOctetStream();
@@ -54,13 +60,20 @@ class ConstructedOctetStream
             }
             else
             {
-                ASN1OctetStringParser aos = (ASN1OctetStringParser)_parser.readObject();
+                ASN1Encodable asn1Obj = _parser.readObject();
 
-                if (aos == null)
+                if (asn1Obj == null)
                 {
                     _currentStream = null;
                     return totalRead < 1 ? -1 : totalRead;
                 }
+
+                if (!(asn1Obj instanceof ASN1OctetStringParser))
+                {
+                    throw new IOException("unknown object encountered: " + asn1Obj.getClass());
+                }
+
+                ASN1OctetStringParser aos = (ASN1OctetStringParser)asn1Obj;
 
                 _currentStream = aos.getOctetStream();
             }
@@ -77,13 +90,20 @@ class ConstructedOctetStream
                 return -1;
             }
 
-            ASN1OctetStringParser s = (ASN1OctetStringParser)_parser.readObject();
+            ASN1Encodable asn1Obj = _parser.readObject();
     
-            if (s == null)
+            if (asn1Obj == null)
             {
                 return -1;
             }
-    
+
+            if (!(asn1Obj instanceof ASN1OctetStringParser))
+            {
+                throw new IOException("unknown object encountered: " + asn1Obj.getClass());
+            }
+
+            ASN1OctetStringParser s = (ASN1OctetStringParser)asn1Obj;
+
             _first = false;
             _currentStream = s.getOctetStream();
         }
@@ -97,13 +117,20 @@ class ConstructedOctetStream
                 return b;
             }
 
-            ASN1OctetStringParser s = (ASN1OctetStringParser)_parser.readObject();
+            ASN1Encodable asn1Obj = _parser.readObject();
 
-            if (s == null)
+            if (asn1Obj == null)
             {
                 _currentStream = null;
                 return -1;
             }
+
+            if (!(asn1Obj instanceof ASN1OctetStringParser))
+            {
+                throw new IOException("unknown object encountered: " + asn1Obj.getClass());
+            }
+
+            ASN1OctetStringParser s = (ASN1OctetStringParser)asn1Obj;
 
             _currentStream = s.getOctetStream();
         }

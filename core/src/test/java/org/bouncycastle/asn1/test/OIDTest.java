@@ -4,10 +4,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OutputStream;
-import org.bouncycastle.asn1.DEROutputStream;
+import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.util.encoders.Hex;
 import org.bouncycastle.util.test.SimpleTest;
@@ -42,13 +43,8 @@ public class OIDTest
         {
             fail("oid ID didn't match", o, encO);
         }
-        
-        ByteArrayOutputStream    bOut = new ByteArrayOutputStream();
-        DEROutputStream          dOut = new DEROutputStream(bOut);
 
-        dOut.writeObject(o);
-
-        byte[]                    bytes = bOut.toByteArray();
+        byte[] bytes = o.getEncoded(ASN1Encoding.DER);
 
         if (bytes.length != enc.length)
         {
@@ -68,17 +64,8 @@ public class OIDTest
         String  oid)
         throws IOException
     {
-        ASN1ObjectIdentifier     o = new ASN1ObjectIdentifier(oid);
-        ByteArrayOutputStream   bOut = new ByteArrayOutputStream();
-        ASN1OutputStream        aOut = new ASN1OutputStream(bOut);
-        
-        aOut.writeObject(o);
-        
-        ByteArrayInputStream    bIn = new ByteArrayInputStream(bOut.toByteArray());
-        ASN1InputStream         aIn = new ASN1InputStream(bIn);
-        
-        o = (ASN1ObjectIdentifier)aIn.readObject();
-        
+        ASN1ObjectIdentifier o = new ASN1ObjectIdentifier(oid);
+        o = (ASN1ObjectIdentifier)ASN1Primitive.fromByteArray(o.getEncoded());
         if (!o.getId().equals(oid))
         {
             fail("failed oid check for " + oid);
@@ -126,6 +113,10 @@ public class OIDTest
         
         validOidCheck(PKCSObjectIdentifiers.pkcs_9_at_contentType.getId());
         validOidCheck("0.1");
+        validOidCheck("1.0");
+        validOidCheck("1.0.2");
+        validOidCheck("1.0.20");
+        validOidCheck("1.0.200");
         validOidCheck("1.1.127.32512.8323072.2130706432.545460846592.139637976727552.35747322042253312.9151314442816847872");
         validOidCheck("1.2.123.12345678901.1.1.1");
         validOidCheck("2.25.196556539987194312349856245628873852187.1");
@@ -134,6 +125,11 @@ public class OIDTest
         invalidOidCheck("1");
         invalidOidCheck("2");
         invalidOidCheck("3.1");
+        invalidOidCheck("0.01");
+        invalidOidCheck("00.1");
+        invalidOidCheck("1.00.2");
+        invalidOidCheck("1.0.02");
+        invalidOidCheck("1.2.00");
         invalidOidCheck("..1");
         invalidOidCheck("192.168.1.1");
         invalidOidCheck(".123452");

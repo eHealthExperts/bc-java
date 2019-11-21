@@ -11,6 +11,7 @@ import java.security.spec.X509EncodedKeySpec;
 
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
@@ -23,8 +24,8 @@ import org.bouncycastle.crypto.util.OpenSSHPrivateKeyUtil;
 import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil;
 import org.bouncycastle.jcajce.provider.asymmetric.util.BaseKeyFactorySpi;
 import org.bouncycastle.jcajce.provider.util.AsymmetricKeyInfoConverter;
-import org.bouncycastle.jce.spec.OpenSSHPrivateKeySpec;
-import org.bouncycastle.jce.spec.OpenSSHPublicKeySpec;
+import org.bouncycastle.jcajce.spec.OpenSSHPrivateKeySpec;
+import org.bouncycastle.jcajce.spec.OpenSSHPublicKeySpec;
 import org.bouncycastle.util.encoders.Hex;
 
 public class KeyFactorySpi
@@ -80,7 +81,7 @@ public class KeyFactorySpi
                 DEROctetString val = (DEROctetString)seq.getObjectAt(2);
                 ASN1InputStream in = new ASN1InputStream(val.getOctets());
 
-                return new OpenSSHPrivateKeySpec(OpenSSHPrivateKeyUtil.encodePrivateKey(new Ed25519PrivateKeyParameters(((DEROctetString)in.readObject()).getOctets(), 0)));
+                return new OpenSSHPrivateKeySpec(OpenSSHPrivateKeyUtil.encodePrivateKey(new Ed25519PrivateKeyParameters(ASN1OctetString.getInstance(in.readObject()).getOctets(), 0)));
             }
             catch (IOException ex)
             {
@@ -93,6 +94,38 @@ public class KeyFactorySpi
             try
             {
                 return new OpenSSHPublicKeySpec(OpenSSHPublicKeyUtil.encodePublicKey(new Ed25519PublicKeyParameters(key.getEncoded(), Ed25519Prefix.length)));
+            }
+            catch (IOException ex)
+            {
+                throw new InvalidKeySpecException(ex.getMessage(), ex.getCause());
+            }
+        }
+        if (spec.isAssignableFrom(org.bouncycastle.jce.spec.OpenSSHPrivateKeySpec.class) && key instanceof BCEdDSAPrivateKey)
+        {
+            try
+            {
+                //
+                // The DEROctetString at element 2 is an encoded DEROctetString with the private key value
+                // within it.
+                //
+
+                ASN1Sequence seq = ASN1Sequence.getInstance(key.getEncoded());
+                DEROctetString val = (DEROctetString)seq.getObjectAt(2);
+                ASN1InputStream in = new ASN1InputStream(val.getOctets());
+
+                return new org.bouncycastle.jce.spec.OpenSSHPrivateKeySpec(OpenSSHPrivateKeyUtil.encodePrivateKey(new Ed25519PrivateKeyParameters(ASN1OctetString.getInstance(in.readObject()).getOctets(), 0)));
+            }
+            catch (IOException ex)
+            {
+                throw new InvalidKeySpecException(ex.getMessage(), ex.getCause());
+            }
+
+        }
+        else if (spec.isAssignableFrom(org.bouncycastle.jce.spec.OpenSSHPublicKeySpec.class) && key instanceof BCEdDSAPublicKey)
+        {
+            try
+            {
+                return new org.bouncycastle.jce.spec.OpenSSHPublicKeySpec(OpenSSHPublicKeyUtil.encodePublicKey(new Ed25519PublicKeyParameters(key.getEncoded(), Ed25519Prefix.length)));
             }
             catch (IOException ex)
             {

@@ -6,5 +6,5 @@ cobertura {
    coverageDirs = [
        "${rootProject.projectDir}/core/build/classes/main",
        "${rootProject.projectDir}/prov/build/classes/main"
-  ] 
+  ]
 }

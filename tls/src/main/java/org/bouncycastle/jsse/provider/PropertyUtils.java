@@ -93,15 +93,41 @@ class PropertyUtils
         return defaultValue;
     }
 
+    static String getStringSecurityProperty(String propertyName, String defaultValue)
+    {
+        String propertyValue = getSecurityProperty(propertyName);
+        if (null != propertyValue)
+        {
+            LOG.log(Level.INFO, "Found string security property [" + propertyName + "]: " + propertyValue);
+            return propertyValue;
+        }
+        LOG.log(Level.WARNING, "String security property [" + propertyName + "] defaulted to: " + defaultValue);
+        return defaultValue;
+    }
+
     static String getStringSystemProperty(String propertyName)
     {
         String propertyValue = getSystemProperty(propertyName);
         if (null != propertyValue)
         {
-            LOG.log(Level. INFO, "Found string system property [" + propertyName + "]: " + propertyValue);
+            LOG.log(Level.INFO, "Found string system property [" + propertyName + "]: " + propertyValue);
             return propertyValue;
         }
         return null;
+    }
+
+    static String[] getStringArraySecurityProperty(String propertyName, String defaultValue)
+    {
+        String propertyValue = getStringSecurityProperty(propertyName, defaultValue);
+
+        return parseStringArray(propertyValue);
+    }
+
+    static String[] getStringArraySystemProperty(String propertyName)
+    {
+        String propertyValue = getStringSystemProperty(propertyName);
+
+        return parseStringArray(propertyValue);
     }
 
     private static String getRangeString(int minimumValue, int maximumValue)
@@ -119,5 +145,28 @@ class PropertyUtils
             sb.append(maximumValue);
         }
         return sb.toString();
+    }
+
+    private static String[] parseStringArray(String propertyValue)
+    {
+        if (null == propertyValue)
+        {
+            return null;
+        }
+
+        String[] entries = JsseUtils.stripDoubleQuotes(propertyValue.trim()).split(",");
+        String[] result = new String[entries.length];
+        int count = 0;
+        for (String entry : entries)
+        {
+            entry = entry.trim();
+            if (entry.length() < 1)
+            {
+                continue;
+            }
+
+            result[count++] = entry;
+        }
+        return JsseUtils.resize(result, count);
     }
 }

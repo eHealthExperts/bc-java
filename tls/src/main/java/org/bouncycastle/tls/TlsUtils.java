@@ -530,7 +530,7 @@ public class TlsUtils
         {
             throw new TlsFatalAlert(AlertDescription.decode_error);
         }
-        return Arrays.copyOfRange(buf, 1, buf.length);
+        return copyOfRangeExact(buf, 1, buf.length);
     }
 
     public static byte[] decodeOpaque16(byte[] buf)
@@ -555,7 +555,7 @@ public class TlsUtils
         {
             throw new TlsFatalAlert(AlertDescription.decode_error);
         }
-        return Arrays.copyOfRange(buf, 2, buf.length);
+        return copyOfRangeExact(buf, 2, buf.length);
     }
 
     public static short decodeUint8(byte[] buf) throws IOException
@@ -1404,11 +1404,25 @@ public class TlsUtils
         return false;
     }
 
+    public static TlsSecret PRF(SecurityParameters securityParameters, TlsSecret secret, String asciiLabel, byte[] seed,
+        int length)
+    {
+        return secret.deriveUsingPRF(securityParameters.getPrfAlgorithm(), asciiLabel, seed, length);
+    }
+
     public static TlsSecret PRF(TlsContext context, TlsSecret secret, String asciiLabel, byte[] seed, int length)
     {
         int prfAlgorithm = context.getSecurityParametersHandshake().getPrfAlgorithm();
 
         return secret.deriveUsingPRF(prfAlgorithm, asciiLabel, seed, length);
+    }
+
+    public static byte[] copyOfRangeExact(byte[] original, int from, int to)
+    {
+        int newLength = to - from;
+        byte[] copy = new byte[newLength];
+        System.arraycopy(original, from, copy, 0, newLength);
+        return copy;
     }
 
     static byte[] concat(byte[] a, byte[] b)
@@ -1452,6 +1466,25 @@ public class TlsUtils
             }
         }
         return EMPTY_BYTES;
+    }
+
+    public static byte[] calculateExporterSeed(SecurityParameters securityParameters, byte[] context_value)
+    {
+        byte[] cr = securityParameters.getClientRandom(), sr = securityParameters.getServerRandom();
+        if (null == context_value)
+        {
+            return Arrays.concatenate(cr, sr);
+        }
+
+        if (!TlsUtils.isValidUint16(context_value.length))
+        {
+            throw new IllegalArgumentException("'context_value' must have length less than 2^16 (or be null)");
+        }
+
+        byte[] context_value_length = new byte[2];
+        TlsUtils.writeUint16(context_value.length, context_value_length, 0);
+
+        return Arrays.concatenate(cr, sr, context_value_length, context_value);
     }
 
     static TlsSecret calculateMasterSecret(TlsContext context, TlsSecret preMasterSecret)
@@ -1803,45 +1836,9 @@ public class TlsUtils
 
     public static int getCipherType(int cipherSuite)
     {
-        switch (getEncryptionAlgorithm(cipherSuite))
-        {
-        case EncryptionAlgorithm.AES_128_CCM:
-        case EncryptionAlgorithm.AES_128_CCM_8:
-        case EncryptionAlgorithm.AES_128_GCM:
-        case EncryptionAlgorithm.AES_128_OCB_TAGLEN96:
-        case EncryptionAlgorithm.AES_256_CCM:
-        case EncryptionAlgorithm.AES_256_CCM_8:
-        case EncryptionAlgorithm.AES_256_GCM:
-        case EncryptionAlgorithm.ARIA_128_GCM:
-        case EncryptionAlgorithm.ARIA_256_GCM:
-        case EncryptionAlgorithm.AES_256_OCB_TAGLEN96:
-        case EncryptionAlgorithm.CAMELLIA_128_GCM:
-        case EncryptionAlgorithm.CAMELLIA_256_GCM:
-        case EncryptionAlgorithm.CHACHA20_POLY1305:
-            return CipherType.aead;
+        int encryptionAlgorithm = getEncryptionAlgorithm(cipherSuite);
 
-        case EncryptionAlgorithm.RC2_CBC_40:
-        case EncryptionAlgorithm.IDEA_CBC:
-        case EncryptionAlgorithm.DES40_CBC:
-        case EncryptionAlgorithm.DES_CBC:
-        case EncryptionAlgorithm._3DES_EDE_CBC:
-        case EncryptionAlgorithm.AES_128_CBC:
-        case EncryptionAlgorithm.AES_256_CBC:
-        case EncryptionAlgorithm.ARIA_128_CBC:
-        case EncryptionAlgorithm.ARIA_256_CBC:
-        case EncryptionAlgorithm.CAMELLIA_128_CBC:
-        case EncryptionAlgorithm.CAMELLIA_256_CBC:
-        case EncryptionAlgorithm.SEED_CBC:
-            return CipherType.block;
-
-        case EncryptionAlgorithm.NULL:
-        case EncryptionAlgorithm.RC4_40:
-        case EncryptionAlgorithm.RC4_128:
-            return CipherType.stream;
-
-        default:
-            return -1;
-        }
+        return getEncryptionAlgorithmType(encryptionAlgorithm);
     }
 
     public static int getEncryptionAlgorithm(int cipherSuite)
@@ -2196,6 +2193,49 @@ public class TlsUtils
         case CipherSuite.TLS_DHE_RSA_WITH_SEED_CBC_SHA:
         case CipherSuite.TLS_RSA_WITH_SEED_CBC_SHA:
             return EncryptionAlgorithm.SEED_CBC;
+
+        default:
+            return -1;
+        }
+    }
+
+    public static int getEncryptionAlgorithmType(int encryptionAlgorithm)
+    {
+        switch (encryptionAlgorithm)
+        {
+        case EncryptionAlgorithm.AES_128_CCM:
+        case EncryptionAlgorithm.AES_128_CCM_8:
+        case EncryptionAlgorithm.AES_128_GCM:
+        case EncryptionAlgorithm.AES_128_OCB_TAGLEN96:
+        case EncryptionAlgorithm.AES_256_CCM:
+        case EncryptionAlgorithm.AES_256_CCM_8:
+        case EncryptionAlgorithm.AES_256_GCM:
+        case EncryptionAlgorithm.ARIA_128_GCM:
+        case EncryptionAlgorithm.ARIA_256_GCM:
+        case EncryptionAlgorithm.AES_256_OCB_TAGLEN96:
+        case EncryptionAlgorithm.CAMELLIA_128_GCM:
+        case EncryptionAlgorithm.CAMELLIA_256_GCM:
+        case EncryptionAlgorithm.CHACHA20_POLY1305:
+            return CipherType.aead;
+
+        case EncryptionAlgorithm.RC2_CBC_40:
+        case EncryptionAlgorithm.IDEA_CBC:
+        case EncryptionAlgorithm.DES40_CBC:
+        case EncryptionAlgorithm.DES_CBC:
+        case EncryptionAlgorithm._3DES_EDE_CBC:
+        case EncryptionAlgorithm.AES_128_CBC:
+        case EncryptionAlgorithm.AES_256_CBC:
+        case EncryptionAlgorithm.ARIA_128_CBC:
+        case EncryptionAlgorithm.ARIA_256_CBC:
+        case EncryptionAlgorithm.CAMELLIA_128_CBC:
+        case EncryptionAlgorithm.CAMELLIA_256_CBC:
+        case EncryptionAlgorithm.SEED_CBC:
+            return CipherType.block;
+
+        case EncryptionAlgorithm.NULL:
+        case EncryptionAlgorithm.RC4_40:
+        case EncryptionAlgorithm.RC4_128:
+            return CipherType.stream;
 
         default:
             return -1;
@@ -3394,10 +3434,15 @@ public class TlsUtils
 
     public static int[] getSupportedCipherSuites(TlsCrypto crypto, int[] suites)
     {
-        int[] supported = new int[suites.length];
+        return getSupportedCipherSuites(crypto, suites, suites.length);
+    }
+
+    public static int[] getSupportedCipherSuites(TlsCrypto crypto, int[] suites, int suitesCount)
+    {
+        int[] supported = new int[suitesCount];
         int count = 0;
 
-        for (int i = 0; i < suites.length; ++i)
+        for (int i = 0; i < suitesCount; ++i)
         {
             int suite = suites[i];
             if (isSupportedCipherSuite(crypto, suite))
@@ -3406,7 +3451,7 @@ public class TlsUtils
             }
         }
 
-        if (count < supported.length)
+        if (count < suitesCount)
         {
             supported = Arrays.copyOf(supported, count);
         }
@@ -3997,7 +4042,7 @@ public class TlsUtils
 
     private static void checkDowngradeMarker(byte[] randomBlock, byte[] downgradeMarker) throws IOException
     {
-        byte[] bytes = Arrays.copyOfRange(randomBlock, randomBlock.length - downgradeMarker.length, randomBlock.length);
+        byte[] bytes = copyOfRangeExact(randomBlock, randomBlock.length - downgradeMarker.length, randomBlock.length);
         if (Arrays.constantTimeAreEqual(bytes, downgradeMarker))
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);

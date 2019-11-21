@@ -11,6 +11,9 @@ import java.util.Vector;
 
 import org.bouncycastle.util.Arrays;
 
+/**
+ * @deprecated Migrate to the (D)TLS API in org.bouncycastle.tls (bctls jar).
+ */
 public class TlsClientProtocol
     extends TlsProtocol
 {
@@ -87,6 +90,8 @@ public class TlsClientProtocol
 
         this.tlsClient.init(tlsClientContext);
         this.recordStream.init(tlsClientContext);
+
+        tlsClient.notifyCloseHandle(this);
 
         TlsSession sessionToResume = tlsClient.getSessionToResume();
         if (sessionToResume != null && sessionToResume.isResumable())

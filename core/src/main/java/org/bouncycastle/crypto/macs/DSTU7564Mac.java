@@ -38,6 +38,9 @@ public class DSTU7564Mac
     public void init(CipherParameters params)
         throws IllegalArgumentException
     {
+        paddedKey = null;
+        reset();
+
         if (params instanceof KeyParameter)
         {
             byte[] key = ((KeyParameter)params).getKey();
@@ -111,7 +114,11 @@ public class DSTU7564Mac
 
         inputLength = 0;
 
-        return engine.doFinal(out, outOff);
+        int res = engine.doFinal(out, outOff);
+
+        reset();
+        
+        return res;
     }
 
     public void reset()
@@ -145,13 +152,13 @@ public class DSTU7564Mac
     private byte[] padKey(byte[] in)
     {
         int paddedLen = ((in.length + engine.getByteLength() - 1) / engine.getByteLength()) * engine.getByteLength();
-
-        int extra = engine.getByteLength() - (int)(in.length % engine.getByteLength());
+        
+        int extra = paddedLen - in.length;
         if (extra < 13)  // terminator byte + 96 bits of length
         {
             paddedLen += engine.getByteLength();
         }
-
+  
         byte[] padded = new byte[paddedLen];
 
         System.arraycopy(in, 0, padded, 0, in.length);

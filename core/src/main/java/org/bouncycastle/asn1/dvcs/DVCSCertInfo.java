@@ -73,7 +73,7 @@ public class DVCSCertInfo
         try
         {
             ASN1Integer encVersion = ASN1Integer.getInstance(x);
-            this.version = encVersion.getValue().intValue();
+            this.version = encVersion.intValueExact();
             x = seq.getObjectAt(i++);
         }
         catch (IllegalArgumentException e)
@@ -154,8 +154,7 @@ public class DVCSCertInfo
 
     public ASN1Primitive toASN1Primitive()
     {
-
-        ASN1EncodableVector v = new ASN1EncodableVector();
+        ASN1EncodableVector v = new ASN1EncodableVector(10);
 
         if (version != DEFAULT_VERSION)
         {

@@ -44,21 +44,14 @@ public final class QTESLAKeyPairGenerator
 
         switch (securityCategory)
         {
-        case QTESLASecurityCategory.HEURISTIC_I:
-            QTESLA.generateKeyPairI(publicKey, privateKey, secureRandom);
-            break;
-        case QTESLASecurityCategory.HEURISTIC_III_SIZE:
-            QTESLA.generateKeyPairIIISize(publicKey, privateKey, secureRandom);
-            break;
-        case QTESLASecurityCategory.HEURISTIC_III_SPEED:
-            QTESLA.generateKeyPairIIISpeed(publicKey, privateKey, secureRandom);
-            break;
         case QTESLASecurityCategory.PROVABLY_SECURE_I:
-            QTESLA.generateKeyPairIP(publicKey, privateKey, secureRandom);
+            QTesla1p.generateKeyPair(publicKey, privateKey, secureRandom);
             break;
+
         case QTESLASecurityCategory.PROVABLY_SECURE_III:
-            QTESLA.generateKeyPairIIIP(publicKey, privateKey, secureRandom);
+            QTesla3p.generateKeyPair(publicKey, privateKey, secureRandom);
             break;
+
         default:
             throw new IllegalArgumentException("unknown security category: " + securityCategory);
         }

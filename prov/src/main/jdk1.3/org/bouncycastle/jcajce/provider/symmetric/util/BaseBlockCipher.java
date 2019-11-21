@@ -32,6 +32,7 @@ import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.OutputLengthException;
 import org.bouncycastle.crypto.engines.DSTU7624Engine;
+import org.bouncycastle.crypto.modes.AEADCipher;
 import org.bouncycastle.crypto.modes.AEADBlockCipher;
 import org.bouncycastle.crypto.modes.CBCBlockCipher;
 import org.bouncycastle.crypto.modes.CCMBlockCipher;
@@ -70,12 +71,14 @@ import org.bouncycastle.jcajce.PKCS12KeyWithParameters;
 import org.bouncycastle.jcajce.spec.AEADParameterSpec;
 import org.bouncycastle.jcajce.spec.GOST28147ParameterSpec;
 import org.bouncycastle.jcajce.spec.RepeatedSecretKeySpec;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Strings;
 
 public class BaseBlockCipher
     extends BaseWrapCipher
     implements PBE
 {
+    private static final int BUF_SIZE = 512;
     private static final Class gcmSpecClass = ClassUtil.loadClass(BaseBlockCipher.class, "javax.crypto.spec.GCMParameterSpec");
 
     //
@@ -149,6 +152,17 @@ public class BaseBlockCipher
     {
         this.baseEngine = engine.getUnderlyingCipher();
         this.ivLength = baseEngine.getBlockSize();
+        this.cipher = new AEADGenericBlockCipher(engine);
+    }
+
+    protected BaseBlockCipher(
+        AEADCipher engine,
+        boolean fixedIv,
+        int ivLength)
+    {
+        this.baseEngine = null;
+        this.fixedIv = fixedIv;
+        this.ivLength = ivLength;
         this.cipher = new AEADGenericBlockCipher(engine);
     }
 
@@ -449,7 +463,7 @@ public class BaseBlockCipher
                 cipher = new BufferedGenericBlockCipher(new BufferedBlockCipher(cipher.getUnderlyingCipher()));
             }
         }
-        else if (paddingName.equals("WITHCTS"))
+        else if (paddingName.equals("WITHCTS") || paddingName.equals("CTSPADDING") || paddingName.equals("CS3PADDING"))
         {
             cipher = new BufferedGenericBlockCipher(new CTSBlockCipher(cipher.getUnderlyingCipher()));
         }
@@ -517,7 +531,7 @@ public class BaseBlockCipher
         //
         // for RC5-64 we must have some default parameters
         //
-        if (params == null && baseEngine.getAlgorithmName().startsWith("RC5-64"))
+        if (params == null && (baseEngine != null && baseEngine.getAlgorithmName().startsWith("RC5-64")))
         {
             throw new InvalidAlgorithmParameterException("RC5 requires an RC5ParametersSpec to be passed in.");
         }
@@ -871,12 +885,16 @@ public class BaseBlockCipher
 
             if (cipher instanceof AEADGenericBlockCipher && aeadParams == null)
             {
-                AEADBlockCipher aeadCipher = ((AEADGenericBlockCipher)cipher).cipher;
+                AEADCipher aeadCipher = ((AEADGenericBlockCipher)cipher).cipher;
 
                 aeadParams = new AEADParameters((KeyParameter)ivParam.getParameters(), aeadCipher.getMac().length * 8, ivParam.getIV());
             }
         }
-        catch (final Exception e)
+        catch (IllegalArgumentException e)
+        {
+            throw new InvalidAlgorithmParameterException(e.getMessage());
+        }
+        catch (Exception e)
         {
             throw new InvalidKeyOrParametersException(e.getMessage(), e);
         }
@@ -1269,9 +1287,9 @@ public class BaseBlockCipher
             }
         }
 
-        private AEADBlockCipher cipher;
+        private AEADCipher cipher;
 
-        AEADGenericBlockCipher(AEADBlockCipher cipher)
+        AEADGenericBlockCipher(AEADCipher cipher)
         {
             this.cipher = cipher;
         }
@@ -1284,7 +1302,12 @@ public class BaseBlockCipher
 
         public String getAlgorithmName()
         {
-            return cipher.getUnderlyingCipher().getAlgorithmName();
+            if (cipher instanceof AEADBlockCipher)
+            {
+                return ((AEADBlockCipher)cipher).getUnderlyingCipher().getAlgorithmName();
+            }
+
+            return cipher.getAlgorithmName();
         }
 
         public boolean wrapOnNoPadding()
@@ -1294,7 +1317,12 @@ public class BaseBlockCipher
 
         public org.bouncycastle.crypto.BlockCipher getUnderlyingCipher()
         {
-            return cipher.getUnderlyingCipher();
+            if (cipher instanceof AEADBlockCipher)
+            {
+                return ((AEADBlockCipher)cipher).getUnderlyingCipher();
+            }
+
+            return null;
         }
 
         public int getOutputSize(int len)
@@ -1349,23 +1377,6 @@ public class BaseBlockCipher
                 }
                 throw new BadPaddingException(e.getMessage());
             }
-        }
-    }
-
-    private static class InvalidKeyOrParametersException
-        extends InvalidKeyException
-    {
-        private final Throwable cause;
-
-        InvalidKeyOrParametersException(String msg, Throwable cause)
-        {
-             super(msg);
-            this.cause = cause;
-        }
-
-        public Throwable getCause()
-        {
-            return cause;
         }
     }
 }

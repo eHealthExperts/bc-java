@@ -16,6 +16,7 @@ import java.util.logging.Logger;
 
 import javax.net.ssl.SSLException;
 import javax.net.ssl.X509ExtendedKeyManager;
+import javax.security.auth.x500.X500Principal;
 
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.jsse.BCSNIMatcher;
@@ -65,7 +66,7 @@ class ProvTlsServer
         super(manager.getContextData().getCrypto());
 
         this.manager = manager;
-        this.sslParameters = sslParameters;
+        this.sslParameters = sslParameters.copyForConnection();
 
         if (!manager.getEnableSessionCreation())
         {
@@ -95,12 +96,6 @@ class ProvTlsServer
     }
 
     @Override
-    public ProtocolVersion[] getSupportedVersions()
-    {
-        return manager.getContext().getSupportedVersions(sslParameters.getProtocols());
-    }
-
-    @Override
     protected Vector getProtocolNames()
     {
         return JsseUtils.getProtocolNames(sslParameters.getApplicationProtocols());
@@ -109,8 +104,13 @@ class ProvTlsServer
     @Override
     protected int[] getSupportedCipherSuites()
     {
-        return TlsUtils.getSupportedCipherSuites(manager.getContextData().getCrypto(),
-            manager.getContext().convertCipherSuites(sslParameters.getCipherSuites()));
+        return manager.getContext().getActiveCipherSuites(getCrypto(), sslParameters, getProtocolVersions());
+    }
+
+    @Override
+    protected ProtocolVersion[] getSupportedVersions()
+    {
+        return manager.getContext().getActiveProtocolVersions(sslParameters);
     }
 
     @Override
@@ -124,12 +124,12 @@ class ProvTlsServer
     {
         if (!selectCredentials(cipherSuite))
         {
-            LOG.finer("Server found no credentials for cipher suite: "
-                + manager.getContext().getCipherSuiteString(cipherSuite));
+            String cipherSuiteName = ProvSSLContextSpi.getCipherSuiteName(cipherSuite);
+            LOG.finer("Server found no credentials for cipher suite: " + cipherSuiteName);
             return false;
         }
 
-        manager.getContext().validateNegotiatedCipherSuite(cipherSuite);
+        manager.getContext().validateNegotiatedCipherSuite(sslParameters, cipherSuite);
 
         return super.selectCipherSuite(cipherSuite);
     }
@@ -241,11 +241,24 @@ class ProvTlsServer
             serverSigAlgs = JsseUtils.getSupportedSignatureAlgorithms(getCrypto());
         }
 
-        Vector certificateAuthorities = new Vector();
-        BCX509ExtendedTrustManager x509TrustManager = manager.getContextData().getX509TrustManager();
-        for (X509Certificate caCert : x509TrustManager.getAcceptedIssuers())
+        Vector certificateAuthorities = null;
         {
-            certificateAuthorities.addElement(X500Name.getInstance(caCert.getSubjectX500Principal().getEncoded()));
+            Set<X500Principal> caSubjects = new HashSet<X500Principal>();
+
+            BCX509ExtendedTrustManager x509TrustManager = manager.getContextData().getX509TrustManager();
+            for (X509Certificate caCert : x509TrustManager.getAcceptedIssuers())
+            {
+                caSubjects.add(caCert.getSubjectX500Principal());
+            }
+
+            if (!caSubjects.isEmpty())
+            {
+                certificateAuthorities = new Vector(caSubjects.size());
+                for (X500Principal caSubject : caSubjects)
+                {
+                    certificateAuthorities.addElement(X500Name.getInstance(caSubject.getEncoded()));
+                }
+            }
         }
 
         return new CertificateRequest(certificateTypes, serverSigAlgs, certificateAuthorities);
@@ -281,8 +294,9 @@ class ProvTlsServer
         keyManagerMissCache = new HashSet<String>();
 
         int selectedCipherSuite = super.getSelectedCipherSuite();
+        String selectedCipherSuiteName = ProvSSLContextSpi.getCipherSuiteName(selectedCipherSuite);
 
-        LOG.fine("Server selected cipher suite: " + manager.getContext().getCipherSuiteString(selectedCipherSuite));
+        LOG.fine("Server selected cipher suite: " + selectedCipherSuiteName);
 
         keyManagerMissCache = null;
 
@@ -370,9 +384,11 @@ class ProvTlsServer
     {
         ProtocolVersion serverVersion = super.getServerVersion();
 
-        String protocolString = manager.getContext().getProtocolString(serverVersion);
+        manager.getContext().validateNegotiatedProtocol(sslParameters, serverVersion);
 
-        LOG.fine("Server selected protocol version: " + protocolString);
+        String serverVersionName = ProvSSLContextSpi.getProtocolVersionName(serverVersion);
+
+        LOG.fine("Server selected protocol version: " + serverVersionName);
 
         return serverVersion;
     }
@@ -399,7 +415,7 @@ class ProvTlsServer
         }
         else
         {
-            X509Certificate[] chain = JsseUtils.getX509CertificateChain(manager.getContextData().getCrypto(), clientCertificate);
+            X509Certificate[] chain = JsseUtils.getX509CertificateChain(getCrypto(), clientCertificate);
             short signatureAlgorithm = clientCertificate.getCertificateAt(0).getLegacySignatureAlgorithm();
             String authType = JsseUtils.getAuthStringClient(signatureAlgorithm);
 

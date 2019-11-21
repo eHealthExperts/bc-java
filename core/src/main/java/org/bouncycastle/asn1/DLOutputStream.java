@@ -5,27 +5,28 @@ import java.io.OutputStream;
 
 /**
  * Stream that outputs encoding based on definite length.
+ * 
+ * @deprecated Will be removed from public API.
  */
 public class DLOutputStream
     extends ASN1OutputStream
 {
-    public DLOutputStream(
-        OutputStream os)
+    /**
+     * @deprecated Use {@link ASN1OutputStream#create(OutputStream, String)} with
+     *             {@link ASN1Encoding#DL} instead.
+     */
+    public DLOutputStream(OutputStream os)
     {
         super(os);
     }
 
-    public void writeObject(
-        ASN1Encodable obj)
-        throws IOException
+    void writePrimitive(ASN1Primitive primitive, boolean withTag) throws IOException
     {
-        if (obj != null)
-        {
-            obj.toASN1Primitive().toDLObject().encode(this);
-        }
-        else
-        {
-            throw new IOException("null object detected");
-        }
+        primitive.toDLObject().encode(this, withTag);
+    }
+
+    ASN1OutputStream getDLSubStream()
+    {
+        return this;
     }
 }

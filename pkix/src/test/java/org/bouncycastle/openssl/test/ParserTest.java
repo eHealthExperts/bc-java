@@ -248,8 +248,8 @@ public class ParserTest
         doOpenSslDsaTest("rc2_64_cbc");
         doOpenSslRsaTest("rc2_64_cbc");
 
-        doDudPasswordTest("7fd98", 0, "corrupted stream - out of bounds length found");
-        doDudPasswordTest("ef677", 1, "corrupted stream - out of bounds length found");
+        doDudPasswordTest("7fd98", 0, "corrupted stream - out of bounds length found: 599005160 >= 447");
+        doDudPasswordTest("ef677", 1, "corrupted stream - out of bounds length found: 2087569732 >= 447");
         doDudPasswordTest("800ce", 2, "unknown tag 26 encountered");
         doDudPasswordTest("b6cd8", 3, "DEF length 81 object truncated by 56");
         doDudPasswordTest("28ce09", 4, "DEF length 110 object truncated by 28");
@@ -265,7 +265,7 @@ public class ParserTest
         doDudPasswordTest("5a3d16", 14, "corrupted stream detected");
         doDudPasswordTest("8d0c97", 15, "corrupted stream detected");
         doDudPasswordTest("bc0daf", 16, "corrupted stream detected");
-        doDudPasswordTest("aaf9c4d",17, "corrupted stream - out of bounds length found");
+        doDudPasswordTest("aaf9c4d",17, "corrupted stream - out of bounds length found: 1580418590 >= 447");
 
         doNoPasswordTest();
         doNoECPublicKeyTest();
@@ -505,12 +505,11 @@ public class ParserTest
         catch (IOException e)
         {
             if (e.getCause() != null && !e.getCause().getMessage().endsWith(message))
-            {
+            {              System.err.println(e.getCause().getMessage());
                fail("issue " + index + " exception thrown, but wrong message");
             }
             else if (e.getCause() == null && !e.getMessage().equals(message))
             {
-                               e.printStackTrace();
                fail("issue " + index + " exception thrown, but wrong message");
             }
         }

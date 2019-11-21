@@ -12,6 +12,9 @@ import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.util.PublicKeyFactory;
 import org.bouncycastle.util.Arrays;
 
+/**
+ * @deprecated Migrate to the (D)TLS API in org.bouncycastle.tls (bctls jar).
+ */
 public class DTLSServerProtocol
     extends DTLSProtocol
 {
@@ -57,6 +60,7 @@ public class DTLSServerProtocol
         server.init(state.serverContext);
 
         DTLSRecordLayer recordLayer = new DTLSRecordLayer(transport, state.serverContext, server, ContentType.handshake);
+        server.notifyCloseHandle(recordLayer);
 
         // TODO Need to handle sending of HelloVerifyRequest without entering a full connection
 

@@ -31,12 +31,21 @@ public class SignatureSubpacketInputStream
     extends InputStream
     implements SignatureSubpacketTags
 {
-    InputStream in;
+    private final InputStream in;
+    private final int         limit;
 
     public SignatureSubpacketInputStream(
         InputStream in)
     {
+        this(in, StreamUtil.findLimit(in));
+    }
+
+    public SignatureSubpacketInputStream(
+        InputStream in,
+        int         limit)
+    {
         this.in = in;
+        this.limit = limit;
     }
 
     public int available()
@@ -87,6 +96,12 @@ public class SignatureSubpacketInputStream
         if (tag < 0)
         {
             throw new EOFException("unexpected EOF reading signature sub packet");
+        }
+
+        // see below about miscoding... we'll try not to panic about anything under 2K.
+        if (bodyLen <= 0 || (bodyLen > limit && bodyLen > 2048))
+        {
+            throw new EOFException("out of range data found in signature sub packet");
         }
 
         byte[] data = new byte[bodyLen - 1];

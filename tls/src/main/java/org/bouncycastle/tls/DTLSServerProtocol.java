@@ -56,8 +56,7 @@ public class DTLSServerProtocol
         securityParameters.extendedPadding = server.shouldUseExtendedPadding();
 
         DTLSRecordLayer recordLayer = new DTLSRecordLayer(state.serverContext, state.server, transport);
-
-        // TODO Need to handle sending of HelloVerifyRequest without entering a full connection
+        server.notifyCloseHandle(recordLayer);
 
         try
         {
@@ -384,7 +383,7 @@ public class DTLSServerProtocol
         }
 
         securityParameters.serverRandom = TlsProtocol.createRandomBlock(state.server.shouldUseGMTUnixTime(), context);
-        if (!server_version.equals(ProtocolVersion.getLatestDTLS(state.server.getSupportedVersions())))
+        if (!server_version.equals(ProtocolVersion.getLatestDTLS(state.server.getProtocolVersions())))
         {
             TlsUtils.writeDowngradeMarker(server_version, securityParameters.getServerRandom());
         }
@@ -640,7 +639,9 @@ public class DTLSServerProtocol
          * master secret [..]. (and see 5.2, 5.3)
          */
         securityParameters.extendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(state.clientExtensions);
-        if (!securityParameters.isExtendedMasterSecret() && state.server.requiresExtendedMasterSecret())
+
+        if (!securityParameters.isExtendedMasterSecret()
+            && (state.resumedSession || state.server.requiresExtendedMasterSecret()))
         {
             throw new TlsFatalAlert(AlertDescription.handshake_failure);
         }

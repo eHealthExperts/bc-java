@@ -2,6 +2,8 @@ package org.bouncycastle.math.ec.custom.sec;
 
 import java.math.BigInteger;
 
+import org.bouncycastle.math.ec.AbstractECLookupTable;
+import org.bouncycastle.math.ec.ECConstants;
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECLookupTable;
@@ -11,10 +13,10 @@ import org.bouncycastle.util.encoders.Hex;
 
 public class SecP256R1Curve extends ECCurve.AbstractFp
 {
-    public static final BigInteger q = new BigInteger(1,
-        Hex.decode("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF"));
+    public static final BigInteger q = SecP256R1FieldElement.Q;
 
-    private static final int SecP256R1_DEFAULT_COORDS = COORD_JACOBIAN;
+    private static final int SECP256R1_DEFAULT_COORDS = COORD_JACOBIAN;
+    private static final ECFieldElement[] SECP256R1_AFFINE_ZS = new ECFieldElement[] { new SecP256R1FieldElement(ECConstants.ONE) }; 
 
     protected SecP256R1Point infinity;
 
@@ -25,13 +27,13 @@ public class SecP256R1Curve extends ECCurve.AbstractFp
         this.infinity = new SecP256R1Point(this, null, null);
 
         this.a = fromBigInteger(new BigInteger(1,
-            Hex.decode("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC")));
+            Hex.decodeStrict("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC")));
         this.b = fromBigInteger(new BigInteger(1,
-            Hex.decode("5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B")));
-        this.order = new BigInteger(1, Hex.decode("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551"));
+            Hex.decodeStrict("5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B")));
+        this.order = new BigInteger(1, Hex.decodeStrict("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551"));
         this.cofactor = BigInteger.valueOf(1);
 
-        this.coord = SecP256R1_DEFAULT_COORDS;
+        this.coord = SECP256R1_DEFAULT_COORDS;
     }
 
     protected ECCurve cloneCurve()
@@ -65,14 +67,14 @@ public class SecP256R1Curve extends ECCurve.AbstractFp
         return new SecP256R1FieldElement(x);
     }
 
-    protected ECPoint createRawPoint(ECFieldElement x, ECFieldElement y, boolean withCompression)
+    protected ECPoint createRawPoint(ECFieldElement x, ECFieldElement y)
     {
-        return new SecP256R1Point(this, x, y, withCompression);
+        return new SecP256R1Point(this, x, y);
     }
 
-    protected ECPoint createRawPoint(ECFieldElement x, ECFieldElement y, ECFieldElement[] zs, boolean withCompression)
+    protected ECPoint createRawPoint(ECFieldElement x, ECFieldElement y, ECFieldElement[] zs)
     {
-        return new SecP256R1Point(this, x, y, zs, withCompression);
+        return new SecP256R1Point(this, x, y, zs);
     }
 
     public ECPoint getInfinity()
@@ -95,7 +97,7 @@ public class SecP256R1Curve extends ECCurve.AbstractFp
             }
         }
 
-        return new ECLookupTable()
+        return new AbstractECLookupTable()
         {
             public int getSize()
             {
@@ -120,7 +122,26 @@ public class SecP256R1Curve extends ECCurve.AbstractFp
                     pos += (FE_INTS * 2);
                 }
 
-                return createRawPoint(new SecP256R1FieldElement(x), new SecP256R1FieldElement(y), false);
+                return createPoint(x, y);
+            }
+
+            public ECPoint lookupVar(int index)
+            {
+                int[] x = Nat256.create(), y = Nat256.create();
+                int pos = index * FE_INTS * 2;
+
+                for (int j = 0; j < FE_INTS; ++j)
+                {
+                    x[j] = table[pos + j];
+                    y[j] = table[pos + FE_INTS + j];
+                }
+
+                return createPoint(x, y);
+            }
+
+            private ECPoint createPoint(int[] x, int[] y)
+            {
+                return createRawPoint(new SecP256R1FieldElement(x), new SecP256R1FieldElement(y), SECP256R1_AFFINE_ZS);
             }
         };
     }

@@ -59,7 +59,7 @@ public class DVCSRequestInformation
         if (seq.getObjectAt(0) instanceof ASN1Integer)
         {
             ASN1Integer encVersion = ASN1Integer.getInstance(seq.getObjectAt(i++));
-            this.version = encVersion.getValue().intValue();
+            this.version = encVersion.intValueExact();
         }
         else
         {
@@ -138,7 +138,7 @@ public class DVCSRequestInformation
 
     public ASN1Primitive toASN1Primitive()
     {
-        ASN1EncodableVector v = new ASN1EncodableVector();
+        ASN1EncodableVector v = new ASN1EncodableVector(9);
 
         if (version != DEFAULT_VERSION)
         {
