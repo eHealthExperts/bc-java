@@ -14,6 +14,9 @@ import org.bouncycastle.math.ec.ECPoint;
 public class EraseUtil {
 
     private static Logger LOG = java.util.logging.Logger.getLogger(EraseUtil.class.getName());
+    
+	/** must be equal to the private constant BigInteger#MAX_CONSTANT which is currently 16 */
+    private static final int BIGINTEGER_MAX_CONSTANT = 16;
 
     public static void clearByteArray(final byte[] array) 
     {
@@ -40,25 +43,36 @@ public class EraseUtil {
 
     public static void clearBigInteger(final BigInteger bigInteger) 
     {
+    	
+
+    	
         if (bigInteger != null) 
         {
-            Field declaredField = null;
-            try {
-
-                declaredField = BigInteger.class.getDeclaredField("mag");
-                final boolean accessible = declaredField.isAccessible();
-
-                declaredField.setAccessible(true);
-
-                final int[] array = (int[]) declaredField.get(bigInteger);
-                clearIntArray(array);
-                declaredField.setAccessible(accessible);
-
-            } 
-            catch (Exception e) 
-            {
-                LOG.log(Level.WARNING, "Could not erase BigInteger", e);
-            }
+        	final long value = bigInteger.longValue();
+        	
+        	// do not clear one of the internal BigInteger constants, which causes heavy side effects
+        	// this should be no problem because these constants won't be used as sensitive cryptographic material
+        	if (value<= -BIGINTEGER_MAX_CONSTANT || value >= BIGINTEGER_MAX_CONSTANT)
+        	{
+        	       	
+	            Field declaredField = null;
+	            try {
+	
+	                declaredField = BigInteger.class.getDeclaredField("mag");
+	                final boolean accessible = declaredField.isAccessible();
+	
+	                declaredField.setAccessible(true);
+	
+	                final int[] array = (int[]) declaredField.get(bigInteger);
+	                clearIntArray(array);
+	                declaredField.setAccessible(accessible);
+	
+	            } 
+	            catch (Exception e) 
+	            {
+	                LOG.log(Level.WARNING, "Could not erase BigInteger", e);
+	            }
+        	}
         }
     }
 
