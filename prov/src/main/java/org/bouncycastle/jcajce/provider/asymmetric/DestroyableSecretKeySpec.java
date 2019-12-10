@@ -23,7 +23,7 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
      *
      * @serial
      */
-    private final byte[] key;
+    private final OctetString key;
 
     /**
      * The name of the algorithm associated with this key.
@@ -61,7 +61,7 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
         {
             throw new IllegalArgumentException("Empty key");
         }
-        this.key = key.clone();
+        this.key = new OctetString(key);
         this.algorithm = algorithm;
     }
 
@@ -114,8 +114,43 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
         {
             throw new ArrayIndexOutOfBoundsException("len is negative");
         }
-        this.key = new byte[len];
-        System.arraycopy(key, offset, this.key, 0, len);
+        byte[] keyBytes = new byte[len];
+        System.arraycopy(keyBytes, offset, keyBytes, 0, len);
+        this.key = new OctetString(keyBytes);
+		EraseUtil.clearByteArray(keyBytes);
+        this.algorithm = algorithm;
+    }
+    
+    /**
+     * Constructs a secret key from the given byte array.
+     *
+     * <p>
+     * This constructor does not check if the given bytes indeed specify a secret key of the specified algorithm. For
+     * example, if the algorithm is DES, this constructor does not check if <code>key</code> is 8 bytes long, and also
+     * does not check for weak or semi-weak keys. In order for those checks to be performed, an algorithm-specific
+     * <i>key specification</i> class (in this case: {@link DESKeySpec DESKeySpec}) should be used.
+     *
+     * @param key
+     *            the key material of the secret key. The contents of the array are copied to protect against subsequent
+     *            modification.
+     * @param algorithm
+     *            the name of the secret-key algorithm to be associated with the given key material. See Appendix A in
+     *            the <a href= "{@docRoot}/../technotes/guides/security/crypto/CryptoSpec.html#AppA"> Java Cryptography
+     *            Architecture Reference Guide</a> for information about standard algorithm names.
+     * @exception IllegalArgumentException
+     *                if <code>algorithm</code> is null or <code>key</code> is null or empty.
+     */
+    public DestroyableSecretKeySpec(final OctetString key, final String algorithm)
+    {
+        if ((key == null) || (algorithm == null)) 
+        {
+            throw new IllegalArgumentException("Missing argument");
+        }
+        if (key.length() == 0)
+        {
+            throw new IllegalArgumentException("Empty key");
+        }
+        this.key = key;
         this.algorithm = algorithm;
     }
 
@@ -146,7 +181,7 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
      */
     public byte[] getEncoded() 
     {
-        return this.key.clone();
+    	return this.key.toBytes();
     }
 
     /**
@@ -156,9 +191,9 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
     public int hashCode() 
     {
         int retval = 0;
-        for (int i = 1; i < this.key.length; i++) 
+        for (int i = 1; i < this.key.length(); i++) 
         {
-            retval += this.key[i] * i;
+            retval += this.key.octetAt(i) * i;
         }
         if (this.algorithm.equalsIgnoreCase("TripleDES")) 
         {
@@ -202,18 +237,18 @@ public class DestroyableSecretKeySpec implements KeySpec, SecretKey
 
         final byte[] thatKey = ((SecretKey) obj).getEncoded();
 
-        boolean result = java.util.Arrays.equals(this.key, thatKey);
+        boolean result = java.util.Arrays.equals(this.key.toBytes(), thatKey);
         EraseUtil.clearByteArray(thatKey);
         return result;
     }
 
     public void destroy() throws DestroyFailedException {
-        EraseUtil.clearByteArray(this.key);
+    	this.key.destroy();
     }
     
     @Override
     protected void finalize() throws Throwable {
     	super.finalize();
-    	EraseUtil.clearByteArray(this.key);
+    	this.key.destroy();
     }
 }
