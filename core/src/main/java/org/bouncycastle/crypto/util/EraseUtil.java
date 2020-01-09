@@ -52,7 +52,7 @@ public class EraseUtil {
         	
         	// do not clear one of the internal BigInteger constants, which causes heavy side effects
         	// this should be no problem because these constants won't be used as sensitive cryptographic material
-        	if (value<= -BIGINTEGER_MAX_CONSTANT || value >= BIGINTEGER_MAX_CONSTANT)
+        	if (value < -BIGINTEGER_MAX_CONSTANT || value > BIGINTEGER_MAX_CONSTANT)
         	{
         	       	
 	            Field declaredField = null;
