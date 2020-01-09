@@ -10,6 +10,8 @@ import java.util.Set;
 
 import javax.crypto.spec.DHParameterSpec;
 
+import org.bouncycastle.jsse.java.security.BCAlgorithmConstraints;
+import org.bouncycastle.jsse.java.security.BCCryptoPrimitive;
 import org.bouncycastle.tls.DefaultTlsDHGroupVerifier;
 import org.bouncycastle.tls.crypto.DHGroup;
 
@@ -39,6 +41,25 @@ class ProvDHGroupVerifier
                 parameters.init(new DHParameterSpec(dhGroup.getP(), dhGroup.getG(), dhGroup.getL()));
 
                 final AlgorithmConstraints constraints = (AlgorithmConstraints) this.algorithmConstraints;
+                return provUnrestrictedGroups || (super.checkGroup(dhGroup) && constraints.permits(primitives, algorithm, parameters));
+            } catch (final NoSuchAlgorithmException e) {
+                throw new SecurityException(e);
+            } catch (final InvalidParameterSpecException e) {
+                throw new SecurityException(e);
+            }
+        }
+        
+        if (this.algorithmConstraints instanceof BCAlgorithmConstraints) {
+
+            final Set<BCCryptoPrimitive> primitives = new HashSet<BCCryptoPrimitive>();
+            primitives.add(BCCryptoPrimitive.KEY_AGREEMENT);
+
+            final String algorithm = "DiffieHellman";
+            try {
+                final AlgorithmParameters parameters = AlgorithmParameters.getInstance(algorithm);
+                parameters.init(new DHParameterSpec(dhGroup.getP(), dhGroup.getG(), dhGroup.getL()));
+
+                final BCAlgorithmConstraints constraints = (BCAlgorithmConstraints) this.algorithmConstraints;
                 return provUnrestrictedGroups || (super.checkGroup(dhGroup) && constraints.permits(primitives, algorithm, parameters));
             } catch (final NoSuchAlgorithmException e) {
                 throw new SecurityException(e);
