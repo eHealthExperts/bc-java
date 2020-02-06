@@ -273,7 +273,7 @@ class ProvSSLSessionContext
         }
     }
 
-    private void removeAllExpiredSessions()
+    private synchronized void removeAllExpiredSessions()
     {
         processQueue();
 
@@ -291,14 +291,14 @@ class ProvSSLSessionContext
         }
     }
 
-    private void removeSession(SessionEntry sessionEntry)
+    private synchronized void removeSession(SessionEntry sessionEntry)
     {
         mapRemove(sessionsByID, sessionEntry.getSessionID(), sessionEntry);
 
         removeSessionByPeer(sessionEntry);
     }
 
-    private boolean removeSessionByPeer(SessionEntry sessionEntry)
+    private synchronized boolean removeSessionByPeer(SessionEntry sessionEntry)
     {
         return mapRemove(sessionsByPeer, sessionEntry.getPeerKey(), sessionEntry);
     }
