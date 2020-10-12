@@ -17,7 +17,6 @@ import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.impl.TlsAEADCipherImpl;
-import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Pack;
 
 public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
@@ -39,8 +38,8 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
         this.cipherMode = isEncrypting ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE;
     }
 
-    public int doFinal(byte[] input, int inputOffset, int inputLength, byte[] output, int outputOffset)
-        throws IOException
+    public int doFinal(byte[] input, int inputOffset, int inputLength, byte[] extraInput, byte[] output,
+        int outputOffset) throws IOException
     {
         /*
          * NOTE: When using the Cipher class, output may be buffered prior to calling doFinal, so
@@ -51,28 +50,17 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
          */
         try
         {
+            int extraInputLength = extraInput.length;
+
             if (cipherMode == Cipher.ENCRYPT_MODE)
             {
-                int ciphertextLength = inputLength;
+                int ciphertextLength = inputLength + extraInputLength;
 
                 byte[] tmp = new byte[64 + ciphertextLength];
-                System.arraycopy(input, inputOffset, tmp, 64, ciphertextLength);
+                System.arraycopy(input, inputOffset, tmp, 64, inputLength);
+                System.arraycopy(extraInput, 0, tmp, 64 + inputLength, extraInputLength);
 
-                // to avoid performance issue in FIPS jar  1.0.0-1.0.2
-                int tmpOff = 0;
-                while (tmpOff < tmp.length - BUF_SIZE)
-                {
-                    tmpOff += cipher.update(tmp, tmpOff, BUF_SIZE, tmp, tmpOff);
-                }
-
-                int len = cipher.update(tmp, tmpOff, tmp.length - tmpOff, tmp, tmpOff);
-                        
-                len += cipher.doFinal(tmp, len);
-
-                if (tmp.length != tmpOff + len)
-                {
-                    throw new IllegalStateException();
-                }
+                runCipher(tmp);
 
                 System.arraycopy(tmp, 64, output, outputOffset, ciphertextLength);
 
@@ -91,40 +79,31 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
             }
             else
             {
+                if (extraInputLength > 0)
+                {
+                    throw new TlsFatalAlert(AlertDescription.internal_error);
+                }
+
                 int ciphertextLength = inputLength - 16;
 
                 byte[] tmp = new byte[64 + ciphertextLength];
                 System.arraycopy(input, inputOffset, tmp, 64, ciphertextLength);
 
-                // to avoid performance issue in FIPS jar  1.0.0-1.0.2
-                int tmpOff = 0;
-                while (tmpOff < tmp.length - BUF_SIZE)
-                {
-                    tmpOff += cipher.update(tmp, tmpOff, BUF_SIZE, tmp, tmpOff);
-                }
-
-                int len = cipher.update(tmp, tmpOff, tmp.length - tmpOff, tmp, tmpOff);
-
-                len += cipher.doFinal(tmp, len);
-
-                if (tmp.length != tmpOff + len)
-                {
-                    throw new IllegalStateException();
-                }
+                runCipher(tmp);
 
                 initMAC(tmp);
                 updateMAC(additionalData, 0, additionalData.length);
                 updateMAC(input, inputOffset, ciphertextLength);
 
-                byte[] calculatedMAC = new byte[16];
-                Pack.longToLittleEndian(additionalData.length & 0xFFFFFFFFL, calculatedMAC, 0);
-                Pack.longToLittleEndian(ciphertextLength & 0xFFFFFFFFL, calculatedMAC, 8);
-                mac.update(calculatedMAC, 0, 16);
-                mac.doFinal(calculatedMAC, 0);
+                byte[] expectedMac = new byte[16];
+                Pack.longToLittleEndian(additionalData.length & 0xFFFFFFFFL, expectedMac, 0);
+                Pack.longToLittleEndian(ciphertextLength & 0xFFFFFFFFL, expectedMac, 8);
+                mac.update(expectedMac, 0, 16);
+                mac.doFinal(expectedMac, 0);
 
-                byte[] receivedMAC = TlsUtils.copyOfRangeExact(input, inputOffset + ciphertextLength, inputOffset + inputLength);
-
-                if (!Arrays.constantTimeAreEqual(calculatedMAC, receivedMAC))
+                boolean badMac = !TlsUtils.constantTimeAreEqual(16, expectedMac, 0, input,
+                    inputOffset + ciphertextLength);
+                if (badMac)
                 {
                     throw new TlsFatalAlert(AlertDescription.bad_record_mac);
                 }
@@ -176,6 +155,25 @@ public class JceChaCha20Poly1305 implements TlsAEADCipherImpl
         for (int i = 0; i < 64; ++i)
         {
             firstBlock[i] = 0;
+        }
+    }
+
+    protected void runCipher(byte[] buf) throws GeneralSecurityException
+    {
+        // to avoid performance issue in FIPS jar 1.0.0-1.0.2, process in chunks
+        int readOff = 0, writeOff = 0;
+        while (readOff < buf.length)
+        {
+            int updateSize = Math.min(BUF_SIZE, buf.length - readOff);
+            writeOff += cipher.update(buf, readOff, updateSize, buf, writeOff);
+            readOff += updateSize;
+        }
+
+        writeOff += cipher.doFinal(buf, writeOff);
+
+        if (buf.length != writeOff)
+        {
+            throw new IllegalStateException();
         }
     }
 

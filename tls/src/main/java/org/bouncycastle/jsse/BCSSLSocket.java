@@ -15,7 +15,11 @@ public interface BCSSLSocket
 
     void setBCHandshakeApplicationProtocolSelector(BCApplicationProtocolSelector<SSLSocket> selector);
 
+    void setBCSessionToResume(BCExtendedSSLSession session);
+
     BCExtendedSSLSession getBCHandshakeSession();
+
+    BCExtendedSSLSession getBCSession();
 
     /**
      * Returns an accessor for extended SSL connection data. This method will initiate the initial

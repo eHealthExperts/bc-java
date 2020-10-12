@@ -27,6 +27,8 @@ public abstract class AbstractTlsServer
     protected boolean truncatedHMacOffered;
     protected boolean clientSentECPointFormats;
     protected CertificateStatusRequest certificateStatusRequest;
+    protected Vector statusRequestV2;
+    protected Vector trustedCAKeys;
 
     protected int selectedCipherSuite;
     protected Vector clientProtocolNames;
@@ -48,7 +50,17 @@ public abstract class AbstractTlsServer
         return true;
     }
 
+    protected boolean allowMultiCertStatus()
+    {
+        return false;
+    }
+
     protected boolean allowTruncatedHMac()
+    {
+        return false;
+    }
+
+    protected boolean allowTrustedCAIndication()
     {
         return false;
     }
@@ -102,7 +114,8 @@ public abstract class AbstractTlsServer
 
     protected boolean isSelectableCipherSuite(int cipherSuite, int availCurveBits, int availFiniteFieldBits, Vector sigAlgs)
     {
-        return TlsUtils.isValidCipherSuiteForVersion(cipherSuite, context.getServerVersion())
+        // TODO[tls13] The version check should be separated out (eventually select ciphersuite before version)
+        return TlsUtils.isValidVersionForCipherSuite(cipherSuite, context.getServerVersion())
             && availCurveBits >= TlsECCUtils.getMinimumCurveBits(cipherSuite)
             && availFiniteFieldBits >= TlsDHUtils.getMinimumFiniteFieldBits(cipherSuite)
             && TlsUtils.isValidCipherSuiteForSignatureAlgorithms(cipherSuite, sigAlgs);
@@ -329,7 +342,10 @@ public abstract class AbstractTlsServer
             // We only support uncompressed format, this is just to validate the extension, and note its presence.
             this.clientSentECPointFormats = (null != TlsExtensionsUtils.getSupportedPointFormatsExtension(clientExtensions));
 
+            // TODO[tls13] These three extensions need review
             this.certificateStatusRequest = TlsExtensionsUtils.getStatusRequestExtension(clientExtensions);
+            this.statusRequestV2 = TlsExtensionsUtils.getStatusRequestV2Extension(clientExtensions);
+            this.trustedCAKeys = TlsExtensionsUtils.getTrustedCAKeysExtensionClient(clientExtensions);
         }
     }
 
@@ -440,16 +456,39 @@ public abstract class AbstractTlsServer
                 new short[]{ ECPointFormat.uncompressed });
         }
 
-        if (null != this.certificateStatusRequest && allowCertificateStatus())
+        // TODO[tls13] See RFC 8446 4.4.2.1
+        if (null != this.statusRequestV2 && allowMultiCertStatus())
+        {
+            /*
+             * RFC 6961 2.2. If a server returns a "CertificateStatus" message in response to a
+             * "status_request_v2" request, then the server MUST have included an extension of type
+             * "status_request_v2" with empty "extension_data" in the extended server hello..
+             */
+            TlsExtensionsUtils.addEmptyExtensionData(checkServerExtensions(), TlsExtensionsUtils.EXT_status_request_v2);
+        }
+        else if (null != this.certificateStatusRequest && allowCertificateStatus())
         {
             /*
              * RFC 6066 8. If a server returns a "CertificateStatus" message, then the server MUST
              * have included an extension of type "status_request" with empty "extension_data" in
              * the extended server hello.
              */
-            checkServerExtensions().put(TlsExtensionsUtils.EXT_status_request, TlsExtensionsUtils.createEmptyExtensionData());
+            TlsExtensionsUtils.addEmptyExtensionData(checkServerExtensions(), TlsExtensionsUtils.EXT_status_request);
         }
 
+        if (null != this.trustedCAKeys && allowTrustedCAIndication())
+        {
+            TlsExtensionsUtils.addTrustedCAKeysExtensionServer(checkServerExtensions());
+        }
+
+        /*
+         * TODO[tls13] RFC 8446 4.2.7 If the server has a group it prefers to the ones in the "key_share"
+         * extension but is still willing to accept the ClientHello, it SHOULD send "supported_groups" to
+         * update the client's view of its preferences; this extension SHOULD contain all groups the server
+         * supports, regardless of whether they are currently supported by the client.
+         * 
+         * (NOTE: The server would put a supported_groups extension in the EncryptedExtensions message)
+         */
         return serverExtensions;
     }
 

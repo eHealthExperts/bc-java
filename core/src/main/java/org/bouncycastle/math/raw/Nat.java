@@ -254,6 +254,34 @@ public abstract class Nat
 //        }
     }
 
+    public static int compare(int len, int[] x, int[] y)
+    {
+        for (int i = len - 1; i >= 0; --i)
+        {
+            int x_i = x[i] ^ Integer.MIN_VALUE;
+            int y_i = y[i] ^ Integer.MIN_VALUE;
+            if (x_i < y_i)
+                return -1;
+            if (x_i > y_i)
+                return 1;
+        }
+        return 0;
+    }
+
+    public static int compare(int len, int[] x, int xOff, int[] y, int yOff)
+    {
+        for (int i = len - 1; i >= 0; --i)
+        {
+            int x_i = x[xOff + i] ^ Integer.MIN_VALUE;
+            int y_i = y[yOff + i] ^ Integer.MIN_VALUE;
+            if (x_i < y_i)
+                return -1;
+            if (x_i > y_i)
+                return 1;
+        }
+        return 0;
+    }
+
     public static int[] copy(int len, int[] x)
     {
         int[] z = new int[len];
@@ -573,6 +601,30 @@ public abstract class Nat
             }
         }
         return true;
+    }
+
+    public static int lessThan(int len, int[] x, int[] y)
+    {
+        long c = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            c += (x[i] & M) - (y[i] & M);
+            c >>= 32;
+        }
+//        assert c == 0L || c == 1L;
+        return (int)c;
+    }
+
+    public static int lessThan(int len, int[] x, int xOff, int[] y, int yOff)
+    {
+        long c = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            c += (x[xOff + i] & M) - (y[yOff + i] & M);
+            c >>= 32;
+        }
+//        assert c == 0L || c == 1L;
+        return (int)c;
     }
 
     public static void mul(int len, int[] x, int[] y, int[] zz)
@@ -1023,7 +1075,7 @@ public abstract class Nat
     }
 
     /**
-     * @deprecated Use {@link #squareWordAddTo(int[], int, int, int[], int) instead.
+     * @deprecated Use {@link #squareWordAddTo(int[], int, int, int[], int)} instead.
      */
     public static int squareWordAdd(int[] x, int xOff, int xPos, int[] z, int zOff)
     {

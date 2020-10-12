@@ -39,7 +39,6 @@ public abstract class ECPublicBCPGKey
     protected ECPublicBCPGKey(
         ASN1ObjectIdentifier oid,
         BigInteger encodedPoint)
-        throws IOException
     {
         this.point = encodedPoint;
         this.oid = oid;
@@ -111,6 +110,10 @@ public abstract class ECPublicBCPGKey
         if (length == 0 || length == 0xFF)
         {
             throw new IOException("future extensions not yet implemented");
+        }
+        if (length > 127)
+        {
+            throw new IOException("unsupported OID");
         }
 
         byte[] buffer = new byte[length + 2];

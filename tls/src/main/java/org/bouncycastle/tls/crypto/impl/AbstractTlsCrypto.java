@@ -2,14 +2,19 @@ package org.bouncycastle.tls.crypto.impl;
 
 import java.io.IOException;
 
+<<<<<<< HEAD
 import org.bouncycastle.crypto.util.EraseUtil;
 import org.bouncycastle.tls.EncryptionAlgorithm;
 import org.bouncycastle.tls.MACAlgorithm;
+=======
+>>>>>>> r1rv66
 import org.bouncycastle.tls.crypto.TlsCertificate;
-import org.bouncycastle.tls.crypto.TlsCipher;
 import org.bouncycastle.tls.crypto.TlsCrypto;
+<<<<<<< HEAD
 import org.bouncycastle.tls.crypto.TlsCryptoParameters;
 import org.bouncycastle.tls.crypto.TlsDHConfig;
+=======
+>>>>>>> r1rv66
 import org.bouncycastle.tls.crypto.TlsSecret;
 
 /**

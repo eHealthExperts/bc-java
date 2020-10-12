@@ -17,7 +17,9 @@ import org.bouncycastle.crypto.generators.X448KeyPairGenerator;
 import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters;
 import org.bouncycastle.crypto.params.Ed448KeyGenerationParameters;
 import org.bouncycastle.crypto.params.X25519KeyGenerationParameters;
+import org.bouncycastle.crypto.params.X25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.X448KeyGenerationParameters;
+import org.bouncycastle.crypto.params.X448PrivateKeyParameters;
 import org.bouncycastle.jcajce.provider.asymmetric.util.ECUtil;
 import org.bouncycastle.jcajce.spec.EdDSAParameterSpec;
 import org.bouncycastle.jcajce.spec.XDHParameterSpec;
@@ -49,42 +51,56 @@ public class KeyPairGeneratorSpi
     public void initialize(int strength, SecureRandom secureRandom)
     {
         this.secureRandom = secureRandom;
-
-        switch (strength)
+        try
         {
-        case 255:
-        case 256:
-            switch (algorithm)
+            switch (strength)
             {
-            case EdDSA:
-            case Ed25519:
-                setupGenerator(Ed25519);
+            case 255:
+            case 256:
+                switch (algorithm)
+                {
+                case EdDSA:
+                case Ed25519:
+                    algorithmCheck(Ed25519);
+                    this.generator = new Ed25519KeyPairGenerator();
+                    setupGenerator(Ed25519);
+                    break;
+                case XDH:
+                case X25519:
+                    algorithmCheck(X25519);
+                    this.generator = new X25519KeyPairGenerator();
+                    setupGenerator(X25519);
+                    break;
+                default:
+                    throw new InvalidParameterException("key size not configurable");
+                }
                 break;
-            case XDH:
-            case X25519:
-                setupGenerator(X25519);
+            case 448:
+                switch (algorithm)
+                {
+                case EdDSA:
+                case Ed448:
+                    algorithmCheck(Ed448);
+                    this.generator = new Ed448KeyPairGenerator();
+                    setupGenerator(Ed448);
+                    break;
+                case XDH:
+                case X448:
+                    algorithmCheck(X448);
+                    this.generator = new X448KeyPairGenerator();
+                    setupGenerator(X448);
+                    break;
+                default:
+                    throw new InvalidParameterException("key size not configurable");
+                }
                 break;
             default:
-                throw new InvalidParameterException("key size not configurable");
+                throw new InvalidParameterException("unknown key size");
             }
-            break;
-        case 448:
-            switch (algorithm)
-            {
-            case EdDSA:
-            case Ed448:
-                setupGenerator(Ed448);
-                break;
-            case XDH:
-            case X448:
-                setupGenerator(X448);
-                break;
-            default:
-                throw new InvalidParameterException("key size not configurable");
-            }
-            break;
-        default:
-            throw new InvalidParameterException("unknown key size");
+        }
+        catch (InvalidAlgorithmParameterException e)
+        {
+            throw new InvalidParameterException(e.getMessage());
         }
     }
 
@@ -145,7 +161,6 @@ public class KeyPairGeneratorSpi
             {
                 throw new InvalidAlgorithmParameterException("parameterSpec for wrong curve type");
             }
-            this.algorithm = algorithm;
         }
     }
 
@@ -192,29 +207,20 @@ public class KeyPairGeneratorSpi
 
         AsymmetricCipherKeyPair kp = generator.generateKeyPair();
 
-        switch (algorithm)
+        if (kp.getPrivate() instanceof X448PrivateKeyParameters
+           || kp.getPrivate() instanceof X25519PrivateKeyParameters)
         {
-        case Ed448:
-            return new KeyPair(new BCEdDSAPublicKey(kp.getPublic()), new BCEdDSAPrivateKey(kp.getPrivate()));
-        case Ed25519:
-            return new KeyPair(new BCEdDSAPublicKey(kp.getPublic()), new BCEdDSAPrivateKey(kp.getPrivate()));
-        case X448:
-            return new KeyPair(new BCXDHPublicKey(kp.getPublic()), new BCXDHPrivateKey(kp.getPrivate()));
-        case X25519:
             return new KeyPair(new BCXDHPublicKey(kp.getPublic()), new BCXDHPrivateKey(kp.getPrivate()));
         }
-
-        throw new IllegalStateException("generator not correctly initialized");
+        else
+        {
+            return new KeyPair(new BCEdDSAPublicKey(kp.getPublic()), new BCEdDSAPrivateKey(kp.getPrivate()));
+        }
     }
 
     private void setupGenerator(int algorithm)
     {
         initialised = true;
-
-        if (secureRandom == null)
-        {
-            secureRandom = new SecureRandom();
-        }
 
         switch (algorithm)
         {

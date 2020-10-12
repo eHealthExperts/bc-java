@@ -11,6 +11,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.math.BigInteger;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
@@ -18,9 +19,12 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.Signature;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.interfaces.DSAPrivateKey;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.cms.CMSObjectIdentifiers;
@@ -31,6 +35,8 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.asn1.x9.ECNamedCurveTable;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.jcajce.interfaces.EdDSAPrivateKey;
+import org.bouncycastle.jcajce.interfaces.EdDSAPublicKey;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.CertificateTrustBlock;
 import org.bouncycastle.openssl.PEMDecryptorProvider;
@@ -45,6 +51,7 @@ import org.bouncycastle.openssl.jcajce.JceOpenSSLPKCS8DecryptorProviderBuilder;
 import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
 import org.bouncycastle.operator.InputDecryptorProvider;
 import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
+import org.bouncycastle.util.Strings;
 import org.bouncycastle.util.test.SimpleTest;
 
 /**
@@ -326,7 +333,34 @@ public class ParserTest
 
         checkTrustedCert(trusted);
 
+        //
+        // EdDSAKey
+        //
+        byte[] msg = Strings.toByteArray("Hello, world!");
 
+        pemRd = openPEMResource("eddsapriv.pem");
+
+        PrivateKeyInfo edPrivInfo = (PrivateKeyInfo)pemRd.readObject();
+
+        EdDSAPrivateKey edPrivKey = (EdDSAPrivateKey)new JcaPEMKeyConverter().setProvider("BC").getPrivateKey(edPrivInfo);
+
+        EdDSAPublicKey edPubKey = edPrivKey.getPublicKey();
+
+        Signature edSig = Signature.getInstance(edPrivKey.getAlgorithm(), "BC");
+
+        edSig.initSign(edPrivKey);
+
+        edSig.update(msg);
+
+        byte[] s = edSig.sign();
+
+        edSig.initVerify(edPubKey);
+
+        edSig.update(msg);
+
+        isTrue(edSig.verify(s));
+
+        doOpenSslGost2012Test();
     }
 
     private void checkTrustedCert(X509TrustedCertificateBlock trusted)
@@ -342,7 +376,7 @@ public class ParserTest
         {
             fail("key purpose usages wrong size");
         }
-        if (!trustBlock.getUses().contains(KeyPurposeId.id_kp_OCSPSigning))
+        if (!trustBlock.getUses().contains(KeyPurposeId.id_kp_OCSPSigning.toOID()))
         {
             fail("key purpose use not found");
         }
@@ -351,7 +385,7 @@ public class ParserTest
         {
             fail("key purpose prohibitions wrong size");
         }
-        if (!trustBlock.getProhibitions().contains(KeyPurposeId.id_kp_clientAuth))
+        if (!trustBlock.getProhibitions().contains(KeyPurposeId.id_kp_clientAuth.toOID()))
         {
             fail("key purpose prohibition not found");
         }
@@ -458,6 +492,36 @@ public class ParserTest
         keyDecryptTest(fileName, expectedPrivKeyClass, new BcPEMDecryptorProvider("changeit".toCharArray()));
     }
 
+    private void doOpenSslGost2012Test()
+        throws Exception
+    {
+        try
+        {
+            KeyFactory.getInstance("ECGOST3410-2012", "BC"); // check for algorithm
+        }
+        catch (Exception e)
+        {
+            return;
+        }
+
+        String fileName = "gost2012_priv.pem";
+
+        PEMParser pr = openPEMResource("data/" + fileName);
+        PKCS8EncryptedPrivateKeyInfo pInfo = (PKCS8EncryptedPrivateKeyInfo)pr.readObject();
+
+        InputDecryptorProvider pkcs8Prov = new JceOpenSSLPKCS8DecryptorProviderBuilder().setProvider("BC").build("test".toCharArray());
+
+        KeyFactory keyFact = KeyFactory.getInstance("ECGOST3410-2012", "BC");
+
+        PrivateKey privKey = keyFact.generatePrivate(new PKCS8EncodedKeySpec(pInfo.decryptPrivateKeyInfo(pkcs8Prov).getEncoded()));
+
+        pr = openPEMResource("data/gost2012_cert.pem");
+        X509Certificate cert = (X509Certificate)CertificateFactory.getInstance("X.509", "BC").generateCertificate(
+            new ByteArrayInputStream(((X509CertificateHolder)pr.readObject()).getEncoded()));
+
+        cert.verify(cert.getPublicKey());
+    }
+
     private void keyDecryptTest(String fileName, Class expectedPrivKeyClass, PEMDecryptorProvider decProv)
         throws IOException
     {
@@ -505,7 +569,7 @@ public class ParserTest
         catch (IOException e)
         {
             if (e.getCause() != null && !e.getCause().getMessage().endsWith(message))
-            {              System.err.println(e.getCause().getMessage());
+            {
                fail("issue " + index + " exception thrown, but wrong message");
             }
             else if (e.getCause() == null && !e.getMessage().equals(message))

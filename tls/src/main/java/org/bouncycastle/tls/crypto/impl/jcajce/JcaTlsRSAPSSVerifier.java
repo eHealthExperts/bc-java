@@ -1,19 +1,13 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.security.GeneralSecurityException;
 import java.security.PublicKey;
-import java.security.Signature;
-import java.security.SignatureException;
 import java.security.spec.AlgorithmParameterSpec;
 
-import org.bouncycastle.jcajce.io.OutputStreamFactory;
 import org.bouncycastle.tls.DigitallySigned;
 import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
-import org.bouncycastle.tls.crypto.TlsCryptoException;
 import org.bouncycastle.tls.crypto.TlsStreamVerifier;
 import org.bouncycastle.tls.crypto.TlsVerifier;
 
@@ -62,48 +56,13 @@ public class JcaTlsRSAPSSVerifier
             throw new IllegalStateException();
         }
 
-        final byte[] sig = signature.getSignature();
-
         short hash = SignatureAlgorithm.getRSAPSSHashAlgorithm(signatureAlgorithm);
         String digestName = crypto.getDigestName(hash);
         String sigName = RSAUtil.getDigestSigAlgName(digestName) + "WITHRSAANDMGF1";
 
-        try
-        {
-            final Signature verifier = crypto.getHelper().createSignature(sigName);
+        // NOTE: We explicitly set them even though they should be the defaults, because providers vary
+        AlgorithmParameterSpec pssSpec = RSAUtil.getPSSParameterSpec(hash, digestName, crypto.getHelper());
 
-            AlgorithmParameterSpec pssSpec = RSAUtil.getPSSParameterSpec(hash, digestName, crypto.getHelper());
-
-            // NOTE: We explicitly set them even though they should be the defaults, because providers vary
-            verifier.setParameter(pssSpec);
-
-            verifier.initVerify(publicKey);
-
-            final OutputStream stream = OutputStreamFactory.createStream(verifier);
-
-            return new TlsStreamVerifier()
-            {
-                public OutputStream getOutputStream() throws IOException
-                {
-                    return stream;
-                }
-
-                public boolean isVerified() throws IOException
-                {
-                    try
-                    {
-                        return verifier.verify(sig);
-                    }
-                    catch (SignatureException e)
-                    {
-                        throw new IOException(e.getMessage());
-                    }
-                }
-            };
-        }
-        catch (GeneralSecurityException e)
-        {
-            throw new TlsCryptoException(sigName + " verification failed", e);
-        }
+        return crypto.createStreamVerifier(sigName, pssSpec, signature.getSignature(), publicKey);
     }
 }

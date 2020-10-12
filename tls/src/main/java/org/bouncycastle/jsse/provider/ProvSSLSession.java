@@ -12,6 +12,7 @@ class ProvSSLSession
     extends ProvSSLSessionBase
 {
     // TODO[jsse] Ensure this behaves according to the javadoc for SSLSocket.getSession and SSLEngine.getSession
+    // TODO[jsse] This would make more sense as a ProvSSLSessionHandshake
     static final ProvSSLSession NULL_SESSION = new ProvSSLSession(null, null, -1, null,
         new JsseSessionParameters(null));
 
@@ -42,6 +43,12 @@ class ProvSSLSession
     }
 
     @Override
+    protected JsseSecurityParameters getJsseSecurityParameters()
+    {
+        return null;
+    }
+
+    @Override
     protected JsseSessionParameters getJsseSessionParameters()
     {
         return jsseSessionParameters;
@@ -56,7 +63,8 @@ class ProvSSLSession
     @Override
     public String[] getLocalSupportedSignatureAlgorithms()
     {
-        throw new UnsupportedOperationException();
+        // TODO Should we store these in SessionParameters?
+        return null;
     }
 
     @Override
@@ -68,7 +76,8 @@ class ProvSSLSession
     @Override
     public String[] getPeerSupportedSignatureAlgorithms()
     {
-        throw new UnsupportedOperationException();
+        // TODO Should we store these in SessionParameters?
+        return null;
     }
 
     @Override

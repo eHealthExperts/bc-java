@@ -17,7 +17,7 @@ import javax.net.ssl.SSLSessionContext;
 
 import org.bouncycastle.tls.SessionID;
 import org.bouncycastle.tls.TlsSession;
-import org.bouncycastle.tls.crypto.TlsCrypto;
+import org.bouncycastle.tls.crypto.impl.jcajce.JcaTlsCrypto;
 
 class ProvSSLSessionContext
     implements SSLSessionContext
@@ -45,26 +45,24 @@ class ProvSSLSessionContext
     protected final Map<String, SessionEntry> sessionsByPeer = new HashMap<String, SessionEntry>();
     protected final ReferenceQueue<ProvSSLSession> sessionsQueue = new ReferenceQueue<ProvSSLSession>();
 
-    protected final ProvSSLContextSpi sslContext;
-    protected final TlsCrypto crypto;
+    protected final ContextData contextData;
 
     protected int sessionCacheSize = provSessionCacheSize;
     protected int sessionTimeoutSeconds = 86400; // 24hrs (in seconds)
 
-    ProvSSLSessionContext(ProvSSLContextSpi sslContext, TlsCrypto crypto)
+    ProvSSLSessionContext(ContextData contextData)
     {
-        this.sslContext = sslContext;
-        this.crypto = crypto;
+        this.contextData = contextData;
     }
 
     ProvSSLContextSpi getSSLContext()
     {
-        return sslContext;
+        return contextData.getContext();
     }
 
-    TlsCrypto getCrypto()
+    JcaTlsCrypto getCrypto()
     {
-        return crypto;
+        return contextData.getCrypto();
     }
 
     synchronized ProvSSLSession getSessionImpl(byte[] sessionID)

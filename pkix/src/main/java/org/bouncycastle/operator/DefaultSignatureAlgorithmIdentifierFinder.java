@@ -15,6 +15,7 @@ import org.bouncycastle.asn1.cryptopro.CryptoProObjectIdentifiers;
 import org.bouncycastle.asn1.eac.EACObjectIdentifiers;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.gm.GMObjectIdentifiers;
+import org.bouncycastle.asn1.isara.IsaraObjectIdentifiers;
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
@@ -160,11 +161,15 @@ public class DefaultSignatureAlgorithmIdentifierFinder
         algorithms.put("SHAKE128WITHXMSSMT-SHAKE128", BCObjectIdentifiers.xmss_mt_SHAKE128ph);
         algorithms.put("SHAKE256WITHXMSSMT-SHAKE256", BCObjectIdentifiers.xmss_mt_SHAKE256ph);
 
+        algorithms.put("LMS", PKCSObjectIdentifiers.id_alg_hss_lms_hashsig);
+
+        algorithms.put("XMSS", IsaraObjectIdentifiers.id_alg_xmss);
         algorithms.put("XMSS-SHA256", BCObjectIdentifiers.xmss_SHA256);
         algorithms.put("XMSS-SHA512", BCObjectIdentifiers.xmss_SHA512);
         algorithms.put("XMSS-SHAKE128", BCObjectIdentifiers.xmss_SHAKE128);
         algorithms.put("XMSS-SHAKE256", BCObjectIdentifiers.xmss_SHAKE256);
 
+        algorithms.put("XMSSMT", IsaraObjectIdentifiers.id_alg_xmssmt);
         algorithms.put("XMSSMT-SHA256", BCObjectIdentifiers.xmss_mt_SHA256);
         algorithms.put("XMSSMT-SHA512", BCObjectIdentifiers.xmss_mt_SHA512);
         algorithms.put("XMSSMT-SHAKE128", BCObjectIdentifiers.xmss_mt_SHAKE128);
@@ -183,6 +188,7 @@ public class DefaultSignatureAlgorithmIdentifierFinder
         noParams.add(X9ObjectIdentifiers.ecdsa_with_SHA384);
         noParams.add(X9ObjectIdentifiers.ecdsa_with_SHA512);
         noParams.add(X9ObjectIdentifiers.id_dsa_with_sha1);
+        noParams.add(OIWObjectIdentifiers.dsaWithSHA1);
         noParams.add(NISTObjectIdentifiers.dsa_with_sha224);
         noParams.add(NISTObjectIdentifiers.dsa_with_sha256);
         noParams.add(NISTObjectIdentifiers.dsa_with_sha384);
@@ -230,6 +236,9 @@ public class DefaultSignatureAlgorithmIdentifierFinder
         noParams.add(BCObjectIdentifiers.xmss_mt_SHA512);
         noParams.add(BCObjectIdentifiers.xmss_mt_SHAKE128);
         noParams.add(BCObjectIdentifiers.xmss_mt_SHAKE256);
+
+        noParams.add(IsaraObjectIdentifiers.id_alg_xmss);
+        noParams.add(IsaraObjectIdentifiers.id_alg_xmssmt);
 
         //
         // qTESLA

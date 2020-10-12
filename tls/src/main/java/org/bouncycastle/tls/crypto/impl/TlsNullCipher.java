@@ -5,12 +5,14 @@ import java.io.IOException;
 import javax.security.auth.DestroyFailedException;
 
 import org.bouncycastle.tls.AlertDescription;
+import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCipher;
 import org.bouncycastle.tls.crypto.TlsCryptoParameters;
+import org.bouncycastle.tls.crypto.TlsDecodeResult;
+import org.bouncycastle.tls.crypto.TlsEncodeResult;
 import org.bouncycastle.tls.crypto.TlsHMAC;
-import org.bouncycastle.util.Arrays;
 
 /**
  * The NULL cipher.
@@ -18,16 +20,21 @@ import org.bouncycastle.util.Arrays;
 public class TlsNullCipher
     implements TlsCipher
 {
-    protected final TlsCryptoParameters cryptoParameters;
+    protected final TlsCryptoParameters cryptoParams;
     protected final TlsSuiteHMac readMac, writeMac;
 
-    public TlsNullCipher(TlsCryptoParameters cryptoParameters, TlsHMAC clientMac, TlsHMAC serverMac)
+    public TlsNullCipher(TlsCryptoParameters cryptoParams, TlsHMAC clientMac, TlsHMAC serverMac)
         throws IOException
     {
-        this.cryptoParameters = cryptoParameters;
+        if (TlsImplUtils.isTLSv13(cryptoParams))
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        this.cryptoParams = cryptoParams;
 
         int key_block_size = clientMac.getMacLength() + serverMac.getMacLength();
-        byte[] key_block = TlsImplUtils.calculateKeyBlock(cryptoParameters, key_block_size);
+        byte[] key_block = TlsImplUtils.calculateKeyBlock(cryptoParams, key_block_size);
 
         int offset = 0;
 
@@ -41,21 +48,26 @@ public class TlsNullCipher
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
 
-        if (cryptoParameters.isServer())
+        if (cryptoParams.isServer())
         {
-            writeMac = new TlsSuiteHMac(cryptoParameters, serverMac);
-            readMac = new TlsSuiteHMac(cryptoParameters, clientMac);
+            writeMac = new TlsSuiteHMac(cryptoParams, serverMac);
+            readMac = new TlsSuiteHMac(cryptoParams, clientMac);
         }
         else
         {
-            writeMac = new TlsSuiteHMac(cryptoParameters, clientMac);
-            readMac = new TlsSuiteHMac(cryptoParameters, serverMac);
+            writeMac = new TlsSuiteHMac(cryptoParams, clientMac);
+            readMac = new TlsSuiteHMac(cryptoParams, serverMac);
         }
     }
 
-    public int getCiphertextLimit(int plaintextLimit)
+    public int getCiphertextDecodeLimit(int plaintextLimit)
     {
         return plaintextLimit + writeMac.getSize();
+    }
+
+    public int getCiphertextEncodeLimit(int plaintextLength, int plaintextLimit)
+    {
+        return plaintextLength + writeMac.getSize();
     }
 
     public int getPlaintextLimit(int ciphertextLimit)
@@ -63,18 +75,18 @@ public class TlsNullCipher
         return ciphertextLimit - writeMac.getSize();
     }
 
-    public byte[] encodePlaintext(long seqNo, short type, byte[] plaintext, int offset, int len)
-        throws IOException
+    public TlsEncodeResult encodePlaintext(long seqNo, short contentType, ProtocolVersion recordVersion, int headerAllocation,
+        byte[] plaintext, int offset, int len) throws IOException
     {
-        byte[] mac = writeMac.calculateMac(seqNo, type, plaintext, offset, len);
-        byte[] ciphertext = new byte[len + mac.length];
-        System.arraycopy(plaintext, offset, ciphertext, 0, len);
-        System.arraycopy(mac, 0, ciphertext, len, mac.length);
-        return ciphertext;
+        byte[] mac = writeMac.calculateMac(seqNo, contentType, plaintext, offset, len);
+        byte[] ciphertext = new byte[headerAllocation + len + mac.length];
+        System.arraycopy(plaintext, offset, ciphertext, headerAllocation, len);
+        System.arraycopy(mac, 0, ciphertext, headerAllocation + len, mac.length);
+        return new TlsEncodeResult(ciphertext, 0, ciphertext.length, contentType);
     }
 
-    public byte[] decodeCiphertext(long seqNo, short type, byte[] ciphertext, int offset, int len)
-        throws IOException
+    public TlsDecodeResult decodeCiphertext(long seqNo, short recordType, ProtocolVersion recordVersion,
+        byte[] ciphertext, int offset, int len) throws IOException
     {
         int macSize = readMac.getSize();
         if (len < macSize)
@@ -84,15 +96,30 @@ public class TlsNullCipher
 
         int macInputLen = len - macSize;
 
-        byte[] receivedMac = TlsUtils.copyOfRangeExact(ciphertext, offset + macInputLen, offset + len);
-        byte[] computedMac = readMac.calculateMac(seqNo, type, ciphertext, offset, macInputLen);
+        byte[] expectedMac = readMac.calculateMac(seqNo, recordType, ciphertext, offset, macInputLen);
 
-        if (!Arrays.constantTimeAreEqual(receivedMac, computedMac))
+        boolean badMac = !TlsUtils.constantTimeAreEqual(macSize, expectedMac, 0, ciphertext, offset + macInputLen);
+        if (badMac)
         {
             throw new TlsFatalAlert(AlertDescription.bad_record_mac);
         }
 
-        return TlsUtils.copyOfRangeExact(ciphertext, offset, offset + macInputLen);
+        return new TlsDecodeResult(ciphertext, offset, macInputLen, recordType);
+    }
+
+    public void rekeyDecoder() throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public void rekeyEncoder() throws IOException
+    {
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public boolean usesOpaqueRecordType()
+    {
+        return false;
     }
     
     public void destroy() throws DestroyFailedException {

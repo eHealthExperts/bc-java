@@ -33,6 +33,27 @@ public final class Arrays
         return java.util.Arrays.equals(a, b);
     }
 
+    public static boolean areEqual(byte[] a, int aFromIndex, int aToIndex, byte[] b, int bFromIndex, int bToIndex)
+    {
+        int aLength = aToIndex - aFromIndex;
+        int bLength = bToIndex - bFromIndex;
+
+        if (aLength != bLength)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < aLength; ++i)
+        {
+            if (a[aFromIndex + i] != b[bFromIndex + i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static boolean areEqual(char[] a, char[] b)
     {
         return java.util.Arrays.equals(a, b);
@@ -825,11 +846,11 @@ public final class Arrays
     {
         if (null == a)
         {
-            return (byte[])b.clone();
+            return clone(b);
         }
         if (null == b)
         {
-            return (byte[])a.clone();
+            return clone(a);
         }
 
         byte[] r = new byte[a.length + b.length];
@@ -913,11 +934,11 @@ public final class Arrays
     {
         if (null == a)
         {
-            return (int[])b.clone();
+            return clone(b);
         }
         if (null == b)
         {
-            return (int[])a.clone();
+            return clone(a);
         }
 
         int[] r = new int[a.length + b.length];

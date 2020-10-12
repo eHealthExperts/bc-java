@@ -70,7 +70,7 @@ public class Ed448Test
 
         signer.init(true, privateKey);
 
-        areEqual(sig, signer.generateSignature());
+        isTrue(areEqual(sig, signer.generateSignature()));
 
         signer.init(false, publicKey);
 
@@ -137,6 +137,16 @@ public class Ed448Test
             if (shouldNotVerify)
             {
                 fail("Ed448(" + algorithm + ") wrong length signature incorrectly verified");
+            }
+        }
+
+        if (msg.length > 0)
+        {
+            boolean shouldNotVerify = verifier.verifySignature(signature);
+
+            if (shouldNotVerify)
+            {
+                fail("Ed448(" + algorithm + ") wrong length failure did not reset verifier");
             }
         }
 

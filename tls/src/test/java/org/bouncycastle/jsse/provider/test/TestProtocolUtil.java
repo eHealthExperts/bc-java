@@ -8,7 +8,7 @@ import java.util.concurrent.Callable;
 
 import org.bouncycastle.util.Strings;
 
-import junit.framework.Assert;
+import junit.framework.TestCase;
 
 class TestProtocolUtil
 {
@@ -22,14 +22,14 @@ class TestProtocolUtil
         implements Runnable
     {
         private final Callable<Exception> callable;
-        private Exception result = null;
+        private Throwable result = null;
 
         public Task(Callable<Exception> callable)
         {
             this.callable = callable;
         }
 
-        public Exception getResult()
+        public Throwable getResult()
         {
             return result;
         }
@@ -40,9 +40,9 @@ class TestProtocolUtil
             {
                 result = callable.call();
             }
-            catch (Exception e)
+            catch (Throwable t)
             {
-                result = e;
+                result = t;
             }
         }
     }
@@ -52,19 +52,21 @@ class TestProtocolUtil
     {
         TestProtocolUtil.Task serverTask = new TestProtocolUtil.Task(server);
         Thread serverThread = new Thread(serverTask);
+        serverThread.setDaemon(true);
         serverThread.start();
         server.await();
 
         TestProtocolUtil.Task clientTask = new TestProtocolUtil.Task(client);
         Thread clientThread = new Thread(clientTask);
+        clientThread.setDaemon(true);
         clientThread.start();
         client.await();
 
         serverThread.join();
         clientThread.join();
 
-        Assert.assertNull(serverTask.getResult());
-        Assert.assertNull(clientTask.getResult());
+        TestCase.assertNull(serverTask.getResult());
+        TestCase.assertNull(clientTask.getResult());
     }
 
     public static void doClientProtocol(
@@ -79,7 +81,7 @@ class TestProtocolUtil
 
         String message = readMessage(in);
 
-        Assert.assertEquals("World", message);
+        TestCase.assertEquals("World", message);
     }
 
     public static void doServerProtocol(
@@ -94,7 +96,7 @@ class TestProtocolUtil
 
         writeMessage(text, out);
 
-        Assert.assertEquals("Hello", message);
+        TestCase.assertEquals("Hello", message);
     }
 
     private static void writeMessage(String text, OutputStream out)

@@ -175,7 +175,7 @@ public class ChaCha20Poly1305
         case State.ENC_DATA:
             return total + MAC_SIZE;
         default:
-            throw new IllegalStateException("state="+state);
+            throw new IllegalStateException();
         }
     }
 
@@ -281,9 +281,15 @@ public class ChaCha20Poly1305
         {
             throw new NullPointerException("'in' cannot be null");
         }
+        /*
+         * The BC provider can pass null when it expects no output (e.g. based on a
+         * getUpdateOutputSize call).
+         * 
+         * See https://github.com/bcgit/bc-java/issues/674
+         */
         if (null == out)
         {
-            throw new NullPointerException("'out' cannot be null");
+//            throw new NullPointerException("'out' cannot be null");
         }
         if (inOff < 0)
         {
@@ -542,7 +548,7 @@ public class ChaCha20Poly1305
 
     private void padMAC(long count)
     {
-        int partial = (int)count % MAC_SIZE;
+        int partial = (int)count & (MAC_SIZE - 1);
         if (0 != partial)
         {
             poly1305.update(ZEROES, 0, MAC_SIZE - partial);

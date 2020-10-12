@@ -16,7 +16,7 @@ class SSLUtils
     static void enableAll(SSLServerSocket ss)
     {
         ss.setEnabledCipherSuites(ss.getSupportedCipherSuites());
-        ss.setEnabledProtocols(ss.getEnabledProtocols());
+        ss.setEnabledProtocols(ss.getSupportedProtocols());
     }
 
     static void restrictKeyExchange(SSLSocket s, String keyExchange)
@@ -59,7 +59,7 @@ class SSLUtils
             {
                 try
                 {
-                    KeyManagerFactory keyManagerFactory = TestUtils.getSunX509KeyManagerFactory();
+                    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("PKIX");
 
                     keyManagerFactory.init(keyStore, password);
 
@@ -99,7 +99,9 @@ class SSLUtils
             }
         };
 
-        new Thread(serverTask).start();
+        Thread t = new Thread(serverTask);
+        t.setDaemon(true);
+        t.start();
 
         try
         {

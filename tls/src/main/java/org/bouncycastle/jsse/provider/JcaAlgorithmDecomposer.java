@@ -1,5 +1,6 @@
 package org.bouncycastle.jsse.provider;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -13,6 +14,11 @@ class JcaAlgorithmDecomposer
 
     public Set<String> decompose(String algorithm)
     {
+        if (algorithm.indexOf('/') < 0)
+        {
+            return Collections.emptySet();
+        }
+
         Set<String> result = new HashSet<String>();
 
         for (String section : algorithm.split("/"))

@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
@@ -17,6 +18,8 @@ import org.bouncycastle.jsse.BCSSLSocket;
 
 abstract class SSLSocketUtil
 {
+    private static AtomicInteger threadNumber = new AtomicInteger();
+
     private static final Method getHandshakeSession;
     private static final Method getSSLParameters;
 
@@ -29,50 +32,58 @@ abstract class SSLSocketUtil
     }
 
     /** This factory method is the one used (only) by ProvSSLServerSocket */
-    static ProvSSLSocketDirect create(ProvSSLContextSpi context, ContextData contextData, boolean enableSessionCreation,
+    static ProvSSLSocketDirect create(ContextData contextData, boolean enableSessionCreation,
         boolean useClientMode, ProvSSLParameters sslParameters)
     {
-        return new ProvSSLSocketDirect(context, contextData, enableSessionCreation, useClientMode, sslParameters);
+        return new ProvSSLSocketDirect(contextData, enableSessionCreation, useClientMode, sslParameters);
     }
 
-    static ProvSSLSocketDirect create(ProvSSLContextSpi context, ContextData contextData)
+    static ProvSSLSocketDirect create(ContextData contextData)
     {
-        return new ProvSSLSocketDirect(context, contextData);
+        return new ProvSSLSocketDirect(contextData);
     }
 
-    static ProvSSLSocketDirect create(ProvSSLContextSpi context, ContextData contextData, InetAddress address, int port,
+    static ProvSSLSocketDirect create(ContextData contextData, InetAddress address, int port,
         InetAddress clientAddress, int clientPort) throws IOException
     {
-        return new ProvSSLSocketDirect(context, contextData, address, port, clientAddress, clientPort);
+        return new ProvSSLSocketDirect(contextData, address, port, clientAddress, clientPort);
     }
 
-    static ProvSSLSocketDirect create(ProvSSLContextSpi context, ContextData contextData, InetAddress address, int port)
+    static ProvSSLSocketDirect create(ContextData contextData, InetAddress address, int port)
         throws IOException
     {
-        return new ProvSSLSocketDirect(context, contextData, address, port);
+        return new ProvSSLSocketDirect(contextData, address, port);
     }
 
-    static ProvSSLSocketDirect create(ProvSSLContextSpi context, ContextData contextData, String host, int port, InetAddress clientAddress, int clientPort)
+    static ProvSSLSocketDirect create(ContextData contextData, String host, int port, InetAddress clientAddress, int clientPort)
         throws IOException, UnknownHostException
     {
-        return new ProvSSLSocketDirect(context, contextData, host, port, clientAddress, clientPort);
+        return new ProvSSLSocketDirect(contextData, host, port, clientAddress, clientPort);
     }
 
-    static ProvSSLSocketDirect create(ProvSSLContextSpi context, ContextData contextData, String host, int port) throws IOException, UnknownHostException
+    static ProvSSLSocketDirect create(ContextData contextData, String host, int port) throws IOException, UnknownHostException
     {
-        return new ProvSSLSocketDirect(context, contextData, host, port);
+        return new ProvSSLSocketDirect(contextData, host, port);
     }
 
-    static ProvSSLSocketWrap create(ProvSSLContextSpi context, ContextData contextData, Socket s, InputStream consumed, boolean autoClose)
+    static ProvSSLSocketWrap create(ContextData contextData, Socket s, InputStream consumed, boolean autoClose)
         throws IOException
     {
-        return new ProvSSLSocketWrap(context, contextData, s, consumed, autoClose);
+        return new ProvSSLSocketWrap(contextData, s, consumed, autoClose);
     }
 
-    static ProvSSLSocketWrap create(ProvSSLContextSpi context, ContextData contextData, Socket s, String host, int port, boolean autoClose)
+    static ProvSSLSocketWrap create(ContextData contextData, Socket s, String host, int port, boolean autoClose)
         throws IOException
     {
-        return new ProvSSLSocketWrap(context, contextData, s, host, port, autoClose);
+        return new ProvSSLSocketWrap(contextData, s, host, port, autoClose);
+    }
+
+    static void handshakeCompleted(Runnable notifyRunnable)
+    {
+        String name = "BCJSSE-HandshakeCompleted-" + (threadNumber.getAndIncrement() & 0x7FFFFFFF);
+
+        // Can't be a daemon thread
+        new Thread(notifyRunnable, name).start();
     }
 
     static BCExtendedSSLSession importHandshakeSession(SSLSocket sslSocket)
@@ -83,16 +94,10 @@ abstract class SSLSocketUtil
         }
         if (null != sslSocket && null != getHandshakeSession)
         {
-            try
+            SSLSession sslSession = (SSLSession)ReflectionUtil.invokeGetter(sslSocket, getHandshakeSession);
+            if (null != sslSession)
             {
-                SSLSession sslSession = (SSLSession)ReflectionUtil.invokeGetter(sslSocket, getHandshakeSession);
-                if (null != sslSession)
-                {
-                    return SSLSessionUtil.importSSLSession(sslSession);
-                }
-            }
-            catch (Exception e)
-            {
+                return SSLSessionUtil.importSSLSession(sslSession);
             }
         }
         return null;
@@ -104,20 +109,17 @@ abstract class SSLSocketUtil
         {
             return ((BCSSLSocket)sslSocket).getParameters();
         }
-        if (null != sslSocket && null != getSSLParameters)
+        if (null == sslSocket || null == getSSLParameters)
         {
-            try
-            {
-                SSLParameters sslParameters = (SSLParameters)ReflectionUtil.invokeGetter(sslSocket, getSSLParameters);
-                if (null != sslParameters)
-                {
-                    return SSLParametersUtil.importSSLParameters(sslParameters);
-                }
-            }
-            catch (Exception e)
-            {
-            }
+            return null;
         }
-        return null;
+
+        SSLParameters sslParameters = (SSLParameters)ReflectionUtil.invokeGetter(sslSocket, getSSLParameters);
+        if (null == sslParameters)
+        {
+            throw new RuntimeException("SSLSocket.getSSLParameters returned null");
+        }
+
+        return SSLParametersUtil.importSSLParameters(sslParameters);
     }
 }

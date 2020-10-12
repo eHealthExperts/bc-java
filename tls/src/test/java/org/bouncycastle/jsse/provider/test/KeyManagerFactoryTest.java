@@ -3,7 +3,6 @@ package org.bouncycastle.jsse.provider.test;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.Principal;
-import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 
@@ -16,10 +15,9 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedKeyManager;
 import javax.security.auth.x500.X500Principal;
 
-import junit.framework.TestCase;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
+
+import junit.framework.TestCase;
 
 public class KeyManagerFactoryTest
     extends TestCase
@@ -28,20 +26,13 @@ public class KeyManagerFactoryTest
 
     protected void setUp()
     {
-        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null)
-        {
-            Security.addProvider(new BouncyCastleProvider());
-        }
-        if (Security.getProvider(BouncyCastleJsseProvider.PROVIDER_NAME) == null)
-        {
-            Security.addProvider(new BouncyCastleJsseProvider());
-        }
+        ProviderUtils.setupLowPriority(false);
     }
 
     public void testBasicRSA()
         throws Exception
     {
-        KeyManagerFactory fact = KeyManagerFactory.getInstance("PKIX", BouncyCastleJsseProvider.PROVIDER_NAME);
+        KeyManagerFactory fact = KeyManagerFactory.getInstance("PKIX", ProviderUtils.PROVIDER_NAME_BCJSSE);
 
         KeyStore ks = getRsaKeyStore(true);
 
@@ -51,7 +42,11 @@ public class KeyManagerFactoryTest
 
         X509ExtendedKeyManager manager = (X509ExtendedKeyManager)managers[0];
 
-        String alias = manager.chooseServerAlias("RSA", null, null);
+        // NOTE: This depends on the value of JsseUtils.getKeyTypeLegacyServer(KeyExchangeAlgorithm.RSA)
+//        String keyType = "RSA";
+        String keyType = "KE:RSA";
+
+        String alias = manager.chooseServerAlias(keyType, null, null);
 
         assertNotNull(alias);
 
@@ -59,11 +54,11 @@ public class KeyManagerFactoryTest
 
         assertNotNull(manager.getPrivateKey(alias));
 
-        alias = manager.chooseServerAlias("RSA", new Principal[] { new X500Principal("CN=TLS Test") }, null);
+        alias = manager.chooseServerAlias(keyType, new Principal[] { new X500Principal("CN=TLS Test") }, null);
 
         assertNull(alias);
 
-        alias = manager.chooseServerAlias("RSA", new Principal[] { new X500Principal("CN=TLS Test CA") }, null);
+        alias = manager.chooseServerAlias(keyType, new Principal[] { new X500Principal("CN=TLS Test CA") }, null);
 
         assertNotNull(alias);
 
@@ -75,7 +70,7 @@ public class KeyManagerFactoryTest
     public void testBasicEC()
         throws Exception
     {
-        KeyManagerFactory fact = KeyManagerFactory.getInstance("PKIX", BouncyCastleJsseProvider.PROVIDER_NAME);
+        KeyManagerFactory fact = KeyManagerFactory.getInstance("PKIX", ProviderUtils.PROVIDER_NAME_BCJSSE);
 
         KeyStore ks = getEcKeyStore(false);
 
@@ -85,7 +80,10 @@ public class KeyManagerFactoryTest
 
         X509ExtendedKeyManager manager = (X509ExtendedKeyManager)managers[0];
 
-        String alias = manager.chooseServerAlias("ECDHE_ECDSA", null, null);
+        // NOTE: This depends on the value of JsseUtils.getKeyTypeLegacyServer(KeyExchangeAlgorithm.ECDHE_ECDSA)
+        String keyType = "ECDHE_ECDSA";
+
+        String alias = manager.chooseServerAlias(keyType, null, null);
 
         assertNotNull(alias);
 
@@ -93,11 +91,11 @@ public class KeyManagerFactoryTest
 
         assertNotNull(manager.getPrivateKey(alias));
 
-        alias = manager.chooseServerAlias("ECDHE_ECDSA", new Principal[] { new X500Principal("CN=TLS Test") }, null);
+        alias = manager.chooseServerAlias(keyType, new Principal[] { new X500Principal("CN=TLS Test") }, null);
 
         assertNull(alias);
 
-        alias = manager.chooseServerAlias("ECDHE_ECDSA", new Principal[] { new X500Principal("CN=TLS Test CA") }, null);
+        alias = manager.chooseServerAlias(keyType, new Principal[] { new X500Principal("CN=TLS Test CA") }, null);
 
         assertNotNull(alias);
 
@@ -181,11 +179,12 @@ public class KeyManagerFactoryTest
 
         SSLUtils.startServer(ks, PASSWORD, trustStore, false, 8886);
 
-        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX", BouncyCastleJsseProvider.PROVIDER_NAME);
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX",
+            ProviderUtils.PROVIDER_NAME_BCJSSE);
 
         trustManagerFactory.init(trustStore);
 
-        SSLContext context = SSLContext.getInstance("TLS");
+        SSLContext context = SSLContext.getInstance("TLS", ProviderUtils.PROVIDER_NAME_BCJSSE);
 
         context.init(null, trustManagerFactory.getTrustManagers(), null);
 
@@ -214,16 +213,24 @@ public class KeyManagerFactoryTest
         SSLUtils.startServer(ks, PASSWORD, trustStore, false, 8886);
 
         /*
-         * For this variation we add the server's certificate to the client's trust store directly, instead of the root (TA).
+         * For this variation we add the server's certificate to the client's trust store directly,
+         * instead of the root (TA).
+         * 
+         * NOTE: For TLS 1.3 with certificate_authorities in ClientHello, or earlier versions with
+         * trusted_ca_keys in ClientHello, this test only works when a) there are no actual CA
+         * certificates in the client trust store, AND/OR b) the server is willing to (eventually)
+         * select a certificate whose issuer is not mentioned in those extensions (or e.g.
+         * trusted_ca_keys not enabled/supported).
          */
         trustStore = KeyStore.getInstance("JKS");
         trustStore.load(null, PASSWORD);
         trustStore.setCertificateEntry("server", ks.getCertificate("test"));
 
-        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX", BouncyCastleJsseProvider.PROVIDER_NAME);
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX",
+            ProviderUtils.PROVIDER_NAME_BCJSSE);
         trustManagerFactory.init(trustStore);
 
-        SSLContext context = SSLContext.getInstance("TLS");
+        SSLContext context = SSLContext.getInstance("TLS", ProviderUtils.PROVIDER_NAME_BCJSSE);
 
         context.init(null, trustManagerFactory.getTrustManagers(), null);
 
@@ -251,17 +258,18 @@ public class KeyManagerFactoryTest
 
         SSLUtils.startServer(serverKS, PASSWORD, serverTS, true, 8887);
 
-        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("PKIX", BouncyCastleJsseProvider.PROVIDER_NAME);
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("PKIX", ProviderUtils.PROVIDER_NAME_BCJSSE);
         keyManagerFactory.init(clientKS, PASSWORD);
 
         KeyStore clientTS = KeyStore.getInstance("JKS");
         clientTS.load(null, PASSWORD);
         clientTS.setCertificateEntry("serverRoot", serverKS.getCertificate("root"));
 
-        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX", BouncyCastleJsseProvider.PROVIDER_NAME);
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX",
+            ProviderUtils.PROVIDER_NAME_BCJSSE);
         trustManagerFactory.init(clientTS);
 
-        SSLContext context = SSLContext.getInstance("TLS");
+        SSLContext context = SSLContext.getInstance("TLS", ProviderUtils.PROVIDER_NAME_BCJSSE);
 
         context.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
 

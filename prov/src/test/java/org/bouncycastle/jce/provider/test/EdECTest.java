@@ -16,6 +16,8 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.Signature;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
@@ -27,8 +29,12 @@ import java.util.Set;
 
 import javax.crypto.KeyAgreement;
 
+import org.bouncycastle.asn1.ASN1Encoding;
+import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.Certificate;
 import org.bouncycastle.jcajce.spec.DHUParameterSpec;
 import org.bouncycastle.jcajce.spec.EdDSAParameterSpec;
@@ -91,14 +97,31 @@ public class EdECTest
 
         Signature sig = Signature.getInstance("EDDSA", "BC");
 
-        Certificate x25519Cert = Certificate.getInstance(EdECTest.x25519Cert);
+        ASN1Sequence x25519Seq = ASN1Sequence.getInstance(EdECTest.x25519Cert);
+        Certificate x25519Cert = Certificate.getInstance(x25519Seq);
 
         sig.initVerify(pub);
 
-        sig.update(x25519Cert.getTBSCertificate().getEncoded());
+        // yes, the demo certificate is invalid...
+        sig.update(x25519Seq.getObjectAt(0).toASN1Primitive().getEncoded(ASN1Encoding.DL));
 
         isTrue(sig.verify(x25519Cert.getSignature().getBytes()));
 
+        CertificateFactory certFact = CertificateFactory.getInstance("X.509", "BC");
+
+        X509Certificate c = (X509Certificate)certFact.generateCertificate(new ByteArrayInputStream(EdECTest.x25519Cert));
+
+        isTrue("Ed25519".equals(c.getSigAlgName()));
+
+        // this may look abit strange but it turn's out the Oracle CertificateFactory tampers
+        // with public key parameters on building the public key. If the keyfactory doesn't
+        // take things into account the generate throws an exception!
+        certFact = CertificateFactory.getInstance("X.509", "SUN");
+
+        c = (X509Certificate)certFact.generateCertificate(new ByteArrayInputStream(EdECTest.x25519Cert));
+
+        testPKCS8Override();
+        
         x448AgreementTest();
         x25519AgreementTest();
         ed448SignatureTest();
@@ -616,6 +639,58 @@ public class EdECTest
         signature.update(msg);
 
         isTrue(signature.verify(sig));
+    }
+
+    private void testPKCS8Override()
+        throws Exception
+    {
+        System.setProperty("org.bouncycastle.pkcs8.v1_info_only", "true");
+
+        KeyPairGenerator kpGen = KeyPairGenerator.getInstance("EdDSA", "BC");
+
+        kpGen.initialize(448);
+
+        KeyPair kp = kpGen.generateKeyPair();
+
+        PrivateKeyInfo info = PrivateKeyInfo.getInstance(kp.getPrivate().getEncoded());
+
+        isTrue(info.getPublicKeyData() == null);
+        isTrue(info.getVersion().equals(new ASN1Integer(0)));
+
+        kpGen = KeyPairGenerator.getInstance("XDH", "BC");
+
+        kpGen.initialize(448);
+
+        kp = kpGen.generateKeyPair();
+
+        info = PrivateKeyInfo.getInstance(kp.getPrivate().getEncoded());
+
+        isTrue(info.getPublicKeyData() == null);
+        isTrue(info.getVersion().equals(new ASN1Integer(0)));
+
+        System.setProperty("org.bouncycastle.pkcs8.v1_info_only", "false");
+
+        kpGen = KeyPairGenerator.getInstance("EdDSA", "BC");
+
+        kpGen.initialize(448);
+
+        kp = kpGen.generateKeyPair();
+
+        info = PrivateKeyInfo.getInstance(kp.getPrivate().getEncoded());
+
+        isTrue(info.getPublicKeyData() != null);
+        isTrue(info.getVersion().equals(new ASN1Integer(1)));
+
+        kpGen = KeyPairGenerator.getInstance("XDH", "BC");
+
+        kpGen.initialize(448);
+
+        kp = kpGen.generateKeyPair();
+
+        info = PrivateKeyInfo.getInstance(kp.getPrivate().getEncoded());
+
+        isTrue(info.getPublicKeyData() != null);
+        isTrue(info.getVersion().equals(new ASN1Integer(1)));
     }
 
     public static void main(

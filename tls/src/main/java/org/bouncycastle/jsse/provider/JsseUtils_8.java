@@ -1,9 +1,15 @@
 package org.bouncycastle.jsse.provider;
 
+import java.security.cert.CertPathBuilder;
+import java.security.cert.PKIXBuilderParameters;
+import java.security.cert.PKIXCertPathChecker;
+import java.security.cert.PKIXRevocationChecker;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIMatcher;
@@ -87,12 +93,41 @@ abstract class JsseUtils_8
         return new ExportSNIMatcher(matcher);
     }
 
-    /*
-     * NOTE: Currently return type is Object to isolate callers from JDK8 type
-     */
-    static Object exportSNIMatchers(Collection<BCSNIMatcher> matchers)
+    static void addStatusResponses(CertPathBuilder pkixBuilder, PKIXBuilderParameters pkixParameters,
+        Map<X509Certificate, byte[]> statusResponseMap)
     {
-        if (matchers.isEmpty())
+        if (statusResponseMap.isEmpty())
+        {
+            return;
+        }
+
+        List<PKIXCertPathChecker> certPathCheckers = pkixParameters.getCertPathCheckers();
+        PKIXRevocationChecker existingChecker = getFirstRevocationChecker(certPathCheckers);
+
+        if (null != existingChecker)
+        {
+            // NOTE: Existing checker will be used irrespective of pkixParameters.isRevocationEnabled
+            Map<X509Certificate, byte[]> ocspResponses = existingChecker.getOcspResponses();
+            if (putAnyAbsent(ocspResponses, statusResponseMap) > 0)
+            {
+                existingChecker.setOcspResponses(ocspResponses);
+                pkixParameters.setCertPathCheckers(certPathCheckers);
+            }
+        }
+        else
+        {
+            if (pkixParameters.isRevocationEnabled())
+            {
+                PKIXRevocationChecker checker = (PKIXRevocationChecker)pkixBuilder.getRevocationChecker();
+                checker.setOcspResponses(statusResponseMap);
+                pkixParameters.addCertPathChecker(checker);
+            }
+        }
+    }
+
+    static List<SNIMatcher> exportSNIMatchers(Collection<BCSNIMatcher> matchers)
+    {
+        if (null == matchers || matchers.isEmpty())
         {
             return Collections.<SNIMatcher>emptyList();
         }
@@ -103,6 +138,14 @@ abstract class JsseUtils_8
             result.add(exportSNIMatcher(matcher));
         }
         return Collections.unmodifiableList(result);
+    }
+
+    /*
+     * NOTE: Return type is Object to isolate callers from JDK 8 type
+     */
+    static Object exportSNIMatchersDynamic(Collection<BCSNIMatcher> matchers)
+    {
+        return exportSNIMatchers(matchers);
     }
 
     static SNIServerName exportSNIServerName(BCSNIServerName serverName)
@@ -124,12 +167,9 @@ abstract class JsseUtils_8
         }
     }
 
-    /*
-     * NOTE: Currently return type is Object to isolate callers from JDK8 type
-     */
-    static Object exportSNIServerNames(Collection<BCSNIServerName> serverNames)
+    static List<SNIServerName> exportSNIServerNames(Collection<BCSNIServerName> serverNames)
     {
-        if (serverNames.isEmpty())
+        if (null == serverNames || serverNames.isEmpty())
         {
             return Collections.<SNIServerName>emptyList();
         }
@@ -140,6 +180,26 @@ abstract class JsseUtils_8
             result.add(exportSNIServerName(serverName));
         }
         return Collections.unmodifiableList(result);
+    }
+
+    /*
+     * NOTE: Return type is Object to isolate callers from JDK 8 type
+     */
+    static Object exportSNIServerNamesDynamic(Collection<BCSNIServerName> serverNames)
+    {
+        return exportSNIServerNames(serverNames);
+    }
+
+    static PKIXRevocationChecker getFirstRevocationChecker(List<PKIXCertPathChecker> certPathCheckers)
+    {
+        for (PKIXCertPathChecker certPathChecker : certPathCheckers)
+        {
+            if (certPathChecker instanceof PKIXRevocationChecker)
+            {
+                return (PKIXRevocationChecker)certPathChecker;
+            }
+        }
+        return null;
     }
 
     static BCSNIMatcher importSNIMatcher(SNIMatcher matcher)
@@ -157,15 +217,9 @@ abstract class JsseUtils_8
         return new ImportSNIMatcher(matcher);
     }
 
-    /*
-     * NOTE: Currently argument is Object type to isolate callers from JDK8 type
-     */
-    static List<BCSNIMatcher> importSNIMatchers(Object getSNIMatchersResult)
+    static List<BCSNIMatcher> importSNIMatchers(Collection<SNIMatcher> matchers)
     {
-        @SuppressWarnings("unchecked")
-        Collection<SNIMatcher> matchers = (Collection<SNIMatcher>)getSNIMatchersResult;
-
-        if (matchers.isEmpty())
+        if (null == matchers || matchers.isEmpty())
         {
             return Collections.emptyList();
         }
@@ -176,6 +230,15 @@ abstract class JsseUtils_8
             result.add(importSNIMatcher(matcher));
         }
         return Collections.unmodifiableList(result);
+    }
+
+    /*
+     * NOTE: Argument type is Object to isolate callers from JDK 8 type
+     */
+    @SuppressWarnings("unchecked")
+    static List<BCSNIMatcher> importSNIMatchersDynamic(Object matchers)
+    {
+        return importSNIMatchers((Collection<SNIMatcher>)matchers);
     }
 
     static BCSNIServerName importSNIServerName(SNIServerName serverName)
@@ -197,15 +260,9 @@ abstract class JsseUtils_8
         }
     }
 
-    /*
-     * NOTE: Currently argument is Object type to isolate callers from JDK8 type
-     */
-    static List<BCSNIServerName> importSNIServerNames(Object getServerNamesResult)
+    static List<BCSNIServerName> importSNIServerNames(Collection<SNIServerName> serverNames)
     {
-        @SuppressWarnings("unchecked")
-        Collection<SNIServerName> serverNames = (Collection<SNIServerName>)getServerNamesResult;
-
-        if (serverNames.isEmpty())
+        if (null == serverNames || serverNames.isEmpty())
         {
             return Collections.emptyList();
         }
@@ -216,5 +273,27 @@ abstract class JsseUtils_8
             result.add(importSNIServerName(serverName));
         }
         return Collections.unmodifiableList(result);
+    }
+
+    /*
+     * NOTE: Argument type is Object to isolate callers from JDK 8 type
+     */
+    @SuppressWarnings("unchecked")
+    static List<BCSNIServerName> importSNIServerNamesDynamic(Object serverNames)
+    {
+        return importSNIServerNames((Collection<SNIServerName>)serverNames);
+    }
+
+    static <K, V> int putAnyAbsent(Map<K, V> to, Map<K, V> from)
+    {
+        int count = 0;
+        for (Map.Entry<K, V> entry : from.entrySet())
+        {
+            if (null == to.putIfAbsent(entry.getKey(), entry.getValue()))
+            {
+                ++count;
+            }
+        }
+        return count;
     }
 }

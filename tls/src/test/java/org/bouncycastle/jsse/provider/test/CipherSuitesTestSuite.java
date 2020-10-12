@@ -1,16 +1,13 @@
 package org.bouncycastle.jsse.provider.test;
 
+import static org.junit.Assert.fail;
+
 import java.security.KeyPair;
 import java.security.KeyStore;
-import java.security.Provider;
-import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 
 import javax.net.ssl.SSLContext;
-
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
@@ -26,20 +23,29 @@ public class CipherSuitesTestSuite
     public static Test suite()
         throws Exception
     {
-        String javaVersion = System.getProperty("java.version");
-        boolean oldJDK = javaVersion.startsWith("1.5") || javaVersion.startsWith("1.6");
+        return createSuite(new CipherSuitesTestSuite(), null, false, new CipherSuitesFilter()
+        {
+            public boolean isIgnored(String cipherSuite)
+            {
+                /*
+                 * TODO[jsse] jdk.tls.disabledAlgorithms default value doesn't permit these. Perhaps
+                 * we could modify that security property when running this test suite.
+                 */
+                return cipherSuite.contains("_WITH_NULL_") || cipherSuite.contains("_WITH_3DES_EDE_CBC_");
+            }
 
-        Provider bc = new BouncyCastleProvider();
-        Provider bcjsse = oldJDK ? new BouncyCastleJsseProvider(bc) : new BouncyCastleJsseProvider();
+            public boolean isPermitted(String cipherSuite)
+            {
+                return true;
+            }
+        });
+    }
 
-        Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME);
-        Security.insertProviderAt(bc, 1);
-
-        Security.removeProvider(BouncyCastleJsseProvider.PROVIDER_NAME);
-        Security.insertProviderAt(bcjsse, 2);
-
-
-        CipherSuitesTestSuite testSuite = new CipherSuitesTestSuite();
+    static Test createSuite(TestSuite testSuite, String category, boolean fips, CipherSuitesFilter filter)
+        throws Exception
+    {
+        // TODO Consider configuring BCJSSE with explicit crypto provider (maybe only when in fips mode?)
+        ProviderUtils.setupHighPriority(fips);
 
         char[] serverPassword = "serverPassword".toCharArray();
 
@@ -53,9 +59,9 @@ public class CipherSuitesTestSuite
 
         KeyStore ks = KeyStore.getInstance("JKS");
         ks.load(null, null);
-        ks.setKeyEntry("serverDSA", caKeyPairDSA.getPrivate(), serverPassword, new X509Certificate[]{caCertDSA});
-        ks.setKeyEntry("serverEC", caKeyPairEC.getPrivate(), serverPassword, new X509Certificate[]{caCertEC});
-        ks.setKeyEntry("serverRSA", caKeyPairRSA.getPrivate(), serverPassword, new X509Certificate[]{caCertRSA});
+        ks.setKeyEntry("serverDSA", caKeyPairDSA.getPrivate(), serverPassword, new X509Certificate[]{ caCertDSA });
+        ks.setKeyEntry("serverEC", caKeyPairEC.getPrivate(), serverPassword, new X509Certificate[]{ caCertEC });
+        ks.setKeyEntry("serverRSA", caKeyPairRSA.getPrivate(), serverPassword, new X509Certificate[]{ caCertRSA });
 
         KeyStore ts = KeyStore.getInstance("JKS");
         ts.load(null, null);
@@ -63,39 +69,81 @@ public class CipherSuitesTestSuite
         ts.setCertificateEntry("caEC", caCertEC);
         ts.setCertificateEntry("caRSA", caCertRSA);
 
-        SSLContext defaultSSLContext = SSLContext.getInstance("Default", BouncyCastleJsseProvider.PROVIDER_NAME);
+        SSLContext defaultSSLContext = SSLContext.getInstance("Default", ProviderUtils.PROVIDER_NAME_BCJSSE);
 
         String[] cipherSuites = defaultSSLContext.getSocketFactory().getSupportedCipherSuites();
-
+        for (int i = 0; i < cipherSuites.length; ++i)
+        {
+            if (!filter.isPermitted(cipherSuites[i]))
+            {
+                fail("Cipher suite not permitted in supported cipher suites: " + cipherSuites[i]);
+            }
+        }
         Arrays.sort(cipherSuites);
 
+        /*
+         * TODO[jsse] jdk.tls.disabledAlgorithms default value doesn't permit SSLv3. Perhaps we
+         * could modify that security property when running this test suite.
+         */
+        // NOTE: Avoid defaultSSLContext.getSupportedSSLParameters() for 1.5 compatibility
+        String[] protocols = new String[]{
+            "TLSv1",
+            "TLSv1.1",
+            "TLSv1.2",
+        };
 
-        for (int t = 0; t < cipherSuites.length; t++)
+        for (int p = 0; p < protocols.length; ++p)
         {
-            String cipherSuite = cipherSuites[t];
+            String protocol = protocols[p];
 
-            if (cipherSuite.contains("_WITH_NULL_") || cipherSuite.contains("_WITH_3DES_EDE_CBC_"))
+            boolean isTLSv13Protocol = "TLSv1.3".equals(protocol);
+            boolean isTLSv12Protocol = "TLSv1.2".equals(protocol);
+
+            for (int t = 0; t < cipherSuites.length; t++)
             {
+                String cipherSuite = cipherSuites[t];
+                if (filter.isIgnored(cipherSuite))
+                {
+                    continue;
+                }
+
+                boolean isTLSv13CipherSuite = !cipherSuite.contains("_WITH_");
+                if (isTLSv13CipherSuite != isTLSv13Protocol)
+                {
+                    // TLS 1.3 uses a distinct set of cipher suites that don't specify a key exchange
+                    continue;
+                }
+
+                boolean isTLSv12CipherSuite = !isTLSv13CipherSuite
+                    && (cipherSuite.contains("_CHACHA20_POLY1305_") ||
+                        cipherSuite.contains("_GCM_") ||
+                        cipherSuite.endsWith("_CBC_SHA256") ||
+                        cipherSuite.endsWith("_CBC_SHA384") ||
+                        cipherSuite.endsWith("_CCM") ||
+                        cipherSuite.endsWith("_CCM_8"));
+                if (isTLSv12CipherSuite && !isTLSv12Protocol)
+                {
+                    //  AEAD ciphers and configurable CBC PRFs are both 1.2 features
+                    continue;
+                }
+
                 /*
-                 * TODO[jsse] jdk.tls.disabledAlgorithms default value doesn't permit these. Perhaps
-                 * we could modify that security property when running this test suite.
+                 * TODO[jsse] Note that there may be failures for cipher suites that are listed as supported
+                 * even though the TlsCrypto instance doesn't implement them (JcaTlsCrypto is dependent on the
+                 * configured crypto providers).
                  */
-                continue;
+
+                CipherSuitesTestConfig config = new CipherSuitesTestConfig();
+                config.category = category;
+                config.cipherSuite = cipherSuite;
+                config.clientTrustStore = ts;
+                config.fips = fips;
+                config.protocol = protocol;
+                config.serverKeyStore = ks;
+                config.serverPassword = serverPassword;
+
+                testSuite.addTest(new CipherSuitesTestCase(config));
             }
-
-            /*
-             * TODO[jsse] Note that there may be failures for cipher suites that are listed as supported
-             * even though the TlsCrypto instance doesn't implement them (JcaTlsCrypto is dependent on the
-             * configured crypto providers).
-             */
-
-            CipherSuitesTestConfig config = new CipherSuitesTestConfig();
-            config.cipherSuite = cipherSuite;
-            config.clientTrustStore = ts;
-            config.serverKeyStore = ks;
-            config.serverPassword = serverPassword;
-
-            testSuite.addTest(new CipherSuitesTestCase(config));
         }
 
         return testSuite;

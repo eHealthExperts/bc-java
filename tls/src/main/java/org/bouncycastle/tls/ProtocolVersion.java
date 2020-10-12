@@ -14,6 +14,16 @@ public final class ProtocolVersion
     public static final ProtocolVersion DTLSv10 = new ProtocolVersion(0xFEFF, "DTLS 1.0");
     public static final ProtocolVersion DTLSv12 = new ProtocolVersion(0xFEFD, "DTLS 1.2");
 
+    static final ProtocolVersion CLIENT_EARLIEST_SUPPORTED_DTLS = DTLSv10;
+    static final ProtocolVersion CLIENT_EARLIEST_SUPPORTED_TLS = SSLv3;
+    static final ProtocolVersion CLIENT_LATEST_SUPPORTED_DTLS = DTLSv12;
+    static final ProtocolVersion CLIENT_LATEST_SUPPORTED_TLS = TLSv12;
+
+    static final ProtocolVersion SERVER_EARLIEST_SUPPORTED_DTLS = DTLSv10;
+    static final ProtocolVersion SERVER_EARLIEST_SUPPORTED_TLS = SSLv3;
+    static final ProtocolVersion SERVER_LATEST_SUPPORTED_DTLS = DTLSv12;
+    static final ProtocolVersion SERVER_LATEST_SUPPORTED_TLS = TLSv12;
+
     public static boolean contains(ProtocolVersion[] versions, ProtocolVersion version)
     {
         if (versions != null && version != null)
@@ -109,6 +119,46 @@ public final class ProtocolVersion
         return latest;
     }
 
+    static boolean isSupportedDTLSVersionClient(ProtocolVersion version)
+    {
+        return null != version
+            && version.isEqualOrLaterVersionOf(CLIENT_EARLIEST_SUPPORTED_DTLS)
+            && version.isEqualOrEarlierVersionOf(CLIENT_LATEST_SUPPORTED_DTLS);
+    }
+
+    static boolean isSupportedDTLSVersionServer(ProtocolVersion version)
+    {
+        return null != version
+            && version.isEqualOrLaterVersionOf(SERVER_EARLIEST_SUPPORTED_DTLS)
+            && version.isEqualOrEarlierVersionOf(SERVER_LATEST_SUPPORTED_DTLS);
+    }
+
+    static boolean isSupportedTLSVersionClient(ProtocolVersion version)
+    {
+        if (null == version)
+        {
+            return false;
+        }
+
+        int fullVersion = version.getFullVersion();
+
+        return fullVersion >= CLIENT_EARLIEST_SUPPORTED_TLS.getFullVersion()
+            && fullVersion <= CLIENT_LATEST_SUPPORTED_TLS.getFullVersion();
+    }
+
+    static boolean isSupportedTLSVersionServer(ProtocolVersion version)
+    {
+        if (null == version)
+        {
+            return false;
+        }
+
+        int fullVersion = version.getFullVersion();
+
+        return fullVersion >= SERVER_EARLIEST_SUPPORTED_TLS.getFullVersion()
+            && fullVersion <= SERVER_LATEST_SUPPORTED_TLS.getFullVersion();
+    }
+
     private int version;
     private String name;
 
@@ -166,6 +216,11 @@ public final class ProtocolVersion
     public boolean isDTLS()
     {
         return getMajorVersion() == 0xFE;
+    }
+
+    public boolean isSSL()
+    {
+        return this == SSLv3;
     }
 
     public boolean isTLS()

@@ -15,6 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.Security;
+import java.security.SignatureException;
 import java.security.cert.CRL;
 import java.security.cert.CRLException;
 import java.security.cert.Certificate;
@@ -1232,7 +1233,8 @@ public class CertTest
 
             PublicKey k = cert.getPublicKey();
 
-            if (cert.getKeyUsage()[7])
+            boolean[] keyUsage = cert.getKeyUsage();
+            if (keyUsage == null || keyUsage.length <= 7 || keyUsage[7])
             {
                 fail("error generating cert - key usage wrong.");
             }
@@ -1787,9 +1789,29 @@ public class CertTest
         checkCertificate(6, oldEcdsa);
         checkCertificate(7, cert7);
         checkCertificate(8, sm_sign);
+
+        System.setProperty("org.bouncycastle.x509.allow_non-der_tbscert", "true");
+
         checkCertificate(9, x25519Cert,
             KeyFactory.getInstance("EdDSA").generatePublic(new X509EncodedKeySpec(Base64.decode("MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE="))));
 
+        System.setProperty("org.bouncycastle.x509.allow_non-der_tbscert", "false");
+
+        try
+        {
+            CertificateFactory fact = CertificateFactory.getInstance("X.509", "BC");
+
+            Certificate cert = fact.generateCertificate(new ByteArrayInputStream(x25519Cert));
+
+            cert.verify(KeyFactory.getInstance("EdDSA").generatePublic(new X509EncodedKeySpec(Base64.decode("MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE="))));
+
+            fail("no exception");
+        }
+        catch (SignatureException e)
+        {
+            isEquals("certificate does not verify with supplied key", e.getMessage());
+        }
+        
         checkComparison(cert1);
 
         checkKeyUsage(8, keyUsage);

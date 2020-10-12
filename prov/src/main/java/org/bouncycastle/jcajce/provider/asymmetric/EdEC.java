@@ -33,15 +33,15 @@ public class EdEC
             provider.addAlgorithm("KeyFactory.X448", PREFIX + "KeyFactorySpi$X448");
             provider.addAlgorithm("KeyFactory.X25519", PREFIX + "KeyFactorySpi$X25519");
 
-            provider.addAlgorithm("KeyFactory.EDDSA", PREFIX + "KeyFactorySpi$EDDSA");
-            provider.addAlgorithm("KeyFactory.ED448", PREFIX + "KeyFactorySpi$ED448");
-            provider.addAlgorithm("KeyFactory.ED25519", PREFIX + "KeyFactorySpi$ED25519");
+            provider.addAlgorithm("KeyFactory.EDDSA", PREFIX + "KeyFactorySpi$EdDSA");
+            provider.addAlgorithm("KeyFactory.ED448", PREFIX + "KeyFactorySpi$Ed448");
+            provider.addAlgorithm("KeyFactory.ED25519", PREFIX + "KeyFactorySpi$Ed25519");
 
             provider.addAlgorithm("Signature.EDDSA", PREFIX + "SignatureSpi$EdDSA");
             provider.addAlgorithm("Signature.ED448", PREFIX + "SignatureSpi$Ed448");
             provider.addAlgorithm("Signature.ED25519", PREFIX + "SignatureSpi$Ed25519");
-            provider.addAlgorithm("Signature", EdECObjectIdentifiers.id_Ed448, PREFIX + "SignatureSpi$Ed448");
-            provider.addAlgorithm("Signature", EdECObjectIdentifiers.id_Ed25519, PREFIX + "SignatureSpi$Ed25519");
+            provider.addAlgorithm("Alg.Alias.Signature", EdECObjectIdentifiers.id_Ed448, "ED448");
+            provider.addAlgorithm("Alg.Alias.Signature", EdECObjectIdentifiers.id_Ed25519, "ED25519");
 
             provider.addAlgorithm("KeyPairGenerator.EDDSA", PREFIX + "KeyPairGeneratorSpi$EdDSA");
             provider.addAlgorithm("KeyPairGenerator.ED448", PREFIX + "KeyPairGeneratorSpi$Ed448");
@@ -72,13 +72,13 @@ public class EdEC
             provider.addAlgorithm("KeyPairGenerator.XDH", PREFIX + "KeyPairGeneratorSpi$XDH");
             provider.addAlgorithm("KeyPairGenerator.X448", PREFIX + "KeyPairGeneratorSpi$X448");
             provider.addAlgorithm("KeyPairGenerator.X25519", PREFIX + "KeyPairGeneratorSpi$X25519");
-            provider.addAlgorithm("KeyPairGenerator", EdECObjectIdentifiers.id_X448, PREFIX + "KeyPairGeneratorSpiSpi$X448");
-            provider.addAlgorithm("KeyPairGenerator", EdECObjectIdentifiers.id_X25519, PREFIX + "KeyPairGeneratorSpiSpi$X25519");
+            provider.addAlgorithm("KeyPairGenerator", EdECObjectIdentifiers.id_X448, PREFIX + "KeyPairGeneratorSpi$X448");
+            provider.addAlgorithm("KeyPairGenerator", EdECObjectIdentifiers.id_X25519, PREFIX + "KeyPairGeneratorSpi$X25519");
 
             registerOid(provider, EdECObjectIdentifiers.id_X448, "XDH", new KeyFactorySpi.X448());
             registerOid(provider, EdECObjectIdentifiers.id_X25519, "XDH", new KeyFactorySpi.X25519());
-            registerOid(provider, EdECObjectIdentifiers.id_Ed448, "EDDSA", new KeyFactorySpi.ED448());
-            registerOid(provider, EdECObjectIdentifiers.id_Ed25519, "EDDSA", new KeyFactorySpi.ED25519());
+            registerOid(provider, EdECObjectIdentifiers.id_Ed448, "EDDSA", new KeyFactorySpi.Ed448());
+            registerOid(provider, EdECObjectIdentifiers.id_Ed25519, "EDDSA", new KeyFactorySpi.Ed25519());
         }
     }
 }

@@ -1,11 +1,10 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.security.GeneralSecurityException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.Signature;
-import java.security.SignatureException;
 
 import org.bouncycastle.asn1.DERNull;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -30,10 +29,11 @@ public class JcaTlsRSASigner
 
     private final JcaTlsCrypto crypto;
     private final PrivateKey privateKey;
+    private final PublicKey publicKey;
 
     private Signature rawSigner = null;
 
-    public JcaTlsRSASigner(JcaTlsCrypto crypto, PrivateKey privateKey)
+    public JcaTlsRSASigner(JcaTlsCrypto crypto, PrivateKey privateKey, PublicKey publicKey)
     {
         if (null == crypto)
         {
@@ -46,6 +46,7 @@ public class JcaTlsRSASigner
 
         this.crypto = crypto;
         this.privateKey = privateKey;
+        this.publicKey = publicKey;
     }
 
     public byte[] generateRawSignature(SignatureAndHashAlgorithm algorithm, byte[] hash) throws IOException
@@ -55,6 +56,7 @@ public class JcaTlsRSASigner
         	LOG.debug("Generate raw signature");
             Signature signer = getRawSigner();
 
+            byte[] input;
             if (algorithm != null)
             {
             	LOG.debug("Signature algorithms [{}] [{}]", algorithm.getSignature(), algorithm.getHash());
@@ -69,8 +71,7 @@ public class JcaTlsRSASigner
                  */
                 AlgorithmIdentifier algID = new AlgorithmIdentifier(
                     TlsUtils.getOIDForHashAlgorithm(algorithm.getHash()), DERNull.INSTANCE);
-                byte[] digestInfo = new DigestInfo(algID, hash).getEncoded();
-                signer.update(digestInfo, 0, digestInfo.length);
+                input = new DigestInfo(algID, hash).getEncoded();
             }
             else
             {
@@ -79,15 +80,31 @@ public class JcaTlsRSASigner
                  * RFC 5246 4.7. Note that earlier versions of TLS used a different RSA signature
                  * scheme that did not include a DigestInfo encoding.
                  */
-                signer.update(hash, 0, hash.length);
+                input = hash;
             }
 
-            return signer.sign();
+            signer.update(input, 0, input.length);
+
+            byte[] signature = signer.sign();
+
+            signer.initVerify(publicKey);
+            signer.update(input, 0, input.length);
+
+            if (signer.verify(signature))
+            {
+                return signature;
+            }
         }
         catch (GeneralSecurityException e)
         {
             throw new TlsFatalAlert(AlertDescription.internal_error, e);
         }
+        finally
+        {
+            this.rawSigner = null;
+        }
+
+        throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
     public TlsStreamSigner getStreamSigner(SignatureAndHashAlgorithm algorithm) throws IOException
@@ -95,46 +112,12 @@ public class JcaTlsRSASigner
         /*
          * NOTE: The SunMSCAPI provider's "NoneWithRSA" can't produce/verify RSA signatures in the correct format for TLS 1.2
          */
-        if (algorithm != null && algorithm.getSignature() == SignatureAlgorithm.rsa && JcaUtils.isSunMSCAPIProviderActive())
+        if (algorithm != null
+            && SignatureAlgorithm.rsa == algorithm.getSignature()
+            && JcaUtils.isSunMSCAPIProviderActive()
+            && isSunMSCAPIRawSigner())
         {
-            try
-            {
-            	LOG.debug("Generate raw signature");
-                Signature rawSigner = getRawSigner();
-
-                if (JcaUtils.isSunMSCAPIProvider(rawSigner.getProvider()))
-                {
-                    String algorithmName = JcaUtils.getJcaAlgorithmName(algorithm);
-                    LOG.debug("Signature algorithms [{}]", algorithmName);
-                    
-                    final Signature signer = crypto.getHelper().createSignature(algorithmName);
-                    signer.initSign(privateKey, crypto.getSecureRandom());
-
-                    return new TlsStreamSigner()
-                    {
-                        public OutputStream getOutputStream()
-                        {
-                            return new SignatureOutputStream(signer);
-                        }
-
-                        public byte[] getSignature() throws IOException
-                        {
-                            try
-                            {
-                                return signer.sign();
-                            }
-                            catch (SignatureException e)
-                            {
-                                throw new TlsFatalAlert(AlertDescription.internal_error, e);
-                            }
-                        }
-                    };
-                }
-            }
-            catch (GeneralSecurityException e)
-            {
-                throw new TlsFatalAlert(AlertDescription.internal_error, e);
-            }
+            return crypto.createVerifyingStreamSigner(algorithm, privateKey, true, publicKey);
         }
 
         return null;
@@ -148,5 +131,20 @@ public class JcaTlsRSASigner
             rawSigner.initSign(privateKey, crypto.getSecureRandom());
         }
         return rawSigner;
+    }
+
+    protected boolean isSunMSCAPIRawSigner() throws IOException
+    {
+        try
+        {
+            Signature rawSigner = getRawSigner();
+
+            return JcaUtils.isSunMSCAPIProvider(rawSigner.getProvider());
+        }
+        catch (GeneralSecurityException e)
+        {
+            // Assume the worst!
+            return true;
+        }
     }
 }

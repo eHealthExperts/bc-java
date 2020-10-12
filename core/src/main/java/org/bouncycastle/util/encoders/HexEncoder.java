@@ -51,18 +51,32 @@ public class HexEncoder
      * @return the number of bytes produced.
      */
     public int encode(
-        byte[]                data,
-        int                    off,
-        int                    length,
+        byte[]          data,
+        int             off,
+        int             length,
         OutputStream    out) 
         throws IOException
-    {        
+    {
+        byte[] buf = new byte[72];
+        int    bufOff = 0;
+
         for (int i = off; i < (off + length); i++)
         {
             int    v = data[i] & 0xff;
 
-            out.write(encodingTable[(v >>> 4)]);
-            out.write(encodingTable[v & 0xf]);
+            buf[bufOff++] = encodingTable[(v >>> 4)];
+            buf[bufOff++] = encodingTable[v & 0xf];
+
+            if (bufOff == buf.length)
+            {
+                out.write(buf);
+                bufOff = 0;
+            }
+        }
+
+        if (bufOff > 0)
+        {
+            out.write(buf, 0, bufOff);
         }
 
         return length * 2;
@@ -89,6 +103,8 @@ public class HexEncoder
     {
         byte    b1, b2;
         int     outLen = 0;
+        byte[]  buf = new byte[36];
+        int     bufOff = 0;
 
         int     end = off + length;
 
@@ -124,9 +140,19 @@ public class HexEncoder
                 throw new IOException("invalid characters encountered in Hex data");
             }
 
-            out.write((b1 << 4) | b2);
+            buf[bufOff++] = (byte)((b1 << 4) | b2);
 
+            if (bufOff == buf.length)
+            {
+                out.write(buf);
+                bufOff = 0;
+            }
             outLen++;
+        }
+
+        if (bufOff > 0)
+        {
+            out.write(buf, 0, bufOff);
         }
 
         return outLen;
@@ -145,7 +171,9 @@ public class HexEncoder
     {
         byte    b1, b2;
         int     length = 0;
-
+        byte[]  buf = new byte[36];
+        int     bufOff = 0;
+        
         int     end = data.length();
 
         while (end > 0)
@@ -180,9 +208,20 @@ public class HexEncoder
                 throw new IOException("invalid characters encountered in Hex string");
             }
 
-            out.write((b1 << 4) | b2);
+            buf[bufOff++] = (byte)((b1 << 4) | b2);
+
+            if (bufOff == buf.length)
+            {
+                out.write(buf);
+                bufOff = 0;
+            }
 
             length++;
+        }
+
+        if (bufOff > 0)
+        {
+            out.write(buf, 0, bufOff);
         }
 
         return length;

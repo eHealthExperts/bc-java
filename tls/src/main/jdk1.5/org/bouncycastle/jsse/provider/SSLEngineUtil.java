@@ -23,14 +23,14 @@ abstract class SSLEngineUtil
         getSSLParameters = ReflectionUtil.findMethod(methods, "getSSLParameters");
     }
 
-    static SSLEngine create(ProvSSLContextSpi context, ContextData contextData)
+    static SSLEngine create(ContextData contextData)
     {
-        return new ProvSSLEngine(context, contextData);
+        return new ProvSSLEngine(contextData);
     }
 
-    static SSLEngine create(ProvSSLContextSpi context, ContextData contextData, String host, int port)
+    static SSLEngine create(ContextData contextData, String host, int port)
     {
-        return new ProvSSLEngine(context, contextData, host, port);
+        return new ProvSSLEngine(contextData, host, port);
     }
 
     static BCExtendedSSLSession importHandshakeSession(SSLEngine sslEngine)
@@ -41,16 +41,10 @@ abstract class SSLEngineUtil
         }
         if (null != sslEngine && null != getHandshakeSession)
         {
-            try
+            SSLSession sslSession = (SSLSession)ReflectionUtil.invokeGetter(sslEngine, getHandshakeSession);
+            if (null != sslSession)
             {
-                SSLSession sslSession = (SSLSession)ReflectionUtil.invokeGetter(sslEngine, getHandshakeSession);
-                if (null != sslSession)
-                {
-                    return SSLSessionUtil.importSSLSession(sslSession);
-                }
-            }
-            catch (Exception e)
-            {
+                return SSLSessionUtil.importSSLSession(sslSession);
             }
         }
         return null;
@@ -62,20 +56,17 @@ abstract class SSLEngineUtil
         {
             return ((BCSSLEngine)sslEngine).getParameters();
         }
-        if (null != sslEngine && null != getSSLParameters)
+        if (null == sslEngine || null == getSSLParameters)
         {
-            try
-            {
-                SSLParameters sslParameters = (SSLParameters)ReflectionUtil.invokeGetter(sslEngine, getSSLParameters);
-                if (null != sslParameters)
-                {
-                    return SSLParametersUtil.importSSLParameters(sslParameters);
-                }
-            }
-            catch (Exception e)
-            {
-            }
+            return null;
         }
-        return null;
+
+        SSLParameters sslParameters = (SSLParameters)ReflectionUtil.invokeGetter(sslEngine, getSSLParameters);
+        if (null == sslParameters)
+        {
+            throw new RuntimeException("SSLEngine.getSSLParameters returned null");
+        }
+
+        return SSLParametersUtil.importSSLParameters(sslParameters);
     }
 }
