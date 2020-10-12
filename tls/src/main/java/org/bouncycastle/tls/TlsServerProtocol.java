@@ -510,7 +510,7 @@ public class TlsServerProtocol
         throws IOException
     {
         LOG.debug("Handle HandshakeMessage [{}]", type);
-        final SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
+        SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
         if (connection_state > CS_CLIENT_HELLO
             && TlsUtils.isTLSv13(securityParameters.getNegotiatedVersion()))
@@ -558,7 +558,7 @@ public class TlsServerProtocol
             case CS_START:
             {
             	resetCurrentSession();
-                SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
+                securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
                 receiveClientHelloMessage(buf);
                 this.connection_state = CS_CLIENT_HELLO;
@@ -611,8 +611,6 @@ public class TlsServerProtocol
                 this.connection_state = CS_SERVER_HELLO;
             	LOG.trace("New connection state CS_SERVER_HELLO");
 
-                recordStream.notifyHelloComplete();
-                
                 if(this.resumedSession) {
                 	recordStream.setPendingConnectionState(TlsUtils.initCipher(getContext()));
                 	

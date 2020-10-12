@@ -28,8 +28,6 @@ import org.bouncycastle.tls.crypto.TlsECDomain;
 public class JceTlsECDomain
     implements TlsECDomain
 {
-    private static Logger LOG = Logger.getLogger(JceTlsECDomain.class.getName());
-    
     protected final JcaTlsCrypto crypto;
     protected final TlsECConfig ecConfig;
     protected final ECParameterSpec ecSpec;

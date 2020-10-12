@@ -31,8 +31,6 @@ public abstract class AbstractTlsSecret
     	return isDestroyed || data == null;
     }
     
-    protected abstract TlsSecret adoptLocalSecret(byte[] data);
-
     protected void checkAlive()
     {
         if (isDestroy())

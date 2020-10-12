@@ -409,6 +409,13 @@ public class TlsExtensionsUtils
         return extensionData == null ? -1 : readCertificateTypeExtensionServer(extensionData);
     }
 
+    public static ServerNameList getServerNameExtension(Hashtable extensions)
+        throws IOException
+    {
+        byte[] extensionData = TlsUtils.getExtensionData(extensions, EXT_server_name);
+        return extensionData == null ? null : readServerNameExtension(extensionData);
+    }
+    
     public static Vector getServerNameExtensionClient(Hashtable extensions)
         throws IOException
     {
@@ -1265,6 +1272,23 @@ public class TlsExtensionsUtils
 
         return recordSizeLimit;
     }
+   
+   public static ServerNameList readServerNameExtension(byte[] extensionData)
+       throws IOException
+   {
+       if (extensionData == null)
+       {
+           throw new IllegalArgumentException("'extensionData' cannot be null");
+       }
+   
+       ByteArrayInputStream buf = new ByteArrayInputStream(extensionData);
+   
+       ServerNameList serverNameList = ServerNameList.parse(buf);
+   
+       TlsProtocol.assertEmpty(buf);
+   
+       return serverNameList;
+   }
 
     public static Vector readServerNameExtensionClient(byte[] extensionData)
         throws IOException

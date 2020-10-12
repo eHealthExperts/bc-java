@@ -2,6 +2,7 @@ package org.bouncycastle.tls.crypto.impl;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.ProtocolVersion;

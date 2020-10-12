@@ -168,7 +168,7 @@ public interface TlsCrypto {
      * @return a {@link TlsCipher} implementing the encryption and MAC algorithm.
      * @throws IOException
      */
-    TlsCipher createCipher(TlsCryptoParameters cryptoParams, int encryptionAlgorithm, int macAlgorithm)
+    public TlsCipher createCipher(TlsCryptoParameters cryptoParams, int encryptionAlgorithm, int macAlgorithm)
         throws IOException;
 
     /**
