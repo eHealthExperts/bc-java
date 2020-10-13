@@ -335,6 +335,9 @@ public abstract class ASN1BitString
     
     protected void finalize() throws Throwable {
     	super.finalize();
-    	EraseUtil.clearByteArray(data);
+    	if(System.getProperty("bc.erase.asn1.skip") == null) 
+    	{
+    		EraseUtil.clearByteArray(data);
+    	}
     }
 }

@@ -303,6 +303,9 @@ public abstract class ASN1OctetString
     @Override
     protected void finalize() throws Throwable {
     	super.finalize();
-    	EraseUtil.clearByteArray(string);
+    	if(System.getProperty("bc.erase.asn1.skip") == null) 
+    	{
+    		EraseUtil.clearByteArray(string);
+    	}
     }
 }
