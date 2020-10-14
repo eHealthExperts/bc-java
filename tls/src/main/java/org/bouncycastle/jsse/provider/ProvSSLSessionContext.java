@@ -283,8 +283,7 @@ class ProvSSLSessionContext
             SessionEntry sessionEntry = iter.next();
             if (invalidateIfCreatedBefore(sessionEntry, creationTimeLimit))
             {
-                iter.remove();
-                removeSessionByPeer(sessionEntry);
+            	removeSession(sessionEntry);
             }
         }
     }

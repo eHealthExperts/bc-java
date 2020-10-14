@@ -128,22 +128,6 @@ public class TlsServerProtocol
     {
         SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
-        /*
-         * NOTE: Currently no server support for session resumption
-         * 
-         * If adding support, ensure securityParameters.tlsUnique is set to the localVerifyData, but
-         * ONLY when extended_master_secret has been negotiated (otherwise NULL).
-         */
-        {
-            invalidateSession();
-
-            securityParameters.sessionID = TlsUtils.EMPTY_BYTES;
-
-            this.tlsSession = TlsUtils.importSession(securityParameters.getSessionID(), null);
-            this.sessionParameters = null;
-            this.sessionMasterSecret = null;
-        }
-
         // TODO[tls13] Negotiate cipher suite first?
 
         ProtocolVersion server_version;
