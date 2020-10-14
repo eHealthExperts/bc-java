@@ -2201,7 +2201,12 @@ public class TlsUtils
         if (null == sigAndHashAlg)
         {
             signatureAlgorithm = verifyingCert.getLegacySignatureAlgorithm();
-
+            sigAndHashAlg = new SignatureAndHashAlgorithm(HashAlgorithm.sha256, signatureAlgorithm);
+            if(!serverContext.getCrypto().hasSignatureAndHashAlgorithm(sigAndHashAlg)) 
+            {
+            	throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+            
             short clientCertType = getLegacyClientCertType(signatureAlgorithm);
             if (clientCertType < 0 || !Arrays.contains(certificateRequest.getCertificateTypes(), clientCertType))
             {
@@ -2210,6 +2215,10 @@ public class TlsUtils
         }
         else
         {
+            if(!serverContext.getCrypto().hasSignatureAndHashAlgorithm(sigAndHashAlg)) 
+            {
+            	throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
             signatureAlgorithm = sigAndHashAlg.getSignature();
 
             // TODO Is it possible (maybe only pre-1.2 to check this immediately when the Certificate arrives?
@@ -2279,10 +2288,14 @@ public class TlsUtils
         TlsCertificate verifyingCert = serverCertificate.getCertificateAt(0);
 
         SignatureAndHashAlgorithm sigAndHashAlg = certificateVerify.getAlgorithm();
+        if(!clientContext.getCrypto().hasSignatureAndHashAlgorithm(sigAndHashAlg)) 
+        {
+        	throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
         verifySupportedSignatureAlgorithm(securityParameters.getClientSigAlgs(), sigAndHashAlg);
 
         short signatureAlgorithm = sigAndHashAlg.getSignature();
-
+        
         // Verify the CertificateVerify message contains a correct signature.
         boolean verified;
         try
@@ -3983,7 +3996,7 @@ public class TlsUtils
         return result;
     }
 
-    public static Vector getUsableSignatureAlgorithms(Vector sigHashAlgs)
+    public static Vector getUsableSignatureAlgorithms(Vector sigHashAlgs, TlsCrypto crypto)
     {
         if (sigHashAlgs == null)
         {
@@ -3998,12 +4011,11 @@ public class TlsUtils
         for (int i = 0; i < sigHashAlgs.size(); ++i)
         {
             SignatureAndHashAlgorithm sigHashAlg = (SignatureAndHashAlgorithm)sigHashAlgs.elementAt(i);
-            if (sigHashAlg.getHash() >= MINIMUM_HASH_STRICT)
+            if (sigHashAlg.getHash() >= MINIMUM_HASH_STRICT && crypto.hasHashAlgorithm(sigHashAlg.getHash()))
             {
                 Short sigAlg = Shorts.valueOf(sigHashAlg.getSignature());
                 if (!v.contains(sigAlg))
                 {
-                    // TODO Check for crypto support before choosing (or pass in cached list?)
                     v.addElement(sigAlg);
                 }
             }

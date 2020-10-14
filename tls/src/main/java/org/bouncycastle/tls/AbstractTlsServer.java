@@ -377,7 +377,7 @@ public abstract class AbstractTlsServer
          * cipher suite design.
          */
         Vector sigAlgs = TlsUtils.getUsableSignatureAlgorithms(
-            context.getSecurityParametersHandshake().getClientSigAlgs());
+            context.getSecurityParametersHandshake().getClientSigAlgs(), getCrypto());
 
         /*
          * RFC 4429 5.1. A server that receives a ClientHello containing one or both of these

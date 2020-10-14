@@ -191,7 +191,15 @@ class ProvTlsClient
         jsseSecurityParameters.localSigSchemes = signatureSchemes;
         jsseSecurityParameters.localSigSchemesCert = signatureSchemes;
 
-        return SignatureSchemeInfo.getSignatureAndHashAlgorithms(jsseSecurityParameters.localSigSchemes);
+        Vector<SignatureAndHashAlgorithm> serverSigAlgsAll = SignatureSchemeInfo.getSignatureAndHashAlgorithms(jsseSecurityParameters.localSigSchemes);
+        
+        int count = serverSigAlgsAll.size();
+        Vector<SignatureAndHashAlgorithm> serverSigAlgs = new Vector(count);
+        for (int i = 0; i < count; ++i)
+        {
+            TlsUtils.addIfSupported(serverSigAlgs, context.getCrypto(), serverSigAlgsAll.get(i));
+        }
+        return serverSigAlgsAll;
     }
 
     @Override
