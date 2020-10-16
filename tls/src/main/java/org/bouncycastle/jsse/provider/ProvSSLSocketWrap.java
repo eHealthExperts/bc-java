@@ -23,6 +23,7 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.net.ssl.SSLSocket;
+import javax.net.ssl.X509ExtendedKeyManager;
 
 import org.bouncycastle.jsse.BCApplicationProtocolSelector;
 import org.bouncycastle.jsse.BCExtendedSSLSession;
@@ -56,7 +57,6 @@ class ProvSSLSocketWrap
     protected final AppDataInput appDataIn = new AppDataInput();
     protected final AppDataOutput appDataOut = new AppDataOutput();
 
-    protected final ProvSSLContextSpi context;
     protected final ContextData contextData;
     protected final Socket wrapSocket;
     protected final InputStream consumed;
@@ -73,38 +73,31 @@ class ProvSSLSocketWrap
     protected ProvSSLConnection connection = null;
     protected ProvSSLSessionHandshake handshakeSession = null;
 
-    protected ProvSSLSocketWrap(ProvSSLContextSpi context, ContextData contextData, Socket s, InputStream consumed, boolean autoClose)
+    protected ProvSSLSocketWrap(ContextData contextData, Socket s, InputStream consumed, boolean autoClose)
         throws IOException
     {
-        this.context = context;
         this.contextData = contextData;
         this.wrapSocket = checkSocket(s);
         this.consumed = consumed;
         this.autoClose = autoClose;
         this.useClientMode = false;
-        this.sslParameters = context.getDefaultParameters(!useClientMode);
+        this.sslParameters = contextData.getContext().getDefaultSSLParameters(useClientMode);
 
         notifyConnected();
     }
 
-    protected ProvSSLSocketWrap(ProvSSLContextSpi context, ContextData contextData, Socket s, String host, int port, boolean autoClose)
+    protected ProvSSLSocketWrap(ContextData contextData, Socket s, String host, int port, boolean autoClose)
         throws IOException
     {
-        this.context = context;
         this.contextData = contextData;
         this.wrapSocket = checkSocket(s);
         this.consumed = null;
         this.peerHost = host;
         this.autoClose = autoClose;
         this.useClientMode = true;
-        this.sslParameters = context.getDefaultParameters(!useClientMode);
+        this.sslParameters = contextData.getContext().getDefaultSSLParameters(useClientMode);
 
         notifyConnected();
-    }
-
-    public ProvSSLContextSpi getContext()
-    {
-        return context;
     }
 
     public ContextData getContextData()
@@ -142,14 +135,18 @@ class ProvSSLSocketWrap
         }
     }
 
-    public String chooseClientAlias(String[] keyType, Principal[] issuers)
+    public ProvX509Key chooseClientKey(String[] keyTypes, Principal[] issuers)
     {
-        return contextData.getX509KeyManager().chooseClientAlias(keyType, issuers, this);
+        X509ExtendedKeyManager x509KeyManager = getContextData().getX509KeyManager();
+        String alias = x509KeyManager.chooseClientAlias(keyTypes, JsseUtils.clone(issuers), this);
+        return ProvX509Key.from(x509KeyManager, alias);
     }
 
-    public String chooseServerAlias(String keyType, Principal[] issuers)
+    public ProvX509Key chooseServerKey(String keyType, Principal[] issuers)
     {
-        return contextData.getX509KeyManager().chooseServerAlias(keyType, issuers, this);
+        X509ExtendedKeyManager x509KeyManager = getContextData().getX509KeyManager();
+        String alias = x509KeyManager.chooseServerAlias(keyType, JsseUtils.clone(issuers), this);
+        return ProvX509Key.from(x509KeyManager, alias);
     }
 
     @Override
@@ -220,6 +217,11 @@ class ProvSSLSocketWrap
         return handshakeSession;
     }
 
+    public BCExtendedSSLSession getBCSession()
+    {
+        return getSessionImpl();
+    }
+
     @Override
     public SocketChannel getChannel()
     {
@@ -264,7 +266,7 @@ class ProvSSLSocketWrap
         return null == handshakeSession ? null : handshakeSession.getApplicationProtocol();
     }
 
-    @Override
+    // An SSLSocket method from JDK 7
     public synchronized SSLSession getHandshakeSession()
     {
         return null == handshakeSession ? null : handshakeSession.getExportSSLSession();
@@ -349,13 +351,9 @@ class ProvSSLSocketWrap
     }
 
     @Override
-    public synchronized SSLSession getSession()
+    public SSLSession getSession()
     {
-        getConnection();
-
-        ProvSSLSession sslSession = (null == connection) ? ProvSSLSession.NULL_SESSION : connection.getSession();
-
-        return sslSession.getExportSSLSession();
+        return getSessionImpl().getExportSSLSession();
     }
 
     @Override
@@ -375,7 +373,7 @@ class ProvSSLSocketWrap
         return SSLParametersUtil.getParameters(sslParameters);
     }
 
-    @Override
+    // An SSLSocket method from JDK 6
     public synchronized SSLParameters getSSLParameters()
     {
         return SSLParametersUtil.getSSLParameters(sslParameters);
@@ -384,13 +382,13 @@ class ProvSSLSocketWrap
     @Override
     public synchronized String[] getSupportedCipherSuites()
     {
-        return context.getSupportedCipherSuites();
+        return contextData.getContext().getSupportedCipherSuites();
     }
 
     @Override
     public synchronized String[] getSupportedProtocols()
     {
-        return context.getSupportedProtocols();
+        return contextData.getContext().getSupportedProtocols();
     }
 
     @Override
@@ -450,6 +448,24 @@ class ProvSSLSocketWrap
     public synchronized void setBCHandshakeApplicationProtocolSelector(BCApplicationProtocolSelector<SSLSocket> selector)
     {
         sslParameters.setSocketAPSelector(selector);
+    }
+
+    public synchronized void setBCSessionToResume(BCExtendedSSLSession session)
+    {
+        if (null == session)
+        {
+            throw new NullPointerException("'session' cannot be null");
+        }
+        if (!(session instanceof ProvSSLSession))
+        {
+            throw new IllegalArgumentException("Session-to-resume must be a session returned from 'getBCSession'");
+        }
+        if (null != protocol)
+        {
+            throw new IllegalArgumentException("Session-to-resume cannot be set after the handshake has begun");
+        }
+
+        sslParameters.setSessionToResume((ProvSSLSession)session);
     }
 
     @Override
@@ -532,7 +548,7 @@ class ProvSSLSocketWrap
         wrapSocket.setSoTimeout(timeout);
     }
 
-    @Override
+    // An SSLSocket method from JDK 6
     public synchronized void setSSLParameters(SSLParameters sslParameters)
     {
         SSLParametersUtil.setSSLParameters(this.sslParameters, sslParameters);
@@ -560,7 +576,7 @@ class ProvSSLSocketWrap
 
         if (this.useClientMode != useClientMode)
         {
-            context.updateDefaultProtocols(sslParameters, !useClientMode);
+            contextData.getContext().updateDefaultSSLParameters(sslParameters, useClientMode);
 
             this.useClientMode = useClientMode;
         }
@@ -650,13 +666,20 @@ class ProvSSLSocketWrap
 
     public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
     {
-        if (null != handshakeSession && !handshakeSession.isValid())
+        if (null != handshakeSession)
         {
-            connection.getSession().invalidate();
+            if (!handshakeSession.isValid())
+            {
+                connection.getSession().invalidate();
+            }
+
+            handshakeSession.getJsseSecurityParameters().clear();
         }
 
         this.handshakeSession = null;
         this.connection = connection;
+
+        notifyHandshakeCompletedListeners(connection.getSession().exportSSLSession);
     }
 
     public synchronized void notifyHandshakeSession(ProvSSLSessionHandshake handshakeSession)
@@ -667,6 +690,13 @@ class ProvSSLSocketWrap
     public synchronized String selectApplicationProtocol(List<String> protocols)
     {
         return sslParameters.getSocketAPSelector().select(this, protocols);
+    }
+
+    synchronized ProvSSLSession getSessionImpl()
+    {
+        getConnection();
+
+        return null == connection ? ProvSSLSession.NULL_SESSION : connection.getSession();
     }
 
     synchronized void handshakeIfNecessary(boolean resumable) throws IOException

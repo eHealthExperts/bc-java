@@ -1,22 +1,28 @@
 package org.bouncycastle.jsse.provider;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Vector;
 
 import org.bouncycastle.jsse.BCSNIServerName;
 import org.bouncycastle.tls.ProtocolVersion;
 import org.bouncycastle.tls.SecurityParameters;
+import org.bouncycastle.tls.ServerName;
 
 class ProvSSLSessionHandshake
     extends ProvSSLSessionBase
 {
     protected final SecurityParameters securityParameters;
+    protected final JsseSecurityParameters jsseSecurityParameters;
 
     ProvSSLSessionHandshake(ProvSSLSessionContext sslSessionContext, String peerHost, int peerPort,
-        SecurityParameters securityParameters)
+        SecurityParameters securityParameters, JsseSecurityParameters jsseSecurityParameters)
     {
         super(sslSessionContext, peerHost, peerPort);
 
         this.securityParameters = securityParameters;
+        this.jsseSecurityParameters = jsseSecurityParameters;
     }
 
     String getApplicationProtocol()
@@ -37,6 +43,12 @@ class ProvSSLSessionHandshake
     }
 
     @Override
+    protected JsseSecurityParameters getJsseSecurityParameters()
+    {
+        return jsseSecurityParameters;
+    }
+
+    @Override
     protected JsseSessionParameters getJsseSessionParameters()
     {
         return null;
@@ -51,7 +63,13 @@ class ProvSSLSessionHandshake
     @Override
     public String[] getLocalSupportedSignatureAlgorithms()
     {
-        throw new UnsupportedOperationException();
+        return SignatureSchemeInfo.getJcaSignatureAlgorithms(jsseSecurityParameters.localSigSchemesCert);
+    }
+
+    @Override
+    public String[] getLocalSupportedSignatureAlgorithmsBC()
+    {
+        return SignatureSchemeInfo.getJcaSignatureAlgorithmsBC(jsseSecurityParameters.localSigSchemesCert);
     }
 
     @Override
@@ -63,7 +81,13 @@ class ProvSSLSessionHandshake
     @Override
     public String[] getPeerSupportedSignatureAlgorithms()
     {
-        throw new UnsupportedOperationException();
+        return SignatureSchemeInfo.getJcaSignatureAlgorithms(jsseSecurityParameters.peerSigSchemesCert);
+    }
+
+    @Override
+    public String[] getPeerSupportedSignatureAlgorithmsBC()
+    {
+        return SignatureSchemeInfo.getJcaSignatureAlgorithmsBC(jsseSecurityParameters.peerSigSchemesCert);
     }
 
     @Override
@@ -75,6 +99,26 @@ class ProvSSLSessionHandshake
     @Override
     public List<BCSNIServerName> getRequestedServerNames()
     {
-        return JsseUtils.convertSNIServerNames(securityParameters.getClientServerNames());
+        @SuppressWarnings("unchecked")
+        Vector<ServerName> clientServerNames = securityParameters.getClientServerNames();
+
+        return JsseUtils.convertSNIServerNames(clientServerNames);
+    }
+
+    @Override
+    public List<byte[]> getStatusResponses()
+    {
+        List<byte[]> statusResponses = jsseSecurityParameters.statusResponses;
+        if (null == statusResponses || statusResponses.isEmpty())
+        {
+            return Collections.emptyList();
+        }
+
+        ArrayList<byte[]> result = new ArrayList<byte[]>(statusResponses.size());
+        for (byte[] statusResponse : statusResponses)
+        {
+            result.add(statusResponse.clone());
+        }
+        return Collections.unmodifiableList(result);
     }
 }

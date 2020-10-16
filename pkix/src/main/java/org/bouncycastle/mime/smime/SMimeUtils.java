@@ -1,7 +1,10 @@
 package org.bouncycastle.mime.smime;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.HashMap;
@@ -121,10 +124,44 @@ class SMimeUtils
         return oid;
     }
 
+    static InputStream autoBuffer(InputStream input)
+    {
+        if (input instanceof java.io.FileInputStream)
+        {
+            return new BufferedInputStream(input);
+        }
+
+        return input;
+    }
+
+    static OutputStream autoBuffer(OutputStream output)
+    {
+        if (output instanceof java.io.FileOutputStream)
+        {
+            return new BufferedOutputStream(output);
+        }
+
+        return output;
+    }
+
     static OutputStream createUnclosable(OutputStream destination)
     {
         return new FilterOutputStream(destination)
         {
+            public void write(byte buf[], int off, int len)
+                throws IOException
+            {
+                if (buf == null)
+                {
+                    throw new NullPointerException();
+                }
+                if ((off | len | (buf.length - (len + off)) | (off + len)) < 0)
+                {
+                    throw new IndexOutOfBoundsException();
+                }
+                out.write(buf, off, len);
+            }
+
             public void close()
                 throws IOException
             {

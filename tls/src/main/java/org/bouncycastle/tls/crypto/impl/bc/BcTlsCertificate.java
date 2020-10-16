@@ -3,6 +3,7 @@ package org.bouncycastle.tls.crypto.impl.bc;
 import java.io.IOException;
 import java.math.BigInteger;
 
+import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -35,6 +36,8 @@ import org.bouncycastle.util.Arrays;
 public class BcTlsCertificate
     implements TlsCertificate
 {
+    private static final BigInteger X509V3_VERSION = BigInteger.valueOf(2);
+
     public static BcTlsCertificate convert(BcTlsCrypto crypto, TlsCertificate certificate)
         throws IOException
     {
@@ -49,14 +52,22 @@ public class BcTlsCertificate
     public static Certificate parseCertificate(byte[] encoding)
         throws IOException
     {
+        final Certificate c;
         try
         {
-            return Certificate.getInstance(encoding);
+            c = Certificate.getInstance(encoding);
         }
         catch (IllegalArgumentException e)
         {
             throw new TlsFatalAlert(AlertDescription.bad_certificate, e);
         }
+
+        if (!X509V3_VERSION.equals(c.getTBSCertificate().getVersion().getValue()))
+        {
+            throw new TlsFatalAlert(AlertDescription.bad_certificate);
+        }
+
+        return c;
     }
 
     protected final BcTlsCrypto crypto;
@@ -148,6 +159,11 @@ public class BcTlsCertificate
         return certificate.getSignatureAlgorithm().getAlgorithm().getId();
     }
 
+    public ASN1Encodable getSigAlgParams()
+    {
+        return certificate.getSignatureAlgorithm().getParameters();
+    }
+
     public short getLegacySignatureAlgorithm() throws IOException
     {
         AsymmetricKeyParameter publicKey = getPublicKey();
@@ -156,17 +172,9 @@ public class BcTlsCertificate
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
 
-        try
+        if (!supportsKeyUsage(KeyUsage.digitalSignature))
         {
-            validateKeyUsage(KeyUsage.digitalSignature);
-        }
-        catch (IOException e)
-        {
-            throw e;
-        }
-        catch (Exception e)
-        {
-            throw new TlsFatalAlert(AlertDescription.unsupported_certificate, e);
+            return -1;
         }
 
         /*
@@ -203,7 +211,7 @@ public class BcTlsCertificate
             return SignatureAlgorithm.ecdsa;
         }
 
-        throw new TlsFatalAlert(AlertDescription.unsupported_certificate);
+        return -1;
     }
 
     protected DHPublicKeyParameters getPubKeyDH() throws IOException
@@ -278,49 +286,14 @@ public class BcTlsCertificate
         }
     }
 
-    public boolean supportsSignatureAlgorithm(short signatureAlgorithm)
-        throws IOException
+    public boolean supportsSignatureAlgorithm(short signatureAlgorithm) throws IOException
     {
-        if (!supportsKeyUsage(KeyUsage.digitalSignature))
-        {
-            return false;
-        }
+        return supportsSignatureAlgorithm(signatureAlgorithm, KeyUsage.digitalSignature);
+    }
 
-        AsymmetricKeyParameter publicKey = getPublicKey();
-
-        switch (signatureAlgorithm)
-        {
-        case SignatureAlgorithm.rsa:
-            return supportsRSA_PKCS1()
-                && publicKey instanceof RSAKeyParameters;
-
-        case SignatureAlgorithm.dsa:
-            return publicKey instanceof DSAPublicKeyParameters;
-
-        case SignatureAlgorithm.ecdsa:
-            return publicKey instanceof ECPublicKeyParameters;
-
-        case SignatureAlgorithm.ed25519:
-            return publicKey instanceof Ed25519PublicKeyParameters;
-
-        case SignatureAlgorithm.ed448:
-            return publicKey instanceof Ed448PublicKeyParameters;
-
-        case SignatureAlgorithm.rsa_pss_rsae_sha256:
-        case SignatureAlgorithm.rsa_pss_rsae_sha384:
-        case SignatureAlgorithm.rsa_pss_rsae_sha512:
-            return supportsRSA_PSS_RSAE()
-                && publicKey instanceof RSAKeyParameters;
-
-        case SignatureAlgorithm.rsa_pss_pss_sha256:
-        case SignatureAlgorithm.rsa_pss_pss_sha384:
-        case SignatureAlgorithm.rsa_pss_pss_sha512:
-            return supportsRSA_PSS_PSS(signatureAlgorithm)
-                && publicKey instanceof RSAKeyParameters;
-
-        default:
-            return false;
-        }
+    public boolean supportsSignatureAlgorithmCA(short signatureAlgorithm) throws IOException
+    {
+        return supportsSignatureAlgorithm(signatureAlgorithm, KeyUsage.keyCertSign);
     }
 
     public TlsCertificate useInRole(int connectionEnd, int keyExchangeAlgorithm) throws IOException
@@ -408,6 +381,50 @@ public class BcTlsCertificate
     {
         AlgorithmIdentifier pubKeyAlgID = certificate.getSubjectPublicKeyInfo().getAlgorithm();
         return RSAUtil.supportsPSS_RSAE(pubKeyAlgID);
+    }
+
+    protected boolean supportsSignatureAlgorithm(short signatureAlgorithm, int keyUsage) throws IOException
+    {
+        if (!supportsKeyUsage(keyUsage))
+        {
+            return false;
+        }
+
+        AsymmetricKeyParameter publicKey = getPublicKey();
+
+        switch (signatureAlgorithm)
+        {
+        case SignatureAlgorithm.rsa:
+            return supportsRSA_PKCS1()
+                && publicKey instanceof RSAKeyParameters;
+
+        case SignatureAlgorithm.dsa:
+            return publicKey instanceof DSAPublicKeyParameters;
+
+        case SignatureAlgorithm.ecdsa:
+            return publicKey instanceof ECPublicKeyParameters;
+
+        case SignatureAlgorithm.ed25519:
+            return publicKey instanceof Ed25519PublicKeyParameters;
+
+        case SignatureAlgorithm.ed448:
+            return publicKey instanceof Ed448PublicKeyParameters;
+
+        case SignatureAlgorithm.rsa_pss_rsae_sha256:
+        case SignatureAlgorithm.rsa_pss_rsae_sha384:
+        case SignatureAlgorithm.rsa_pss_rsae_sha512:
+            return supportsRSA_PSS_RSAE()
+                && publicKey instanceof RSAKeyParameters;
+
+        case SignatureAlgorithm.rsa_pss_pss_sha256:
+        case SignatureAlgorithm.rsa_pss_pss_sha384:
+        case SignatureAlgorithm.rsa_pss_pss_sha512:
+            return supportsRSA_PSS_PSS(signatureAlgorithm)
+                && publicKey instanceof RSAKeyParameters;
+
+        default:
+            return false;
+        }
     }
 
     protected void validateKeyUsage(int keyUsageBits)

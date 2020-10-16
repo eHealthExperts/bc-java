@@ -11,11 +11,9 @@ interface ProvTlsManager
 
     void checkServerTrusted(X509Certificate[] chain, String authType) throws IOException;
 
-    String chooseClientAlias(String[] keyType, Principal[] issuers);
+    ProvX509Key chooseClientKey(String[] keyTypes, Principal[] issuers);
 
-    String chooseServerAlias(String keyType, Principal[] issuers);
-
-    ProvSSLContextSpi getContext();
+    ProvX509Key chooseServerKey(String keyType, Principal[] issuers);
 
     boolean getEnableSessionCreation();
 

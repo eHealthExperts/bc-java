@@ -31,14 +31,23 @@ public class BcChaCha20Poly1305 implements TlsAEADCipherImpl
         this.isEncrypting = isEncrypting;
     }
 
-    public int doFinal(byte[] input, int inputOffset, int inputLength, byte[] output, int outputOffset)
-        throws IOException
+    public int doFinal(byte[] input, int inputOffset, int inputLength, byte[] extraInput, byte[] output,
+        int outputOffset) throws IOException
     {
+        int extraInputLength = extraInput.length;
+
         if (isEncrypting)
         {
-            int ciphertextLength = inputLength;
+            int ciphertextLength = inputLength + extraInputLength;
 
-            if (ciphertextLength != cipher.processBytes(input, inputOffset, ciphertextLength, output, outputOffset))
+            int outputLength = cipher.processBytes(input, inputOffset, inputLength, output, outputOffset);
+            if (extraInputLength > 0)
+            {
+                outputLength += cipher.processBytes(extraInput, 0, extraInputLength, output,
+                    outputOffset + outputLength);
+            }
+
+            if (ciphertextLength != outputLength)
             {
                 throw new IllegalStateException();
             }
@@ -56,24 +65,30 @@ public class BcChaCha20Poly1305 implements TlsAEADCipherImpl
         }
         else
         {
+            if (extraInputLength > 0)
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+
             int ciphertextLength = inputLength - 16;
 
             updateMAC(input, inputOffset, ciphertextLength);
 
-            byte[] calculatedMAC = new byte[16];
-            Pack.longToLittleEndian(additionalDataLength & 0xFFFFFFFFL, calculatedMAC, 0);
-            Pack.longToLittleEndian(ciphertextLength & 0xFFFFFFFFL, calculatedMAC, 8);
-            mac.update(calculatedMAC, 0, 16);
-            mac.doFinal(calculatedMAC, 0);
+            byte[] expectedMac = new byte[16];
+            Pack.longToLittleEndian(additionalDataLength & 0xFFFFFFFFL, expectedMac, 0);
+            Pack.longToLittleEndian(ciphertextLength & 0xFFFFFFFFL, expectedMac, 8);
+            mac.update(expectedMac, 0, 16);
+            mac.doFinal(expectedMac, 0);
 
-            byte[] receivedMAC = TlsUtils.copyOfRangeExact(input, inputOffset + ciphertextLength, inputOffset + inputLength);
-
-            if (!Arrays.constantTimeAreEqual(calculatedMAC, receivedMAC))
+            boolean badMac = !TlsUtils.constantTimeAreEqual(16, expectedMac, 0, input, inputOffset + ciphertextLength);
+            if (badMac)
             {
                 throw new TlsFatalAlert(AlertDescription.bad_record_mac);
             }
 
-            if (ciphertextLength != cipher.processBytes(input, inputOffset, ciphertextLength, output, outputOffset))
+            int outputLength = cipher.processBytes(input, inputOffset, ciphertextLength, output, outputOffset);
+
+            if (ciphertextLength != outputLength)
             {
                 throw new IllegalStateException();
             }

@@ -14,7 +14,7 @@ import org.bouncycastle.tls.TlsUtils;
 
 class CipherSuiteInfo
 {
-    static CipherSuiteInfo forCipherSuite(int cipherSuite, String name)
+    static CipherSuiteInfo forCipherSuite(int cipherSuite, String name, boolean isTLSv13)
     {
         if (!name.startsWith("TLS_"))
         {
@@ -35,18 +35,21 @@ class CipherSuiteInfo
         decomposeHashAlgorithm(decompositionTLS, hashAlgorithm);
         decomposeMACAlgorithm(decompositionTLS, encryptionAlgorithmType, macAlgorithm);
 
-        return new CipherSuiteInfo(cipherSuite, name, Collections.unmodifiableSet(decompositionTLS),
+        return new CipherSuiteInfo(cipherSuite, name, isTLSv13, Collections.unmodifiableSet(decompositionTLS),
             Collections.unmodifiableSet(decompositionX509));
     }
 
     private final int cipherSuite;
     private final String name;
+    private final boolean isTLSv13;
     private final Set<String> decompositionTLS, decompositionX509;
 
-    private CipherSuiteInfo(int cipherSuite, String name, Set<String> decompositionTLS, Set<String> decompositionX509)
+    private CipherSuiteInfo(int cipherSuite, String name, boolean isTLSv13, Set<String> decompositionTLS,
+        Set<String> decompositionX509)
     {
         this.cipherSuite = cipherSuite;
         this.name = name;
+        this.isTLSv13 = isTLSv13;
         this.decompositionTLS = decompositionTLS;
         this.decompositionX509 = decompositionX509;
     }
@@ -69,6 +72,11 @@ class CipherSuiteInfo
     public String getName()
     {
         return name;
+    }
+
+    boolean isTLSv13()
+    {
+        return isTLSv13;
     }
 
     private static void addAll(Set<String> decomposition, String... entries)
@@ -112,6 +120,30 @@ class CipherSuiteInfo
             break;
         case EncryptionAlgorithm.AES_256_GCM:
             decomposition.add("AES_256_GCM");
+            break;
+        case EncryptionAlgorithm.ARIA_128_CBC:
+            decomposition.add("ARIA_128_CBC");
+            break;
+        case EncryptionAlgorithm.ARIA_256_CBC:
+            decomposition.add("ARIA_256_CBC");
+            break;
+        case EncryptionAlgorithm.ARIA_128_GCM:
+            decomposition.add("ARIA_128_GCM");
+            break;
+        case EncryptionAlgorithm.ARIA_256_GCM:
+            decomposition.add("ARIA_256_GCM");
+            break;
+        case EncryptionAlgorithm.CAMELLIA_128_CBC:
+            decomposition.add("CAMELLIA_128_CBC");
+            break;
+        case EncryptionAlgorithm.CAMELLIA_256_CBC:
+            decomposition.add("CAMELLIA_256_CBC");
+            break;
+        case EncryptionAlgorithm.CAMELLIA_128_GCM:
+            decomposition.add("CAMELLIA_128_GCM");
+            break;
+        case EncryptionAlgorithm.CAMELLIA_256_GCM:
+            decomposition.add("CAMELLIA_256_GCM");
             break;
         case EncryptionAlgorithm.CHACHA20_POLY1305:
             // NOTE: Following SunJSSE, nothing beyond the transformation added above (i.e "ChaCha20-Poly1305")
@@ -160,6 +192,9 @@ class CipherSuiteInfo
         case KeyExchangeAlgorithm.ECDHE_RSA:
             addAll(decomposition, "ECDHE", "RSA", "ECDHE_RSA");
             break;
+        case KeyExchangeAlgorithm.NULL:
+            // NOTE: TLS 1.3 cipher suites
+            break;
         case KeyExchangeAlgorithm.RSA:
             addAll(decomposition, "RSA");
             break;
@@ -205,9 +240,13 @@ class CipherSuiteInfo
         case CipherSuite.TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA:
         case CipherSuite.TLS_DHE_DSS_WITH_AES_128_CBC_SHA:
         case CipherSuite.TLS_DHE_DSS_WITH_AES_256_CBC_SHA:
+        case CipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA:
+        case CipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA:
         case CipherSuite.TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_128_CBC_SHA:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA:
+        case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA:
+        case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_3DES_EDE_CBC_SHA:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:
@@ -219,6 +258,8 @@ class CipherSuiteInfo
         case CipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA:
         case CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA:
         case CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA:
+        case CipherSuite.TLS_RSA_WITH_CAMELLIA_128_CBC_SHA:
+        case CipherSuite.TLS_RSA_WITH_CAMELLIA_256_CBC_SHA:
         case CipherSuite.TLS_RSA_WITH_NULL_SHA:
             /*
              * TODO[jsse] We follow SunJSSE behaviour here, but it's not quite right; these cipher
@@ -226,9 +267,18 @@ class CipherSuiteInfo
              */
             return HashAlgorithm.sha256;
 
+        case CipherSuite.TLS_AES_128_CCM_SHA256:
+        case CipherSuite.TLS_AES_128_CCM_8_SHA256:
+        case CipherSuite.TLS_AES_128_GCM_SHA256:
+        case CipherSuite.TLS_CHACHA20_POLY1305_SHA256:
         case CipherSuite.TLS_DHE_DSS_WITH_AES_128_CBC_SHA256:
         case CipherSuite.TLS_DHE_DSS_WITH_AES_128_GCM_SHA256:
         case CipherSuite.TLS_DHE_DSS_WITH_AES_256_CBC_SHA256:
+        case CipherSuite.TLS_DHE_DSS_WITH_ARIA_128_CBC_SHA256:
+        case CipherSuite.TLS_DHE_DSS_WITH_ARIA_128_GCM_SHA256:
+        case CipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA256:
+        case CipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_128_GCM_SHA256:
+        case CipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA256:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_128_CBC_SHA256:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_128_CCM:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_128_CCM_8:
@@ -236,6 +286,11 @@ class CipherSuiteInfo
         case CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA256:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_256_CCM:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_256_CCM_8:
+        case CipherSuite.TLS_DHE_RSA_WITH_ARIA_128_CBC_SHA256:
+        case CipherSuite.TLS_DHE_RSA_WITH_ARIA_128_GCM_SHA256:
+        case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA256:
+        case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_128_GCM_SHA256:
+        case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA256:
         case CipherSuite.TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM:
@@ -243,9 +298,17 @@ class CipherSuiteInfo
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CCM:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_ARIA_128_CBC_SHA256:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_ARIA_128_GCM_SHA256:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_CAMELLIA_128_CBC_SHA256:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_CAMELLIA_128_GCM_SHA256:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:
         case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:
         case CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_ARIA_128_CBC_SHA256:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_ARIA_128_GCM_SHA256:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_CAMELLIA_128_CBC_SHA256:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_CAMELLIA_128_GCM_SHA256:
         case CipherSuite.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
         case CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA256:
         case CipherSuite.TLS_RSA_WITH_AES_128_CCM:
@@ -254,16 +317,39 @@ class CipherSuiteInfo
         case CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA256:
         case CipherSuite.TLS_RSA_WITH_AES_256_CCM:
         case CipherSuite.TLS_RSA_WITH_AES_256_CCM_8:
+        case CipherSuite.TLS_RSA_WITH_ARIA_128_CBC_SHA256:
+        case CipherSuite.TLS_RSA_WITH_ARIA_128_GCM_SHA256:
+        case CipherSuite.TLS_RSA_WITH_CAMELLIA_128_CBC_SHA256:
+        case CipherSuite.TLS_RSA_WITH_CAMELLIA_128_GCM_SHA256:
+        case CipherSuite.TLS_RSA_WITH_CAMELLIA_256_CBC_SHA256:
         case CipherSuite.TLS_RSA_WITH_NULL_SHA256:
             return HashAlgorithm.sha256;
 
+        case CipherSuite.TLS_AES_256_GCM_SHA384:
         case CipherSuite.TLS_DHE_DSS_WITH_AES_256_GCM_SHA384:
+        case CipherSuite.TLS_DHE_DSS_WITH_ARIA_256_CBC_SHA384:
+        case CipherSuite.TLS_DHE_DSS_WITH_ARIA_256_GCM_SHA384:
+        case CipherSuite.TLS_DHE_DSS_WITH_CAMELLIA_256_GCM_SHA384:
         case CipherSuite.TLS_DHE_RSA_WITH_AES_256_GCM_SHA384:
+        case CipherSuite.TLS_DHE_RSA_WITH_ARIA_256_CBC_SHA384:
+        case CipherSuite.TLS_DHE_RSA_WITH_ARIA_256_GCM_SHA384:
+        case CipherSuite.TLS_DHE_RSA_WITH_CAMELLIA_256_GCM_SHA384:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384:
         case CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_ARIA_256_CBC_SHA384:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_ARIA_256_GCM_SHA384:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_CAMELLIA_256_CBC_SHA384:
+        case CipherSuite.TLS_ECDHE_ECDSA_WITH_CAMELLIA_256_GCM_SHA384:
         case CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384:
         case CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_ARIA_256_CBC_SHA384:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_ARIA_256_GCM_SHA384:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_CAMELLIA_256_CBC_SHA384:
+        case CipherSuite.TLS_ECDHE_RSA_WITH_CAMELLIA_256_GCM_SHA384:
         case CipherSuite.TLS_RSA_WITH_AES_256_GCM_SHA384:
+        case CipherSuite.TLS_RSA_WITH_ARIA_256_CBC_SHA384:
+        case CipherSuite.TLS_RSA_WITH_ARIA_256_GCM_SHA384:
+        case CipherSuite.TLS_RSA_WITH_CAMELLIA_256_GCM_SHA384:
             return HashAlgorithm.sha384;
 
         default:
@@ -288,6 +374,18 @@ class CipherSuiteInfo
         case EncryptionAlgorithm.AES_128_GCM:
         case EncryptionAlgorithm.AES_256_GCM:
             return "AES/GCM/NoPadding";
+        case EncryptionAlgorithm.ARIA_128_CBC:
+        case EncryptionAlgorithm.ARIA_256_CBC:
+            return "ARIA/CBC/NoPadding";
+        case EncryptionAlgorithm.ARIA_128_GCM:
+        case EncryptionAlgorithm.ARIA_256_GCM:
+            return "ARIA/GCM/NoPadding";
+        case EncryptionAlgorithm.CAMELLIA_128_CBC:
+        case EncryptionAlgorithm.CAMELLIA_256_CBC:
+            return "Camellia/CBC/NoPadding";
+        case EncryptionAlgorithm.CAMELLIA_128_GCM:
+        case EncryptionAlgorithm.CAMELLIA_256_GCM:
+            return "Camellia/GCM/NoPadding";
         case EncryptionAlgorithm.CHACHA20_POLY1305:
             return "ChaCha20-Poly1305";
         case EncryptionAlgorithm.NULL:

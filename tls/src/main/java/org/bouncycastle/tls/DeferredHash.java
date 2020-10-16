@@ -19,7 +19,7 @@ class DeferredHash
     protected TlsContext context;
 
     private DigestInputBuffer buf;
-    private Hashtable<Short, TlsHash> hashes;
+    private Hashtable hashes;
     private boolean forceBuffering;
     private boolean sealed;
 
@@ -63,19 +63,29 @@ class DeferredHash
         this.forceBuffering = true;
     }
 
-    public TlsHandshakeHash notifyPRFDetermined()
+    public void notifyPRFDetermined()
     {
-        int prfAlgorithm = context.getSecurityParametersHandshake().getPrfAlgorithm();
-        if (prfAlgorithm == PRFAlgorithm.tls_prf_legacy)
+        SecurityParameters securityParameters = context.getSecurityParametersHandshake();
+
+        switch (securityParameters.getPRFAlgorithm())
+        {
+        case PRFAlgorithm.ssl_prf_legacy:
+        case PRFAlgorithm.tls_prf_legacy:
         {
             checkTrackingHash(Shorts.valueOf(HashAlgorithm.md5));
             checkTrackingHash(Shorts.valueOf(HashAlgorithm.sha1));
+            break;
         }
-        else
+        default:
         {
-            checkTrackingHash(Shorts.valueOf(TlsUtils.getHashAlgorithmForPRFAlgorithm(prfAlgorithm)));
+            checkTrackingHash(Shorts.valueOf(securityParameters.getPRFHashAlgorithm()));
+            if (TlsUtils.isTLSv13(securityParameters.getNegotiatedVersion()))
+            {
+                sealHashAlgorithms();
+            }
+            break;
         }
-        return this;
+        }
     }
 
     public void trackHashAlgorithm(short hashAlgorithm)
@@ -90,25 +100,34 @@ class DeferredHash
 
     public void sealHashAlgorithms()
     {
-        if (!sealed)
+        if (sealed)
         {
-            sealed = true;
-            checkStopBuffering();
+            throw new IllegalStateException("Already sealed");
         }
+
+        this.sealed = true;
+        checkStopBuffering();
     }
 
     public TlsHandshakeHash stopTracking()
     {
+        SecurityParameters securityParameters = context.getSecurityParametersHandshake();
+
         Hashtable newHashes = new Hashtable();
-        int prfAlgorithm = context.getSecurityParametersHandshake().getPrfAlgorithm();
-        if (prfAlgorithm == PRFAlgorithm.tls_prf_legacy)
+        switch (securityParameters.getPRFAlgorithm())
+        {
+        case PRFAlgorithm.ssl_prf_legacy:
+        case PRFAlgorithm.tls_prf_legacy:
         {
             cloneHash(newHashes, HashAlgorithm.md5);
             cloneHash(newHashes, HashAlgorithm.sha1);
+            break;
         }
-        else
+        default:
         {
-            cloneHash(newHashes, TlsUtils.getHashAlgorithmForPRFAlgorithm(prfAlgorithm));
+            cloneHash(newHashes, securityParameters.getPRFHashAlgorithm());
+            break;
+        }
         }
         return new DeferredHash(context, newHashes);
     }
@@ -117,16 +136,22 @@ class DeferredHash
     {
         checkStopBuffering();
 
-        TlsHash prfHash;
+        SecurityParameters securityParameters = context.getSecurityParametersHandshake();
 
-        int prfAlgorithm = context.getSecurityParametersHandshake().getPrfAlgorithm();
-        if (prfAlgorithm == PRFAlgorithm.tls_prf_legacy)
+        TlsHash prfHash;
+        switch (securityParameters.getPRFAlgorithm())
+        {
+        case PRFAlgorithm.ssl_prf_legacy:
+        case PRFAlgorithm.tls_prf_legacy:
         {
             prfHash = new CombinedHash(context, cloneHash(HashAlgorithm.md5), cloneHash(HashAlgorithm.sha1));
+            break;
         }
-        else
+        default:
         {
-            prfHash = cloneHash(TlsUtils.getHashAlgorithmForPRFAlgorithm(prfAlgorithm));
+            prfHash = cloneHash(securityParameters.getPRFHashAlgorithm());
+            break;
+        }
         }
 
         if (buf != null)
@@ -144,6 +169,8 @@ class DeferredHash
         {
             throw new IllegalStateException("HashAlgorithm." + HashAlgorithm.getText(hashAlgorithm) + " is not being tracked");
         }
+
+        checkStopBuffering();
 
         d = (TlsHash)d.clone();
         if (buf != null)
@@ -172,7 +199,7 @@ class DeferredHash
 
     public byte[] calculateHash()
     {
-        throw new IllegalStateException("Use fork() to get a definite Digest");
+        throw new IllegalStateException("Use fork() to get a definite hash");
     }
 
     public Object clone()
@@ -182,9 +209,6 @@ class DeferredHash
 
     public void reset()
     {
-        this.forceBuffering = false;
-        this.sealed = false;
-
         if (buf != null)
         {
             buf.reset();

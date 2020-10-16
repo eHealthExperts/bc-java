@@ -16,12 +16,22 @@ public class SecurityParameters
     final short compressionAlgorithm = CompressionMethod._null;
     short maxFragmentLength = -1;
     int prfAlgorithm = -1;
+    short prfHashAlgorithm = -1;
+    int prfHashLength = -1;
     int verifyDataLength = -1;
+    TlsSecret earlyExporterMasterSecret = null;
+    TlsSecret earlySecret = null;
+    TlsSecret exporterMasterSecret = null;
+    TlsSecret handshakeSecret = null;
     TlsSecret masterSecret = null;
+    TlsSecret sharedSecret = null;
+    TlsSecret trafficSecretClient = null;
+    TlsSecret trafficSecretServer = null;
     byte[] clientRandom = null;
     byte[] serverRandom = null;
     byte[] sessionHash = null;
     byte[] sessionID = null;
+    byte[] psk = null;
     byte[] pskIdentity = null;
     byte[] srpIdentity = null;
     byte[] tlsServerEndPoint = null;
@@ -32,14 +42,18 @@ public class SecurityParameters
     boolean truncatedHMac = false;
     ProtocolName applicationProtocol = null;
     boolean applicationProtocolSet = false;
+    short[] clientCertTypes = null;
     Vector clientServerNames = null;
     Vector clientSigAlgs = null;
     Vector clientSigAlgsCert = null;
     int[] clientSupportedGroups = null;
+    Vector serverSigAlgs = null;
+    Vector serverSigAlgsCert = null;
     int keyExchangeAlgorithm = -1;
     Certificate localCertificate = null;
     Certificate peerCertificate = null;
     ProtocolVersion negotiatedVersion = null;
+    int statusRequestVersion = 0;
 
     // TODO[tls-ops] Investigate whether we can handle verify data using TlsSecret
     byte[] localVerifyData = null;
@@ -47,18 +61,23 @@ public class SecurityParameters
 
     void clear()
     {
-        sessionHash = null;
-        sessionID = null;
-        clientServerNames = null;
-        clientSigAlgs = null;
-        clientSigAlgsCert = null;
-        clientSupportedGroups = null;
+        this.sessionHash = null;
+        this.sessionID = null;
+        this.clientCertTypes = null;
+        this.clientServerNames = null;
+        this.clientSigAlgs = null;
+        this.clientSigAlgsCert = null;
+        this.clientSupportedGroups = null;
+        this.serverSigAlgs = null;
+        this.serverSigAlgsCert = null;
+        this.statusRequestVersion = 0;
 
-        if (this.masterSecret != null)
-        {
-            this.masterSecret.destroy();
-            this.masterSecret = null;
-        }
+        this.earlyExporterMasterSecret = clearSecret(earlyExporterMasterSecret);
+        this.earlySecret = clearSecret(earlySecret);
+        this.exporterMasterSecret = clearSecret(exporterMasterSecret);
+        this.handshakeSecret = clearSecret(handshakeSecret);
+        this.masterSecret = clearSecret(masterSecret);
+        this.sharedSecret = clearSecret(sharedSecret);
     }
 
     /**
@@ -87,6 +106,11 @@ public class SecurityParameters
         return cipherSuite;
     }
 
+    public short[] getClientCertTypes()
+    {
+        return clientCertTypes;
+    }
+
     public Vector getClientServerNames()
     {
         return clientServerNames;
@@ -107,6 +131,16 @@ public class SecurityParameters
         return clientSupportedGroups;
     }
 
+    public Vector getServerSigAlgs()
+    {
+        return serverSigAlgs;
+    }
+
+    public Vector getServerSigAlgsCert()
+    {
+        return serverSigAlgsCert;
+    }
+
     /**
      * @return {@link CompressionMethod}
      */
@@ -124,11 +158,32 @@ public class SecurityParameters
     }
 
     /**
-     * @return {@link PRFAlgorithm}
+     * @deprecated Use {@link #getPRFAlgorithm()} instead.
      */
     public int getPrfAlgorithm()
     {
         return prfAlgorithm;
+    }
+
+    /**
+     * @return {@link PRFAlgorithm}
+     */
+    public int getPRFAlgorithm()
+    {
+        return prfAlgorithm;
+    }
+
+    /**
+     * @return {@link HashAlgorithm} for the current {@link PRFAlgorithm}
+     */
+    public short getPRFHashAlgorithm()
+    {
+        return prfHashAlgorithm;
+    }
+
+    public int getPRFHashLength()
+    {
+        return prfHashLength;
     }
 
     public int getVerifyDataLength()
@@ -136,9 +191,44 @@ public class SecurityParameters
         return verifyDataLength;
     }
 
+    public TlsSecret getEarlyExporterMasterSecret()
+    {
+        return earlyExporterMasterSecret;
+    }
+
+    public TlsSecret getEarlySecret()
+    {
+        return earlySecret;
+    }
+
+    public TlsSecret getExporterMasterSecret()
+    {
+        return exporterMasterSecret;
+    }
+
+    public TlsSecret getHandshakeSecret()
+    {
+        return handshakeSecret;
+    }
+
     public TlsSecret getMasterSecret()
     {
         return masterSecret;
+    }
+
+    public TlsSecret getSharedSecret()
+    {
+        return sharedSecret;
+    }
+
+    public TlsSecret getTrafficSecretClient()
+    {
+        return trafficSecretClient;
+    }
+
+    public TlsSecret getTrafficSecretServer()
+    {
+        return trafficSecretServer;
     }
 
     public byte[] getClientRandom()
@@ -161,12 +251,9 @@ public class SecurityParameters
         return sessionID;
     }
 
-    /**
-     * @deprecated Use {@link SecurityParameters#getPSKIdentity()}
-     */
-    public byte[] getPskIdentity()
+    public byte[] getPSK()
     {
-        return pskIdentity;
+        return psk;
     }
 
     public byte[] getPSKIdentity()
@@ -254,5 +341,19 @@ public class SecurityParameters
     public ProtocolVersion getNegotiatedVersion()
     {
         return negotiatedVersion;
+    }
+
+    public int getStatusRequestVersion()
+    {
+        return statusRequestVersion;
+    }
+
+    private static TlsSecret clearSecret(TlsSecret secret)
+    {
+        if (null != secret)
+        {
+            secret.destroy();
+        }
+        return null;
     }
 }

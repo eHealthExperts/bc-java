@@ -253,6 +253,14 @@ public interface PKCSObjectIdentifiers
      */
     ASN1ObjectIdentifier id_rsa_KEM              = id_alg.branch("14");
 
+
+    /**
+     * id-alg-hss-lms-hashsig OBJECT IDENTIFIER ::= { iso(1)
+     *     member-body(2) us(840) rsadsi(113549) pkcs(1) pkcs9(9)
+     *    smime(16) alg(3) 17 }
+     */
+    public static final ASN1ObjectIdentifier id_alg_hss_lms_hashsig = id_alg.branch("17");
+
     /**
      * <pre>
      * id-alg-AEADChaCha20Poly1305 OBJECT IDENTIFIER ::=
@@ -263,6 +271,30 @@ public interface PKCSObjectIdentifiers
      * </pre>
      */
     ASN1ObjectIdentifier id_alg_AEADChaCha20Poly1305 = id_alg.branch("18");
+
+    /**
+     * <pre>
+     *    id-alg-hkdf-with-sha256 OBJECT IDENTIFIER ::= { iso(1) member-body(2)
+     *        us(840) rsadsi(113549) pkcs(1) pkcs-9(9) smime(16) alg(3) 28 }
+     * </pre>
+     */
+    ASN1ObjectIdentifier id_alg_hkdf_with_sha256 = id_alg.branch("28");
+
+    /**
+     * <pre>
+     *    id-alg-hkdf-with-sha384 OBJECT IDENTIFIER ::= { iso(1) member-body(2)
+     *        us(840) rsadsi(113549) pkcs(1) pkcs-9(9) smime(16) alg(3) 29 }
+     * </pre>
+     */
+    ASN1ObjectIdentifier id_alg_hkdf_with_sha384 = id_alg.branch("29");
+
+    /**
+     * <pre>
+     *    id-alg-hkdf-with-sha512 OBJECT IDENTIFIER ::= { iso(1) member-body(2)
+     *        us(840) rsadsi(113549) pkcs(1) pkcs-9(9) smime(16) alg(3) 30 }
+     * </pre>
+     */
+    ASN1ObjectIdentifier id_alg_hkdf_with_sha512 = id_alg.branch("30");
 
     //
     // id-cti OBJECT IDENTIFIER ::= {iso(1) member-body(2) usa(840)

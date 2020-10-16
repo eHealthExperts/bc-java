@@ -19,9 +19,11 @@ class ProvAlgorithmConstraints
     private static final String PROPERTY_TLS_DISABLED_ALGORITHMS = "jdk.tls.disabledAlgorithms";
 
     private static final String DEFAULT_CERTPATH_DISABLED_ALGORITHMS =
-        "MD2, MD5, SHA1 jdkCA & usage TLSServer, RSA keySize < 1024, DSA keySize < 1024, EC keySize < 224";
+        "MD2, MD5, SHA1 jdkCA & usage TLSServer, RSA keySize < 1024, DSA keySize < 1024, EC keySize < 224, " +
+        "include jdk.disabled.namedCurves";
     private static final String DEFAULT_TLS_DISABLED_ALGORITHMS =
-        "SSLv3, RC4, DES, MD5withRSA, DH keySize < 1024, EC keySize < 224, 3DES_EDE_CBC, anon, NULL";
+        "SSLv3, RC4, DES, MD5withRSA, DH keySize < 1024, EC keySize < 224, 3DES_EDE_CBC, anon, NULL, " +
+        "include jdk.disabled.namedCurves";
 
     private static final DisabledAlgorithmConstraints provTlsDisabledAlgorithms = DisabledAlgorithmConstraints.create(
         ProvAlgorithmDecomposer.INSTANCE_TLS, PROPERTY_TLS_DISABLED_ALGORITHMS, DEFAULT_TLS_DISABLED_ALGORITHMS);
@@ -36,7 +38,7 @@ class ProvAlgorithmConstraints
     private final Set<String> supportedSignatureAlgorithms;
     private final boolean enableX509Constraints;
 
-    public ProvAlgorithmConstraints(BCAlgorithmConstraints configAlgorithmConstraints, boolean enableX509Constraints)
+    ProvAlgorithmConstraints(BCAlgorithmConstraints configAlgorithmConstraints, boolean enableX509Constraints)
     {
         super(null);
 
@@ -45,7 +47,7 @@ class ProvAlgorithmConstraints
         this.enableX509Constraints = enableX509Constraints;
     }
 
-    public ProvAlgorithmConstraints(BCAlgorithmConstraints configAlgorithmConstraints,
+    ProvAlgorithmConstraints(BCAlgorithmConstraints configAlgorithmConstraints,
         String[] supportedSignatureAlgorithms, boolean enableX509Constraints)
     {
         super(null);
@@ -60,9 +62,15 @@ class ProvAlgorithmConstraints
         checkPrimitives(primitives);
         checkAlgorithmName(algorithm);
 
-        if (null != supportedSignatureAlgorithms && !isSupportedSignatureAlgorithm(algorithm))
+        if (null != supportedSignatureAlgorithms)
         {
-            return false;
+            String algorithmBC = algorithm;
+            algorithm = getAlgorithm(algorithmBC);
+
+            if (!isSupportedSignatureAlgorithm(algorithmBC))
+            {
+                return false;
+            }
         }
 
         if (null != configAlgorithmConstraints && !configAlgorithmConstraints.permits(primitives, algorithm, parameters))
@@ -114,9 +122,15 @@ class ProvAlgorithmConstraints
         checkAlgorithmName(algorithm);
         checkKey(key);
 
-        if (null != supportedSignatureAlgorithms && !isSupportedSignatureAlgorithm(algorithm))
+        if (null != supportedSignatureAlgorithms)
         {
-            return false;
+            String algorithmBC = algorithm;
+            algorithm = getAlgorithm(algorithmBC);
+
+            if (!isSupportedSignatureAlgorithm(algorithmBC))
+            {
+                return false;
+            }
         }
 
         if (null != configAlgorithmConstraints && !configAlgorithmConstraints.permits(primitives, algorithm, key, parameters))
@@ -138,16 +152,14 @@ class ProvAlgorithmConstraints
         return true;
     }
 
-    private boolean isSupportedSignatureAlgorithm(String algorithm)
+    private String getAlgorithm(String algorithmBC)
     {
-        return !supportedSignatureAlgorithms.isEmpty()
-            && containsIgnoreCase(supportedSignatureAlgorithms, removeAnyMGFSpecifier(algorithm));
+        int colonPos = algorithmBC.indexOf(':');
+        return colonPos < 0 ? algorithmBC : algorithmBC.substring(0, colonPos);
     }
 
-    private static String removeAnyMGFSpecifier(String algorithm)
+    private boolean isSupportedSignatureAlgorithm(String algorithmBC)
     {
-        // TODO[jsse] Follows SunJSSE behaviour. Case-insensitive search?
-        int andPos = algorithm.indexOf("and");
-        return andPos < 1 ? algorithm : algorithm.substring(0, andPos);
+        return containsIgnoreCase(supportedSignatureAlgorithms, algorithmBC);
     }
 }

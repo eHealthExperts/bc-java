@@ -9,6 +9,8 @@ import java.io.OutputStream;
 import javax.security.auth.DestroyFailedException;
 
 import org.bouncycastle.tls.crypto.TlsCipher;
+import org.bouncycastle.tls.crypto.TlsDecodeResult;
+import org.bouncycastle.tls.crypto.TlsEncodeResult;
 import org.bouncycastle.tls.crypto.TlsNullNullCipher;
 
 /**
@@ -23,18 +25,9 @@ class RecordStream
     private TlsProtocol handler;
     private InputStream input;
     private OutputStream output;
-    private TlsContext context = null;
+//    private TlsContext context = null;
     private TlsCipher pendingCipher = null, readCipher = null, writeCipher = null;
     private SequenceNumber readSeqNo = new SequenceNumber(), writeSeqNo = new SequenceNumber();
-
-    private TlsHandshakeHash handshakeHash = null;
-    private SimpleOutputStream handshakeHashUpdater = new SimpleOutputStream()
-    {
-        public void write(byte[] buf, int off, int len) throws IOException
-        {
-            handshakeHash.update(buf, off, len);
-        }
-    };
 
     private ProtocolVersion writeVersion = null;
 
@@ -49,10 +42,9 @@ class RecordStream
 
     void init(TlsContext context)
     {
-        this.context = context;
-        this.readCipher = new TlsNullNullCipher();
+//        this.context = context;
+        this.readCipher = TlsNullNullCipher.INSTANCE;
         this.writeCipher = this.readCipher;
-        this.handshakeHash = new DeferredHash(context);
 
         setPlaintextLimit(DEFAULT_PLAINTEXT_LIMIT);
     }
@@ -65,7 +57,7 @@ class RecordStream
     void setPlaintextLimit(int plaintextLimit)
     {
         this.plaintextLimit = plaintextLimit;
-        this.ciphertextLimit = this.plaintextLimit + 1024;
+        this.ciphertextLimit = readCipher.getCiphertextDecodeLimit(plaintextLimit);
     }
 
     void setWriteVersion(ProtocolVersion writeVersion)
@@ -97,6 +89,7 @@ class RecordStream
             throw new TlsFatalAlert(AlertDescription.handshake_failure);
         }
         this.readCipher = this.pendingCipher;
+        this.ciphertextLimit = readCipher.getCiphertextDecodeLimit(plaintextLimit);
         this.readSeqNo = new SequenceNumber();
     }
 
@@ -108,27 +101,15 @@ class RecordStream
             throw new TlsFatalAlert(AlertDescription.handshake_failure);
         }
         this.pendingCipher = null;
-        this.handshakeHash = new DeferredHash(context);
     }
 
-    RecordPreview previewRecordHeader(byte[] recordHeader, boolean appDataReady) throws IOException
+    RecordPreview previewRecordHeader(byte[] recordHeader) throws IOException
     {
-        short type = TlsUtils.readUint8(recordHeader, RecordFormat.TYPE_OFFSET);
+        short recordType = TlsUtils.readUint8(recordHeader, RecordFormat.TYPE_OFFSET);
 
-        if (!appDataReady && type == ContentType.application_data)
-        {
-            throw new TlsFatalAlert(AlertDescription.unexpected_message);
-        }
+        checkRecordType(recordType);
 
-        /*
-         * RFC 5246 6. If a TLS implementation receives an unexpected record type, it MUST send an
-         * unexpected_message alert.
-         */
-        checkType(type, AlertDescription.unexpected_message);
-
-        /*
-         * legacy_record_version (2 octets at RecordFormat.VERSION_OFFSET) is ignored.
-         */
+//        ProtocolVersion recordVersion = TlsUtils.readVersion(recordHeader, RecordFormat.VERSION_OFFSET);
 
         int length = TlsUtils.readUint16(recordHeader, RecordFormat.LENGTH_OFFSET);
 
@@ -137,9 +118,10 @@ class RecordStream
         int recordSize = RecordFormat.FRAGMENT_OFFSET + length;
         int applicationDataLimit = 0;
 
-        if (type == ContentType.application_data)
+        // NOTE: For TLS 1.3, this only MIGHT be application data
+        if (ContentType.application_data == recordType && handler.isApplicationDataReady())
         {
-            applicationDataLimit = Math.min(getPlaintextLimit(), readCipher.getPlaintextLimit(length));
+            applicationDataLimit = Math.max(0, Math.min(plaintextLimit, readCipher.getPlaintextLimit(length)));
         }
 
         return new RecordPreview(recordSize, applicationDataLimit);
@@ -147,9 +129,10 @@ class RecordStream
 
     RecordPreview previewOutputRecord(int applicationDataSize)
     {
-        int applicationDataLimit = Math.max(0, Math.min(getPlaintextLimit(), applicationDataSize));
+        int applicationDataLimit = Math.max(0, Math.min(plaintextLimit, applicationDataSize));
 
-        int recordSize = writeCipher.getCiphertextLimit(applicationDataLimit) + RecordFormat.FRAGMENT_OFFSET;
+        int recordSize = RecordFormat.FRAGMENT_OFFSET
+            + writeCipher.getCiphertextEncodeLimit(applicationDataLimit, plaintextLimit);
 
         return new RecordPreview(recordSize, applicationDataLimit);
     }
@@ -168,22 +151,27 @@ class RecordStream
             return false;
         }
 
-        short type = TlsUtils.readUint8(input, inputOff + RecordFormat.TYPE_OFFSET);
+        short recordType = TlsUtils.readUint8(input, inputOff + RecordFormat.TYPE_OFFSET);
 
-        /*
-         * RFC 5246 6. If a TLS implementation receives an unexpected record type, it MUST send an
-         * unexpected_message alert.
-         */
-        checkType(type, AlertDescription.unexpected_message);
+        checkRecordType(recordType);
 
-        /*
-         * legacy_record_version (2 octets at RecordFormat.VERSION_OFFSET) is ignored.
-         */
+        ProtocolVersion recordVersion = TlsUtils.readVersion(input, inputOff + RecordFormat.VERSION_OFFSET);
 
         checkLength(length, ciphertextLimit, AlertDescription.record_overflow);
 
-        byte[] plaintext = decodeAndVerify(type, input, inputOff + RecordFormat.FRAGMENT_OFFSET, length);
-        handler.processRecord(type, plaintext, 0, plaintext.length);
+        /*
+         * TODO[tls13] No CCS required, but accept one for compatibility purposes. Search
+         * RFC 8446 for "change_cipher_spec" for details.
+         */
+        if (readCipher.usesOpaqueRecordType() && ContentType.change_cipher_spec == recordType)
+        {
+            return true;
+        }
+
+        TlsDecodeResult decoded = decodeAndVerify(recordType, recordVersion, input,
+            inputOff + RecordFormat.FRAGMENT_OFFSET, length);
+
+        handler.processRecord(decoded.contentType, decoded.buf, decoded.off, decoded.len);
         return true;
     }
 
@@ -195,17 +183,11 @@ class RecordStream
             return false;
         }
 
-        short type = TlsUtils.readUint8(inputRecord.buf, RecordFormat.TYPE_OFFSET);
+        short recordType = TlsUtils.readUint8(inputRecord.buf, RecordFormat.TYPE_OFFSET);
 
-        /*
-         * RFC 5246 6. If a TLS implementation receives an unexpected record type, it MUST send an
-         * unexpected_message alert.
-         */
-        checkType(type, AlertDescription.unexpected_message);
+        checkRecordType(recordType);
 
-        /*
-         * legacy_record_version (2 octets at RecordFormat.VERSION_OFFSET) is ignored.
-         */
+        ProtocolVersion recordVersion = TlsUtils.readVersion(inputRecord.buf, RecordFormat.VERSION_OFFSET);
 
         int length = TlsUtils.readUint16(inputRecord.buf, RecordFormat.LENGTH_OFFSET);
 
@@ -213,33 +195,42 @@ class RecordStream
 
         inputRecord.readFragment(input, length);
 
-        byte[] plaintext;
+        TlsDecodeResult decoded;
         try
         {
-            plaintext = decodeAndVerify(type, inputRecord.buf, RecordFormat.FRAGMENT_OFFSET, length);
+            /*
+             * TODO[tls13] No CCS required, but accept one for compatibility purposes. Search
+             * RFC 8446 for "change_cipher_spec" for details.
+             */
+            if (readCipher.usesOpaqueRecordType() && ContentType.change_cipher_spec == recordType)
+            {
+                return true;
+            }
+
+            decoded = decodeAndVerify(recordType, recordVersion, inputRecord.buf, RecordFormat.FRAGMENT_OFFSET, length);
         }
         finally
         {
             inputRecord.reset();
         }
 
-        handler.processRecord(type, plaintext, 0, plaintext.length);
+        handler.processRecord(decoded.contentType, decoded.buf, decoded.off, decoded.len);
         return true;
     }
 
-    byte[] decodeAndVerify(short type, byte[] ciphertext, int off, int len)
+    TlsDecodeResult decodeAndVerify(short recordType, ProtocolVersion recordVersion, byte[] ciphertext, int off, int len)
         throws IOException
     {
         long seqNo = readSeqNo.nextValue(AlertDescription.unexpected_message);
-        byte[] decoded = readCipher.decodeCiphertext(seqNo, type, ciphertext, off, len);
+        TlsDecodeResult decoded = readCipher.decodeCiphertext(seqNo, recordType, recordVersion, ciphertext, off, len);
 
-        checkLength(decoded.length, plaintextLimit, AlertDescription.record_overflow);
+        checkLength(decoded.len, plaintextLimit, AlertDescription.record_overflow);
 
         /*
          * RFC 5246 6.2.1 Implementations MUST NOT send zero-length fragments of Handshake, Alert,
          * or ChangeCipherSpec content types.
          */
-        if (decoded.length < 1 && type != ContentType.application_data)
+        if (decoded.len < 1 && decoded.contentType != ContentType.application_data)
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
@@ -247,7 +238,7 @@ class RecordStream
         return decoded;
     }
 
-    void writeRecord(short type, byte[] plaintext, int plaintextOffset, int plaintextLength)
+    void writeRecord(short contentType, byte[] plaintext, int plaintextOffset, int plaintextLength)
         throws IOException
     {
         // Never send anything until a valid ClientHello has been received
@@ -255,12 +246,6 @@ class RecordStream
         {
             return;
         }
-
-        /*
-         * RFC 5246 6. Implementations MUST NOT send record types not defined in this document
-         * unless negotiated by some extension.
-         */
-        checkType(type, AlertDescription.internal_error);
 
         /*
          * RFC 5246 6.2.1 The length should not exceed 2^14.
@@ -271,29 +256,27 @@ class RecordStream
          * RFC 5246 6.2.1 Implementations MUST NOT send zero-length fragments of Handshake, Alert,
          * or ChangeCipherSpec content types.
          */
-        if (plaintextLength < 1 && type != ContentType.application_data)
+        if (plaintextLength < 1 && contentType != ContentType.application_data)
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
 
         long seqNo = writeSeqNo.nextValue(AlertDescription.internal_error);
+        ProtocolVersion recordVersion = writeVersion;
 
-        byte[] ciphertext = writeCipher.encodePlaintext(seqNo, type, plaintext, plaintextOffset, plaintextLength);
+        TlsEncodeResult encoded = writeCipher.encodePlaintext(seqNo, contentType, recordVersion,
+            RecordFormat.FRAGMENT_OFFSET, plaintext, plaintextOffset, plaintextLength);
 
-        /*
-         * RFC 5246 6.2.3. The length may not exceed 2^14 + 2048.
-         */
-        checkLength(ciphertext.length, ciphertextLimit, AlertDescription.internal_error);
+        int ciphertextLength = encoded.len - RecordFormat.FRAGMENT_OFFSET;
+        TlsUtils.checkUint16(ciphertextLength);
 
-        byte[] record = new byte[RecordFormat.FRAGMENT_OFFSET + ciphertext.length];
-        TlsUtils.writeUint8(type, record, RecordFormat.TYPE_OFFSET);
-        TlsUtils.writeVersion(writeVersion, record, RecordFormat.VERSION_OFFSET);
-        TlsUtils.writeUint16(ciphertext.length, record, RecordFormat.LENGTH_OFFSET);
-        System.arraycopy(ciphertext, 0, record, RecordFormat.FRAGMENT_OFFSET, ciphertext.length);
+        TlsUtils.writeUint8(encoded.recordType, encoded.buf, encoded.off + RecordFormat.TYPE_OFFSET);
+        TlsUtils.writeVersion(recordVersion, encoded.buf, encoded.off + RecordFormat.VERSION_OFFSET);
+        TlsUtils.writeUint16(ciphertextLength, encoded.buf, encoded.off + RecordFormat.LENGTH_OFFSET);
 
         try
         {
-            output.write(record);
+            output.write(encoded.buf, encoded.off, encoded.len);
         }
         catch (InterruptedIOException e)
         {
@@ -301,28 +284,6 @@ class RecordStream
         }
 
         output.flush();
-    }
-
-    void notifyHelloComplete()
-    {
-        this.handshakeHash = handshakeHash.notifyPRFDetermined();
-    }
-
-    TlsHandshakeHash getHandshakeHash()
-    {
-        return handshakeHash;
-    }
-
-    OutputStream getHandshakeHashUpdater()
-    {
-        return handshakeHashUpdater;
-    }
-
-    TlsHandshakeHash prepareToFinish()
-    {
-        TlsHandshakeHash result = handshakeHash;
-        this.handshakeHash = handshakeHash.stopTracking();
-        return result;
     }
 
     void close() throws IOException
@@ -400,19 +361,43 @@ class RecordStream
         output.flush();
     }
 
-    private static void checkType(short type, short alertDescription)
+    private void checkRecordType(short recordType)
         throws IOException
     {
-        switch (type)
+        if (readCipher.usesOpaqueRecordType())
         {
-        case ContentType.application_data:
-        case ContentType.alert:
-        case ContentType.change_cipher_spec:
-        case ContentType.handshake:
-//        case ContentType.heartbeat:
-            break;
-        default:
-            throw new TlsFatalAlert(alertDescription);
+            if (ContentType.change_cipher_spec == recordType)
+            {
+                /*
+                 * TODO[tls13] No CCS required, but accept one for compatibility purposes. Search
+                 * RFC 8446 for "change_cipher_spec" for details.
+                 */
+            }
+            else if (ContentType.application_data != recordType)
+            {
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
+        }
+        else
+        {
+            switch (recordType)
+            {
+            case ContentType.application_data:
+            {
+                if (!handler.isApplicationDataReady())
+                {
+                    throw new TlsFatalAlert(AlertDescription.unexpected_message);
+                }
+                break;
+            }
+            case ContentType.alert:
+            case ContentType.change_cipher_spec:
+            case ContentType.handshake:
+    //        case ContentType.heartbeat:
+                break;
+            default:
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
         }
     }
 

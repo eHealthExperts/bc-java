@@ -21,10 +21,11 @@ public abstract class TlsRSAUtils
     public static TlsSecret generateEncryptedPreMasterSecret(TlsContext context, TlsCertificate certificate,
         OutputStream output) throws IOException
     {
-        TlsSecret preMasterSecret = context.getCrypto().generateRSAPreMasterSecret(context.getClientVersion());
+        TlsSecret preMasterSecret = context.getCrypto()
+            .generateRSAPreMasterSecret(context.getRSAPreMasterSecretVersion());
 
         byte[] encryptedPreMasterSecret = preMasterSecret.encrypt(certificate);
-        TlsUtils.writeOpaque16(encryptedPreMasterSecret, output);
+        TlsUtils.writeEncryptedPMS(context, encryptedPreMasterSecret, output);
 
         return preMasterSecret;
     }

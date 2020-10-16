@@ -24,6 +24,7 @@ import org.bouncycastle.tls.SignatureAndHashAlgorithm;
 import org.bouncycastle.tls.TlsAuthentication;
 import org.bouncycastle.tls.TlsCredentialedSigner;
 import org.bouncycastle.tls.TlsCredentials;
+import org.bouncycastle.tls.TlsExtensionsUtils;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsServerCertificate;
 import org.bouncycastle.tls.TlsUtils;
@@ -62,11 +63,6 @@ class TlsTestClientImpl
         return firstFatalAlertDescription;
     }
 
-    public boolean shouldCheckSigAlgOfPeerCerts()
-    {
-        return config.clientCheckSigAlgOfServerCerts;
-    }
-
     public TlsCrypto getCrypto()
     {
         switch (config.clientCrypto)
@@ -81,10 +77,18 @@ class TlsTestClientImpl
     public Hashtable getClientExtensions() throws IOException
     {
         Hashtable clientExtensions = super.getClientExtensions();
-        if (clientExtensions != null && !config.clientSendSignatureAlgorithms)
+        if (clientExtensions != null)
         {
-            clientExtensions.remove(TlsUtils.EXT_signature_algorithms);
-            this.supportedSignatureAlgorithms = null;
+            if (!config.clientSendSignatureAlgorithms)
+            {
+                clientExtensions.remove(TlsExtensionsUtils.EXT_signature_algorithms);
+                this.supportedSignatureAlgorithms = null;
+            }
+            if (!config.clientSendSignatureAlgorithmsCert)
+            {
+                clientExtensions.remove(TlsExtensionsUtils.EXT_signature_algorithms_cert);
+                this.supportedSignatureAlgorithmsCert = null;
+            }
         }
         return clientExtensions;
     }
@@ -182,13 +186,28 @@ class TlsTestClientImpl
 
                 boolean isEmpty = serverCertificate == null || serverCertificate.getCertificate() == null
                     || serverCertificate.getCertificate().isEmpty();
-                if (isEmpty || !TlsTestUtils.isCertificateOneOf(context.getCrypto(), chain[0],
-                    new String[]
-                    { "x509-server-dsa.pem", "x509-server-ecdh.pem", "x509-server-ecdsa.pem", "x509-server-ed25519.pem",
-                        "x509-server-rsa_pss_256.pem", "x509-server-rsa_pss_384.pem", "x509-server-rsa_pss_512.pem",
-                        "x509-server-rsa-enc.pem", "x509-server-rsa-sign.pem" }))
+
+                if (isEmpty)
                 {
                     throw new TlsFatalAlert(AlertDescription.bad_certificate);
+                }
+
+                String[] trustedCertResources = new String[]{ "x509-server-dsa.pem", "x509-server-ecdh.pem",
+                    "x509-server-ecdsa.pem", "x509-server-ed25519.pem", "x509-server-ed448.pem",
+                    "x509-server-rsa_pss_256.pem", "x509-server-rsa_pss_384.pem", "x509-server-rsa_pss_512.pem",
+                    "x509-server-rsa-enc.pem", "x509-server-rsa-sign.pem" };
+
+                TlsCertificate[] certPath = TlsTestUtils.getTrustedCertPath(context.getCrypto(), chain[0],
+                    trustedCertResources);
+
+                if (null == certPath)
+                {
+                    throw new TlsFatalAlert(AlertDescription.bad_certificate);
+                }
+
+                if (config.clientCheckSigAlgOfServerCerts)
+                {
+                    TlsUtils.checkPeerSigAlgs(context, certPath);
                 }
             }
 

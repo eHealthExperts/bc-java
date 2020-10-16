@@ -53,11 +53,6 @@ class TlsTestServerImpl
         return firstFatalAlertDescription;
     }
 
-    public boolean shouldCheckSigAlgOfPeerCerts()
-    {
-        return config.serverCheckSigAlgOfClientCerts;
-    }
-
     public TlsCrypto getCrypto()
     {
         switch (config.serverCrypto)
@@ -200,13 +195,26 @@ class TlsTestServerImpl
             }
         }
 
-        if (!isEmpty && !TlsTestUtils.isCertificateOneOf(context.getCrypto(), chain[0],
-            new String[]
-            { "x509-client-dsa.pem", "x509-client-ecdh.pem", "x509-client-ecdsa.pem", "x509-client-ed25519.pem",
-                "x509-client-rsa_pss_256.pem", "x509-client-rsa_pss_384.pem", "x509-client-rsa_pss_512.pem",
-                "x509-client-rsa.pem" }))
+        if (isEmpty)
+        {
+            return;
+        }
+
+        String[] trustedCertResources = new String[]{ "x509-client-dsa.pem", "x509-client-ecdh.pem",
+            "x509-client-ecdsa.pem", "x509-client-ed25519.pem", "x509-client-ed448.pem", "x509-client-rsa_pss_256.pem",
+            "x509-client-rsa_pss_384.pem", "x509-client-rsa_pss_512.pem", "x509-client-rsa.pem" };
+
+        TlsCertificate[] certPath = TlsTestUtils.getTrustedCertPath(context.getCrypto(), chain[0],
+            trustedCertResources);
+
+        if (null == certPath)
         {
             throw new TlsFatalAlert(AlertDescription.bad_certificate);
+        }
+
+        if (config.serverCheckSigAlgOfClientCerts)
+        {
+            TlsUtils.checkPeerSigAlgs(context, certPath);
         }
     }
 
@@ -224,15 +232,15 @@ class TlsTestServerImpl
 
     protected TlsCredentialedSigner getDSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.dsa);
+        return loadSignerCredentials(SignatureAlgorithm.dsa);
     }
 
     protected TlsCredentialedSigner getECDSASignerCredentials() throws IOException
     {
         // TODO[RFC 8422] Code should choose based on client's supported sig algs?
-        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.ecdsa);
-//        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.ed25519);
-//        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.ed448);
+        return loadSignerCredentials(SignatureAlgorithm.ecdsa);
+//        return loadSignerCredentials(SignatureAlgorithm.ed25519);
+//        return loadSignerCredentials(SignatureAlgorithm.ed448);
     }
 
     protected TlsCredentialedDecryptor getRSAEncryptionCredentials() throws IOException
@@ -243,7 +251,7 @@ class TlsTestServerImpl
 
     protected TlsCredentialedSigner getRSASignerCredentials() throws IOException
     {
-        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), SignatureAlgorithm.rsa);
+        return loadSignerCredentials(SignatureAlgorithm.rsa);
     }
 
     protected ProtocolVersion[] getSupportedVersions()
@@ -259,5 +267,10 @@ class TlsTestServerImpl
     protected String hex(byte[] data)
     {
         return data == null ? "(null)" : Hex.toHexString(data);
+    }
+
+    private TlsCredentialedSigner loadSignerCredentials(short signatureAlgorithm) throws IOException
+    {
+        return TlsTestUtils.loadSignerCredentialsServer(context, getSupportedSignatureAlgorithms(), signatureAlgorithm);
     }
 }

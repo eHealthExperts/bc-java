@@ -13,22 +13,21 @@ import java.security.interfaces.RSAPublicKey;
 
 import javax.crypto.interfaces.DHPublicKey;
 
+import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.Certificate;
-import org.bouncycastle.asn1.x509.Extensions;
-import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
-import org.bouncycastle.asn1.x509.TBSCertificate;
 import org.bouncycastle.jcajce.util.JcaJceHelper;
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.ConnectionEnd;
 import org.bouncycastle.tls.KeyExchangeAlgorithm;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.TlsFatalAlert;
+import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.TlsCryptoException;
 import org.bouncycastle.tls.crypto.TlsVerifier;
@@ -40,6 +39,18 @@ import org.bouncycastle.tls.crypto.impl.RSAUtil;
 public class JcaTlsCertificate
     implements TlsCertificate
 {
+    protected static final int KU_DIGITAL_SIGNATURE = 0;
+    protected static final int KU_NON_REPUDIATION = 1;
+    protected static final int KU_KEY_ENCIPHERMENT = 2;
+    protected static final int KU_DATA_ENCIPHERMENT = 3;
+    protected static final int KU_KEY_AGREEMENT = 4;
+    protected static final int KU_KEY_CERT_SIGN = 5;
+    protected static final int KU_CRL_SIGN = 6;
+    protected static final int KU_ENCIPHER_ONLY = 7;
+    protected static final int KU_DECIPHER_ONLY = 8;
+
+    private static final int X509V3_VERSION = 3;
+
     public static JcaTlsCertificate convert(JcaTlsCrypto crypto, TlsCertificate certificate) throws IOException
     {
         if (certificate instanceof JcaTlsCertificate)
@@ -53,6 +64,7 @@ public class JcaTlsCertificate
     public static X509Certificate parseCertificate(JcaJceHelper helper, byte[] encoding)
         throws IOException
     {
+        final X509Certificate certificate;
         try
         {
             /*
@@ -65,17 +77,23 @@ public class JcaTlsCertificate
             byte[] derEncoding = Certificate.getInstance(encoding).getEncoded(ASN1Encoding.DER);
 
             ByteArrayInputStream input = new ByteArrayInputStream(derEncoding);
-            X509Certificate certificate = (X509Certificate)helper.createCertificateFactory("X.509").generateCertificate(input);
+            certificate = (X509Certificate)helper.createCertificateFactory("X.509").generateCertificate(input);
             if (input.available() != 0)
             {
                 throw new IOException("Extra data detected in stream");
             }
-            return certificate;
         }
         catch (GeneralSecurityException e)
         {
             throw new TlsCryptoException("unable to decode certificate", e);
         }
+
+        if (X509V3_VERSION != certificate.getVersion())
+        {
+            throw new TlsFatalAlert(AlertDescription.bad_certificate);
+        }
+
+        return certificate;
     }
 
     protected final JcaTlsCrypto crypto;
@@ -83,7 +101,7 @@ public class JcaTlsCertificate
 
     protected DHPublicKey pubKeyDH = null;
     protected ECPublicKey pubKeyEC = null;
-    protected RSAPublicKey pubKeyRSA = null;
+    protected PublicKey pubKeyRSA = null;
 
     public JcaTlsCertificate(JcaTlsCrypto crypto, byte[] encoding)
         throws IOException
@@ -99,7 +117,7 @@ public class JcaTlsCertificate
 
     public TlsVerifier createVerifier(short signatureAlgorithm) throws IOException
     {
-        validateKeyUsage(KeyUsage.digitalSignature);
+        validateKeyUsageBit(KU_DIGITAL_SIGNATURE);
 
         switch (signatureAlgorithm)
         {
@@ -165,6 +183,13 @@ public class JcaTlsCertificate
         return certificate.getSigAlgOID();
     }
 
+    public ASN1Encodable getSigAlgParams() throws IOException
+    {
+        byte[] derEncoding = certificate.getSigAlgParams();
+
+        return null == derEncoding ? null : TlsUtils.readDERObject(derEncoding);
+    }
+
     DHPublicKey getPubKeyDH() throws IOException
     {
         try
@@ -221,80 +246,112 @@ public class JcaTlsCertificate
         return publicKey;
     }
 
-    RSAPublicKey getPubKeyRSA() throws IOException
+    PublicKey getPubKeyRSA() throws IOException
     {
-        try
-        {
-            return (RSAPublicKey)getPublicKey();
-        }
-        catch (ClassCastException e)
-        {
-            throw new TlsFatalAlert(AlertDescription.certificate_unknown, e);
-        }
+        return getPublicKey();
     }
 
     public short getLegacySignatureAlgorithm() throws IOException
     {
-         PublicKey publicKey = getPublicKey();
+        PublicKey publicKey = getPublicKey();
 
-         try
-         {
-             validateKeyUsage(KeyUsage.digitalSignature);
-         }
-         catch (IOException e)
-         {
-             throw e;
-         }
-         catch (Exception e)
-         {
-             throw new TlsFatalAlert(AlertDescription.unsupported_certificate, e);
-         }
+        if (!supportsKeyUsageBit(KU_DIGITAL_SIGNATURE))
+        {
+            return -1;
+        }
 
-         /*
-          * RFC 5246 7.4.6. Client Certificate
-          */
+        /*
+         * RFC 5246 7.4.6. Client Certificate
+         */
 
-         /*
-          * RSA public key; the certificate MUST allow the key to be used for signing with the
-          * signature scheme and hash algorithm that will be employed in the certificate verify
-          * message.
-          */
-         if (publicKey instanceof RSAPublicKey)
-         {
-             return SignatureAlgorithm.rsa;
-         }
+        /*
+         * RSA public key; the certificate MUST allow the key to be used for signing with the
+         * signature scheme and hash algorithm that will be employed in the certificate verify
+         * message.
+         */
+        if (publicKey instanceof RSAPublicKey)
+        {
+            return SignatureAlgorithm.rsa;
+        }
 
-         /*
-          * DSA public key; the certificate MUST allow the key to be used for signing with the
-          * hash algorithm that will be employed in the certificate verify message.
-          */
-         if (publicKey instanceof DSAPublicKey)
-         {
-             return SignatureAlgorithm.dsa;
-         }
+        /*
+         * DSA public key; the certificate MUST allow the key to be used for signing with the hash
+         * algorithm that will be employed in the certificate verify message.
+         */
+        if (publicKey instanceof DSAPublicKey)
+        {
+            return SignatureAlgorithm.dsa;
+        }
 
-         /*
-          * ECDSA-capable public key; the certificate MUST allow the key to be used for signing
-          * with the hash algorithm that will be employed in the certificate verify message; the
-          * public key MUST use a curve and point format supported by the server.
-          */
-         if (publicKey instanceof ECPublicKey)
-         {
-             // TODO Check the curve and point format
-             return SignatureAlgorithm.ecdsa;
-         }
+        /*
+         * ECDSA-capable public key; the certificate MUST allow the key to be used for signing with
+         * the hash algorithm that will be employed in the certificate verify message; the public
+         * key MUST use a curve and point format supported by the server.
+         */
+        if (publicKey instanceof ECPublicKey)
+        {
+            // TODO Check the curve and point format
+            return SignatureAlgorithm.ecdsa;
+        }
 
-         throw new TlsFatalAlert(AlertDescription.unsupported_certificate);
+        return -1;
     }
 
-    public boolean supportsSignatureAlgorithm(short signatureAlgorithm)
-        throws IOException
+    public boolean supportsSignatureAlgorithm(short signatureAlgorithm) throws IOException
     {
-        if (!supportsKeyUsage(KeyUsage.digitalSignature))
+        if (!supportsKeyUsageBit(KU_DIGITAL_SIGNATURE))
         {
             return false;
         }
 
+        return implSupportsSignatureAlgorithm(signatureAlgorithm);
+    }
+
+    public boolean supportsSignatureAlgorithmCA(short signatureAlgorithm) throws IOException
+    {
+        return implSupportsSignatureAlgorithm(signatureAlgorithm);
+    }
+
+    public TlsCertificate useInRole(int connectionEnd, int keyExchangeAlgorithm) throws IOException
+    {
+        switch (keyExchangeAlgorithm)
+        {
+        case KeyExchangeAlgorithm.DH_DSS:
+        case KeyExchangeAlgorithm.DH_RSA:
+        {
+            validateKeyUsageBit(KU_KEY_AGREEMENT);
+            this.pubKeyDH = getPubKeyDH();
+            return this;
+        }
+
+        case KeyExchangeAlgorithm.ECDH_ECDSA:
+        case KeyExchangeAlgorithm.ECDH_RSA:
+        {
+            validateKeyUsageBit(KU_KEY_AGREEMENT);
+            this.pubKeyEC = getPubKeyEC();
+            return this;
+        }
+        }
+
+        if (connectionEnd == ConnectionEnd.server)
+        {
+            switch (keyExchangeAlgorithm)
+            {
+            case KeyExchangeAlgorithm.RSA:
+            case KeyExchangeAlgorithm.RSA_PSK:
+            {
+                validateKeyUsageBit(KU_KEY_ENCIPHERMENT);
+                this.pubKeyRSA = getPubKeyRSA();
+                return this;
+            }
+            }
+        }
+
+        throw new TlsFatalAlert(AlertDescription.certificate_unknown);
+    }
+
+    protected boolean implSupportsSignatureAlgorithm(short signatureAlgorithm) throws IOException
+    {
         PublicKey publicKey = getPublicKey();
 
         switch (signatureAlgorithm)
@@ -332,44 +389,6 @@ public class JcaTlsCertificate
         }
     }
 
-    public TlsCertificate useInRole(int connectionEnd, int keyExchangeAlgorithm) throws IOException
-    {
-        switch (keyExchangeAlgorithm)
-        {
-        case KeyExchangeAlgorithm.DH_DSS:
-        case KeyExchangeAlgorithm.DH_RSA:
-        {
-            validateKeyUsage(KeyUsage.keyAgreement);
-            this.pubKeyDH = getPubKeyDH();
-            return this;
-        }
-
-        case KeyExchangeAlgorithm.ECDH_ECDSA:
-        case KeyExchangeAlgorithm.ECDH_RSA:
-        {
-            validateKeyUsage(KeyUsage.keyAgreement);
-            this.pubKeyEC = getPubKeyEC();
-            return this;
-        }
-        }
-
-        if (connectionEnd == ConnectionEnd.server)
-        {
-            switch (keyExchangeAlgorithm)
-            {
-            case KeyExchangeAlgorithm.RSA:
-            case KeyExchangeAlgorithm.RSA_PSK:
-            {
-                validateKeyUsage(KeyUsage.keyEncipherment);
-                this.pubKeyRSA = getPubKeyRSA();
-                return this;
-            }
-            }
-        }
-
-        throw new TlsFatalAlert(AlertDescription.certificate_unknown);
-    }
-
     protected PublicKey getPublicKey() throws IOException
     {
         try
@@ -378,7 +397,7 @@ public class JcaTlsCertificate
         }
         catch (RuntimeException e)
         {
-            throw new TlsFatalAlert(AlertDescription.unsupported_certificate, e);
+            throw new TlsFatalAlert(AlertDescription.bad_certificate, e);
         }
     }
 
@@ -392,32 +411,11 @@ public class JcaTlsCertificate
         return certificate;
     }
 
-    protected boolean supportsKeyUsage(int keyUsageBits)
+    protected boolean supportsKeyUsageBit(int keyUsageBit)
     {
-        Extensions exts;
-        try
-        {
-            exts = TBSCertificate.getInstance(certificate.getTBSCertificate()).getExtensions();
-        }
-        catch (CertificateEncodingException e)
-        {
-            return false;
-        }
+        boolean[] keyUsage = certificate.getKeyUsage();
 
-        if (exts != null)
-        {
-            KeyUsage ku = KeyUsage.fromExtensions(exts);
-            if (ku != null)
-            {
-                int bits = ku.getBytes()[0] & 0xff;
-                if ((bits & keyUsageBits) != keyUsageBits)
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
+        return null == keyUsage || (keyUsage.length > keyUsageBit && keyUsage[keyUsageBit]);
     }
 
     protected boolean supportsRSA_PKCS1()
@@ -441,10 +439,10 @@ public class JcaTlsCertificate
         return RSAUtil.supportsPSS_RSAE(pubKeyAlgID);
     }
 
-    protected void validateKeyUsage(int keyUsageBits)
+    protected void validateKeyUsageBit(int keyUsageBit)
         throws IOException
     {
-        if (!supportsKeyUsage(keyUsageBits))
+        if (!supportsKeyUsageBit(keyUsageBit))
         {
             throw new TlsFatalAlert(AlertDescription.certificate_unknown);
         }

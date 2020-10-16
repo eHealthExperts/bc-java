@@ -7,8 +7,6 @@ import java.math.BigInteger;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.spec.RSAPrivateCrtKeySpec;
 
-import org.bouncycastle.asn1.DERNull;
-import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.pkcs.RSAPrivateKey;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -43,6 +41,20 @@ public class BCRSAPrivateCrtKey
     {
         super(key);
 
+        this.publicExponent = key.getPublicExponent();
+        this.primeP = key.getP();
+        this.primeQ = key.getQ();
+        this.primeExponentP = key.getDP();
+        this.primeExponentQ = key.getDQ();
+        this.crtCoefficient = key.getQInv();
+    }
+
+    BCRSAPrivateCrtKey(
+        AlgorithmIdentifier algorithmIdentifier,
+        RSAPrivateCrtKeyParameters key)
+    {
+        super(algorithmIdentifier, key);
+        
         this.publicExponent = key.getPublicExponent();
         this.primeP = key.getP();
         this.primeQ = key.getQ();
@@ -102,7 +114,7 @@ public class BCRSAPrivateCrtKey
         PrivateKeyInfo info)
         throws IOException
     {
-        this(RSAPrivateKey.getInstance(info.parsePrivateKey()));
+        this(info.getPrivateKeyAlgorithm(), RSAPrivateKey.getInstance(info.parsePrivateKey()));
     }
 
     /**
@@ -111,7 +123,14 @@ public class BCRSAPrivateCrtKey
     BCRSAPrivateCrtKey(
         RSAPrivateKey key)
     {
-        super(new RSAPrivateCrtKeyParameters(key.getModulus(),
+        this(BCRSAPublicKey.DEFAULT_ALGORITHM_IDENTIFIER, key);
+    }
+
+    BCRSAPrivateCrtKey(
+        AlgorithmIdentifier algorithmIdentifier,
+        RSAPrivateKey key)
+    {
+        super(algorithmIdentifier, new RSAPrivateCrtKeyParameters(key.getModulus(),
                                 key.getPublicExponent(), key.getPrivateExponent(),
                                 key.getPrime1(), key.getPrime2(), key.getExponent1(), key.getExponent2(), key.getCoefficient()));
 
@@ -143,7 +162,7 @@ public class BCRSAPrivateCrtKey
      */
     public byte[] getEncoded()
     {
-        return KeyUtil.getEncodedPrivateKeyInfo(new AlgorithmIdentifier(PKCSObjectIdentifiers.rsaEncryption, DERNull.INSTANCE), new RSAPrivateKey(getModulus(), getPublicExponent(), getPrivateExponent(), getPrimeP(), getPrimeQ(), getPrimeExponentP(), getPrimeExponentQ(), getCrtCoefficient()));
+        return KeyUtil.getEncodedPrivateKeyInfo(algorithmIdentifier, new RSAPrivateKey(getModulus(), getPublicExponent(), getPrivateExponent(), getPrimeP(), getPrimeQ(), getPrimeExponentP(), getPrimeExponentQ(), getCrtCoefficient()));
     }
 
     /**

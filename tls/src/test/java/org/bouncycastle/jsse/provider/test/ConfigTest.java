@@ -1,48 +1,42 @@
 package org.bouncycastle.jsse.provider.test;
 
-
-import java.security.Security;
+import java.security.Provider;
 
 import junit.framework.TestCase;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 
 public class ConfigTest
     extends TestCase
 {
     protected void setUp()
     {
-        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null)
-        {
-            Security.addProvider(new BouncyCastleProvider());
-        }
+        ProviderUtils.setupLowPriority(false);
     }
 
     public void testWithString()
     {
-        String BC = BouncyCastleProvider.PROVIDER_NAME;
+        String BC = ProviderUtils.PROVIDER_NAME_BC;
 
-        BouncyCastleJsseProvider jsseProv = new BouncyCastleJsseProvider("fips:" + BC);
+        Provider jsseProv = ProviderUtils.createProviderBCJSSE("fips:" + BC);
 
-        assertTrue(jsseProv.isFipsMode());
+        assertTrue(ProviderUtils.isFipsModeBCJSSE(jsseProv));
 
-        jsseProv = new BouncyCastleJsseProvider(BC);
+        jsseProv = ProviderUtils.createProviderBCJSSE(BC);
 
-        assertFalse(jsseProv.isFipsMode());
+        assertFalse(ProviderUtils.isFipsModeBCJSSE(jsseProv));
 
-        jsseProv = new BouncyCastleJsseProvider("unknown:" + BC);
+        jsseProv = ProviderUtils.createProviderBCJSSE("unknown:" + BC);
 
-        assertFalse(jsseProv.isFipsMode());
+        assertFalse(ProviderUtils.isFipsModeBCJSSE(jsseProv));
     }
 
     public void testWithProvider()
     {
-        BouncyCastleJsseProvider jsseProv = new BouncyCastleJsseProvider(true, new BouncyCastleProvider());
+        Provider jsseProv = ProviderUtils.createProviderBCJSSE(true, ProviderUtils.createProviderBC());
 
-        assertTrue(jsseProv.isFipsMode());
+        assertTrue(ProviderUtils.isFipsModeBCJSSE(jsseProv));
 
-        jsseProv = new BouncyCastleJsseProvider(new BouncyCastleProvider());
+        jsseProv = ProviderUtils.createProviderBCJSSE(ProviderUtils.createProviderBC());
 
-        assertFalse(jsseProv.isFipsMode());
+        assertFalse(ProviderUtils.isFipsModeBCJSSE(jsseProv));
     }
 }
