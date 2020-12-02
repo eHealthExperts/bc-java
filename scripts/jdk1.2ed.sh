@@ -82,3 +82,21 @@ g/private final/s/final//
 w
 q
 %
+
+ed org/bouncycastle/jcajce/provider/drbg/DRBG.java <<%
+g/private final/s/final//
+w
+q
+%
+
+ed org/bouncycastle/cms/bc/BcCMSContentEncryptorBuilder.java <<%
+g/private final/s/final//
+w
+q
+%
+
+ed org/bouncycastle/crypto/prng/SP800SecureRandomBuilder.java <<%
+g/private final/s/final//
+w
+q
+%

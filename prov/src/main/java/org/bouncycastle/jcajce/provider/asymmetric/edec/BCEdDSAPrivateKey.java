@@ -14,15 +14,17 @@ import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed448PrivateKeyParameters;
 import org.bouncycastle.crypto.util.PrivateKeyInfoFactory;
-import org.bouncycastle.jcajce.interfaces.EdDSAKey;
+import org.bouncycastle.jcajce.interfaces.EdDSAPrivateKey;
+import org.bouncycastle.jcajce.interfaces.EdDSAPublicKey;
 import org.bouncycastle.util.Arrays;
+import org.bouncycastle.util.Properties;
 
 public class BCEdDSAPrivateKey
-    implements EdDSAKey, PrivateKey
+    implements EdDSAPrivateKey
 {
     static final long serialVersionUID = 1L;
     
-    private transient AsymmetricKeyParameter eddsaPrivateKey;
+    transient AsymmetricKeyParameter eddsaPrivateKey;
 
     private final boolean hasPublicKey;
     private final byte[] attributes;
@@ -74,7 +76,7 @@ public class BCEdDSAPrivateKey
             ASN1Set attrSet = ASN1Set.getInstance(attributes);
             PrivateKeyInfo privInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(eddsaPrivateKey, attrSet);
 
-            if (hasPublicKey)
+            if (hasPublicKey && !Properties.isOverrideSet("org.bouncycastle.pkcs8.v1_info_only"))
             {
                 return privInfo.getEncoded();
             }
@@ -86,6 +88,18 @@ public class BCEdDSAPrivateKey
         catch (IOException e)
         {
             return null;
+        }
+    }
+
+    public EdDSAPublicKey getPublicKey()
+    {
+        if (eddsaPrivateKey instanceof Ed448PrivateKeyParameters)
+        {
+            return new BCEdDSAPublicKey(((Ed448PrivateKeyParameters)eddsaPrivateKey).generatePublicKey());
+        }
+        else
+        {
+            return new BCEdDSAPublicKey(((Ed25519PrivateKeyParameters)eddsaPrivateKey).generatePublicKey());
         }
     }
 
@@ -115,12 +129,12 @@ public class BCEdDSAPrivateKey
             return true;
         }
 
-        if (!(o instanceof BCEdDSAPrivateKey))
+        if (!(o instanceof PrivateKey))
         {
             return false;
         }
 
-        BCEdDSAPrivateKey other = (BCEdDSAPrivateKey)o;
+        PrivateKey other = (PrivateKey)o;
 
         return Arrays.areEqual(other.getEncoded(), this.getEncoded());
     }

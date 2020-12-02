@@ -23,6 +23,7 @@ import org.bouncycastle.tls.TlsExtensionsUtils;
 import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsServerCertificate;
 import org.bouncycastle.tls.TlsSession;
+import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.impl.bc.BcTlsCrypto;
 import org.bouncycastle.util.Arrays;
@@ -117,14 +118,26 @@ class MockTlsClient
 
                 boolean isEmpty = serverCertificate == null || serverCertificate.getCertificate() == null
                     || serverCertificate.getCertificate().isEmpty();
-                if (isEmpty || !TlsTestUtils.isCertificateOneOf(context.getCrypto(), chain[0],
-                    new String[]
-                    { "x509-server-dsa.pem", "x509-server-ecdh.pem", "x509-server-ecdsa.pem", "x509-server-ed25519.pem",
-                        "x509-server-rsa_pss_256.pem", "x509-server-rsa_pss_384.pem", "x509-server-rsa_pss_512.pem",
-                        "x509-server-rsa-enc.pem", "x509-server-rsa-sign.pem" }))
+
+                if (isEmpty)
                 {
                     throw new TlsFatalAlert(AlertDescription.bad_certificate);
                 }
+
+                String[] trustedCertResources = new String[]{ "x509-server-dsa.pem", "x509-server-ecdh.pem",
+                    "x509-server-ecdsa.pem", "x509-server-ed25519.pem", "x509-server-ed448.pem",
+                    "x509-server-rsa_pss_256.pem", "x509-server-rsa_pss_384.pem", "x509-server-rsa_pss_512.pem",
+                    "x509-server-rsa-enc.pem", "x509-server-rsa-sign.pem" };
+
+                TlsCertificate[] certPath = TlsTestUtils.getTrustedCertPath(context.getCrypto(), chain[0],
+                    trustedCertResources);
+
+                if (null == certPath)
+                {
+                    throw new TlsFatalAlert(AlertDescription.bad_certificate);
+                }
+
+                TlsUtils.checkPeerSigAlgs(context, certPath);
             }
 
             public TlsCredentials getClientCredentials(CertificateRequest certificateRequest)
@@ -152,28 +165,34 @@ class MockTlsClient
             System.out.println("Client ALPN: " + protocolName.getUtf8Decoding());
         }
 
-        TlsSession newSession = context.getResumableSession();
+        TlsSession newSession = context.getSession();
         if (newSession != null)
         {
-            byte[] newSessionID = newSession.getSessionID();
-            String hex = Hex.toHexString(newSessionID);
-
-            if (this.session != null && Arrays.areEqual(this.session.getSessionID(), newSessionID))
+            if (newSession.isResumable())
             {
-                System.out.println("Client resumed session: " + hex);
+                byte[] newSessionID = newSession.getSessionID();
+                String hex = Hex.toHexString(newSessionID);
+
+                if (this.session != null && Arrays.areEqual(this.session.getSessionID(), newSessionID))
+                {
+                    System.out.println("Client resumed session: " + hex);
+                }
+                else
+                {
+                    System.out.println("Client established session: " + hex);
+                }
+
+                this.session = newSession;
             }
-            else
-            {
-                System.out.println("Client established session: " + hex);
 
-                byte[] tlsServerEndPoint = context.exportChannelBinding(ChannelBinding.tls_server_end_point);
+            byte[] tlsServerEndPoint = context.exportChannelBinding(ChannelBinding.tls_server_end_point);
+            if (null != tlsServerEndPoint)
+            {
                 System.out.println("Client 'tls-server-end-point': " + hex(tlsServerEndPoint));
             }
 
             byte[] tlsUnique = context.exportChannelBinding(ChannelBinding.tls_unique);
             System.out.println("Client 'tls-unique': " + hex(tlsUnique));
-
-            this.session = newSession;
         }
     }
 

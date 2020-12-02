@@ -21,12 +21,24 @@ import org.bouncycastle.tls.crypto.TlsSigner;
 public class BcDefaultTlsCredentialedSigner
     extends DefaultTlsCredentialedSigner
 {
+    private static BcTlsCertificate getEndEntity(BcTlsCrypto crypto, Certificate certificate) throws IOException
+    {
+        if (certificate == null || certificate.isEmpty())
+        {
+            throw new IllegalArgumentException("No certificate");
+        }
+
+        return BcTlsCertificate.convert(crypto, certificate.getCertificateAt(0));
+    }
+
     private static TlsSigner makeSigner(BcTlsCrypto crypto, AsymmetricKeyParameter privateKey, Certificate certificate,
         SignatureAndHashAlgorithm signatureAndHashAlgorithm)
     {
         TlsSigner signer;
         if (privateKey instanceof RSAKeyParameters)
         {
+            RSAKeyParameters privKeyRSA = (RSAKeyParameters)privateKey;
+
             if (signatureAndHashAlgorithm != null)
             {
                 short signatureAlgorithm = signatureAndHashAlgorithm.getSignature();
@@ -38,11 +50,21 @@ public class BcDefaultTlsCredentialedSigner
                 case SignatureAlgorithm.rsa_pss_rsae_sha256:
                 case SignatureAlgorithm.rsa_pss_rsae_sha384:
                 case SignatureAlgorithm.rsa_pss_rsae_sha512:
-                    return new BcTlsRSAPSSSigner(crypto, (RSAKeyParameters)privateKey, signatureAlgorithm);
+                    return new BcTlsRSAPSSSigner(crypto, privKeyRSA, signatureAlgorithm);
                 }
             }
 
-            signer = new BcTlsRSASigner(crypto, (RSAKeyParameters)privateKey);
+            RSAKeyParameters pubKeyRSA;
+            try
+            {
+                pubKeyRSA = getEndEntity(crypto, certificate).getPubKeyRSA();
+            }
+            catch (Exception e)
+            {
+                throw new RuntimeException(e);
+            }
+
+            signer = new BcTlsRSASigner(crypto, privKeyRSA, pubKeyRSA);
         }
         else if (privateKey instanceof DSAPrivateKeyParameters)
         {
@@ -54,27 +76,11 @@ public class BcDefaultTlsCredentialedSigner
         }
         else if (privateKey instanceof Ed25519PrivateKeyParameters)
         {
-            try
-            {
-                signer = new BcTlsEd25519Signer(crypto, (Ed25519PrivateKeyParameters)privateKey,
-                    BcTlsCertificate.convert(crypto, certificate.getCertificateAt(0)).getPubKeyEd25519());
-            }
-            catch (IOException e)
-            {
-                throw Exceptions.illegalArgumentException("exception converting certificate", e);
-            }
+            signer = new BcTlsEd25519Signer(crypto, (Ed25519PrivateKeyParameters)privateKey);
         }
         else if (privateKey instanceof Ed448PrivateKeyParameters)
         {
-            try
-            {
-                signer = new BcTlsEd448Signer(crypto, (Ed448PrivateKeyParameters)privateKey,
-                    BcTlsCertificate.convert(crypto, certificate.getCertificateAt(0)).getPubKeyEd448());
-            }
-            catch (IOException e)
-            {
-                throw Exceptions.illegalArgumentException("exception converting certificate", e);
-            }
+            signer = new BcTlsEd448Signer(crypto, (Ed448PrivateKeyParameters)privateKey);
         }
         else
         {

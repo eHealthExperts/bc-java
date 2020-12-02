@@ -9,13 +9,12 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.security.spec.KeySpec;
 import java.util.Arrays;
 
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
-import javax.crypto.spec.DHPublicKeySpec;
-import javax.security.auth.DestroyFailedException;
 
 import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.TlsDHUtils;
@@ -55,7 +54,7 @@ public class JceTlsDHDomain
              * is used as the pre_master_secret. We use the convention established by the JSSE to
              * signal this by asking for "TlsPremasterSecret".
              */
-            byte[] secret = crypto.calculateKeyAgreement("DH", privateKey, publicKey, "TlsPremasterSecret");
+            byte[] secret = crypto.calculateKeyAgreement("DiffieHellman", privateKey, publicKey, "TlsPremasterSecret");
 
             if (padded)
             {
@@ -73,30 +72,27 @@ public class JceTlsDHDomain
             throw new TlsCryptoException("cannot calculate secret", e);
         }
     }
-
-    public static DHParameterSpec getParameters(TlsDHConfig dhConfig)
-    {
-        DHGroup dhGroup = TlsDHUtils.getDHGroup(dhConfig);
-        if (dhGroup == null)
-        {
-            throw new IllegalArgumentException("No DH configuration provided");
-        }
-
-        // NOTE: dhGroup.getQ() is ignored here
-        return new DHParameterSpec(dhGroup.getP(), dhGroup.getG(), dhGroup.getL());
-    }
-
-    private static Logger LOG = Logger.getLogger(JceTlsDHDomain.class.getName());
     
     protected final JcaTlsCrypto crypto;
     protected final TlsDHConfig dhConfig;
-    protected final DHParameterSpec dhParameterSpec;
+    protected final DHParameterSpec dhSpec;
 
     public JceTlsDHDomain(JcaTlsCrypto crypto, TlsDHConfig dhConfig)
     {
-        this.crypto = crypto;
-        this.dhConfig = dhConfig;
-        this.dhParameterSpec = getParameters(dhConfig);
+        DHGroup dhGroup = TlsDHUtils.getDHGroup(dhConfig);
+        if (null != dhGroup)
+        {
+            DHParameterSpec spec = DHUtil.getDHParameterSpec(crypto, dhGroup);
+            if (null != spec)
+            {
+                this.crypto = crypto;
+                this.dhConfig = dhConfig;
+                this.dhSpec = spec;
+                return;
+            }
+        }
+
+        throw new IllegalArgumentException("No DH configuration provided");
     }
 
     public JceTlsSecret calculateDHAgreement(DHPrivateKey privateKey, DHPublicKey publicKey)
@@ -112,7 +108,7 @@ public class JceTlsDHDomain
 
     public BigInteger decodeParameter(byte[] encoding) throws IOException
     {
-        if (dhConfig.isPadded() && getValueLength(dhParameterSpec) != encoding.length)
+        if (dhConfig.isPadded() && getValueLength(dhSpec) != encoding.length)
         {
             throw new TlsFatalAlert(AlertDescription.illegal_parameter);
         }
@@ -130,10 +126,10 @@ public class JceTlsDHDomain
         try
         {
             BigInteger y = decodeParameter(encoding);
+            KeySpec publicKeySpec = DHUtil.createPublicKeySpec(y, dhSpec);
 
-            KeyFactory keyFactory = crypto.getHelper().createKeyFactory("DH");
-
-            return (DHPublicKey)keyFactory.generatePublic(new DHPublicKeySpec(y, dhParameterSpec.getP(), dhParameterSpec.getG()));
+            KeyFactory keyFactory = crypto.getHelper().createKeyFactory("DiffieHellman");
+            return (DHPublicKey)keyFactory.generatePublic(publicKeySpec);
         }
         catch (IOException e)
         {
@@ -147,20 +143,20 @@ public class JceTlsDHDomain
 
     public byte[] encodeParameter(BigInteger x) throws IOException
     {
-        return encodeValue(dhParameterSpec, dhConfig.isPadded(), x);
+        return encodeValue(dhSpec, dhConfig.isPadded(), x);
     }
 
     public byte[] encodePublicKey(DHPublicKey publicKey) throws IOException
     {
-        return encodeValue(dhParameterSpec, true, publicKey.getY());
+        return encodeValue(dhSpec, true, publicKey.getY());
     }
 
     public KeyPair generateKeyPair() throws IOException
     {
         try
         {
-            KeyPairGenerator keyPairGenerator = crypto.getHelper().createKeyPairGenerator("DH");
-            keyPairGenerator.initialize(dhParameterSpec, crypto.getSecureRandom());
+            KeyPairGenerator keyPairGenerator = crypto.getHelper().createKeyPairGenerator("DiffieHellman");
+            keyPairGenerator.initialize(dhSpec, crypto.getSecureRandom());
             return keyPairGenerator.generateKeyPair();
         }
         catch (GeneralSecurityException e)

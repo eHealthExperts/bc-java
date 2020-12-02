@@ -204,7 +204,7 @@ public class SMIMESignedWriter
                 headers.put((String)ent.getKey(), (String)ent.getValue());
             }
 
-            return new SMIMESignedWriter(this, headers, boundary, mimeOut);
+            return new SMIMESignedWriter(this, headers, boundary, SMimeUtils.autoBuffer(mimeOut));
         }
 
         private void addHashHeader(
@@ -351,6 +351,18 @@ public class SMIMESignedWriter
             this.backing = backing;
             this.sigStream = sigStream;
             this.sigBase = sigBase;
+        }
+
+        public void write(byte[] buf)
+            throws IOException
+        {
+            main.write(buf);
+        }
+
+        public void write(byte[] buf, int off, int len)
+            throws IOException
+        {
+            main.write(buf, off, len);
         }
 
         public void write(int i)

@@ -28,8 +28,7 @@ import java.util.Set;
 
 import javax.security.auth.x500.X500Principal;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1Primitive;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.CRLDistPoint;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.asn1.x509.DistributionPoint;
@@ -40,6 +39,7 @@ import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.TargetInformation;
 import org.bouncycastle.asn1.x509.X509Extensions;
 import org.bouncycastle.jcajce.PKIXCRLStore;
+import org.bouncycastle.jcajce.PKIXCertRevocationCheckerParameters;
 import org.bouncycastle.jcajce.PKIXCertStoreSelector;
 import org.bouncycastle.jcajce.PKIXExtendedBuilderParameters;
 import org.bouncycastle.jcajce.PKIXExtendedParameters;
@@ -125,7 +125,8 @@ class RFC3281CertPathUtilities
      * @throws CertPathValidatorException if the certificate is revoked or the
      *             status cannot be checked or some error occurs.
      */
-    protected static void checkCRLs(X509AttributeCertificate attrCert,
+    protected static void checkCRLs(
+        X509AttributeCertificate attrCert,
         PKIXExtendedParameters paramsPKIX, X509Certificate issuerCert,
         Date validDate, List certPathCerts, JcaJceHelper helper) throws CertPathValidatorException
     {
@@ -151,7 +152,7 @@ class RFC3281CertPathUtilities
 
                 try
                 {
-                    crlStores.addAll(CertPathValidatorUtilities.getAdditionalStoresFromCRLDistributionPoint(crldp, paramsPKIX.getNamedCRLStoreMap()));
+                    crlStores.addAll(CertPathValidatorUtilities.getAdditionalStoresFromCRLDistributionPoint(crldp, paramsPKIX.getNamedCRLStoreMap(), validDate, helper));
                 }
                 catch (AnnotatedException e)
                 {
@@ -196,7 +197,8 @@ class RFC3281CertPathUtilities
                             PKIXExtendedParameters paramsPKIXClone = (PKIXExtendedParameters)paramsPKIX
                                     .clone();
 
-                            checkCRL(dps[i], attrCert, paramsPKIXClone,
+                            checkCRL(
+                                dps[i], attrCert, paramsPKIXClone,
                                 validDate, issuerCert, certStatus, reasonsMask,
                                 certPathCerts, helper);
                             validCrlFound = true;
@@ -225,14 +227,10 @@ class RFC3281CertPathUtilities
                          * fields omitted and a distribution point name of the
                          * certificate issuer.
                          */
-                        ASN1Primitive issuer = null;
+                        X500Name issuer;
                         try
                         {
-
-                            issuer = new ASN1InputStream(
-                                ((X500Principal) attrCert.getIssuer()
-                                    .getPrincipals()[0]).getEncoded())
-                                .readObject();
+                            issuer = PrincipalUtils.getEncodedIssuerPrincipal(attrCert);
                         }
                         catch (Exception e)
                         {
@@ -246,6 +244,7 @@ class RFC3281CertPathUtilities
                                     issuer))), null, null);
                         PKIXExtendedParameters paramsPKIXClone = (PKIXExtendedParameters) paramsPKIX
                             .clone();
+ 
                         checkCRL(dp, attrCert, paramsPKIXClone, validDate,
                             issuerCert, certStatus, reasonsMask, certPathCerts, helper);
                         validCrlFound = true;
@@ -368,8 +367,8 @@ class RFC3281CertPathUtilities
     protected static void processAttrCert3(X509Certificate acIssuerCert,
         PKIXExtendedParameters pkixParams) throws CertPathValidatorException
     {
-        if (acIssuerCert.getKeyUsage() != null
-            && (!acIssuerCert.getKeyUsage()[0] && !acIssuerCert.getKeyUsage()[1]))
+        boolean[] keyUsage = acIssuerCert.getKeyUsage();
+        if (keyUsage != null && !((keyUsage.length > 0 && keyUsage[0]) || (keyUsage.length > 1 && keyUsage[1])))
         {
             throw new CertPathValidatorException(
                 "Attribute certificate issuer public key cannot be used to validate digital signatures.");
@@ -575,9 +574,10 @@ class RFC3281CertPathUtilities
      *             cannot be checked or some error occurs.
      */
     private static void checkCRL(DistributionPoint dp,
-        X509AttributeCertificate attrCert, PKIXExtendedParameters paramsPKIX,
-        Date validDate, X509Certificate issuerCert, CertStatus certStatus,
-        ReasonsMask reasonMask, List certPathCerts, JcaJceHelper helper) throws AnnotatedException
+                                 X509AttributeCertificate attrCert, PKIXExtendedParameters paramsPKIX,
+                                 Date validDate, X509Certificate issuerCert, CertStatus certStatus,
+                                 ReasonsMask reasonMask, List certPathCerts, JcaJceHelper helper)
+        throws AnnotatedException, RecoverableCertPathValidatorException
     {
 
         /*
@@ -605,7 +605,8 @@ class RFC3281CertPathUtilities
          * getAdditionalStore()
          */
 
-        Set crls = CertPathValidatorUtilities.getCompleteCRLs(dp, attrCert,
+        PKIXCertRevocationCheckerParameters params = new PKIXCertRevocationCheckerParameters(paramsPKIX, validDate, null, -1, issuerCert, null);
+        Set crls = CertPathValidatorUtilities.getCompleteCRLs(params, dp, attrCert,
             currentDate, paramsPKIX);
         boolean validCrlFound = false;
         AnnotatedException lastException = null;
@@ -644,7 +645,7 @@ class RFC3281CertPathUtilities
                 if (paramsPKIX.isUseDeltasEnabled())
                 {
                     // get delta CRLs
-                    Set deltaCRLs = CertPathValidatorUtilities.getDeltaCRLs(currentDate, crl, paramsPKIX.getCertStores(), paramsPKIX.getCRLStores());
+                    Set deltaCRLs = CertPathValidatorUtilities.getDeltaCRLs(currentDate, crl, paramsPKIX.getCertStores(), paramsPKIX.getCRLStores(), helper);
                     // we only want one valid delta CRL
                     // (h)
                     deltaCRL = RFC3280CertPathUtilities.processCRLH(deltaCRLs,

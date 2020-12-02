@@ -1,7 +1,6 @@
 package org.bouncycastle.asn1.pkcs;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.Enumeration;
 
 import org.bouncycastle.asn1.ASN1BitString;
@@ -176,6 +175,11 @@ public class PrivateKeyInfo
         }
     }
 
+    public ASN1Integer getVersion()
+    {
+        return version;
+    }
+
     public ASN1Set getAttributes()
     {
         return attributes;
@@ -184,6 +188,11 @@ public class PrivateKeyInfo
     public AlgorithmIdentifier getPrivateKeyAlgorithm()
     {
         return privateKeyAlgorithm;
+    }
+
+    public ASN1OctetString getPrivateKey()
+    {
+        return new DEROctetString(privateKey.getOctets());
     }
 
     public ASN1Encodable parsePrivateKey()

@@ -20,8 +20,11 @@ public class BouncyCastleJsseProvider
 {
     public static final String PROVIDER_NAME = "BCJSSE";
 
-    private static final double PROVIDER_VERSION = 1.0010;
-    private static final String PROVIDER_INFO = "Bouncy Castle JSSE Provider Version 1.0.10";
+    // TODO[tls13]
+    static final boolean PROVIDER_TLS13_ENABLED = false;
+
+    private static final double PROVIDER_VERSION = 1.0011;
+    private static final String PROVIDER_INFO = "Bouncy Castle JSSE Provider Version 1.0.11";
 
     private Map<String, BcJsseService> serviceMap = new HashMap<String, BcJsseService>();
     private Map<String, EngineCreator> creatorMap = new HashMap<String, EngineCreator>();
@@ -30,9 +33,14 @@ public class BouncyCastleJsseProvider
 
     public BouncyCastleJsseProvider()
     {
+        this(false);
+    }
+
+    public BouncyCastleJsseProvider(boolean fipsMode)
+    {
         super(PROVIDER_NAME, PROVIDER_VERSION, PROVIDER_INFO);
 
-        this.isInFipsMode = configure(false, new JcaTlsCryptoProvider());
+        this.isInFipsMode = configure(fipsMode, new JcaTlsCryptoProvider());
     }
 
     public BouncyCastleJsseProvider(Provider provider)
@@ -73,7 +81,7 @@ public class BouncyCastleJsseProvider
         }
         catch (GeneralSecurityException e)
         {
-            throw new IllegalArgumentException("unable to set up TlsCrypto: " + e.getMessage(), e);
+            throw new IllegalArgumentException("unable to set up JcaTlsCryptoProvider: " + e.getMessage(), e);
         }
 
         this.isInFipsMode = configure(fipsMode, cryptoProvider);
@@ -127,15 +135,15 @@ public class BouncyCastleJsseProvider
         }
         catch (ClassNotFoundException e)
         {
-            throw new IllegalArgumentException("unable to find Provider/TlsCrypto class: " + cryptoName);
+            throw new IllegalArgumentException("unable to find Provider/JcaTlsCryptoProvider class: " + cryptoName);
         }
         catch (InstantiationException e)
         {
-            throw new IllegalArgumentException("unable to create Provider/TlsCrypto class '" + cryptoName + "': " + e.getMessage(), e);
+            throw new IllegalArgumentException("unable to create Provider/JcaTlsCryptoProvider class '" + cryptoName + "': " + e.getMessage(), e);
         }
         catch (IllegalAccessException e)
         {
-            throw new IllegalArgumentException("unable to create Provider/TlsCrypto class '" + cryptoName + "': " + e.getMessage(), e);
+            throw new IllegalArgumentException("unable to create Provider/JcaTlsCryptoProvider class '" + cryptoName + "': " + e.getMessage(), e);
         }
     }
 
@@ -146,7 +154,7 @@ public class BouncyCastleJsseProvider
         {
             public Object createInstance(Object constructorParameter)
             {
-                return new ProvKeyManagerFactorySpi();
+                return new ProvKeyManagerFactorySpi(cryptoProvider.getHelper());
             }
         });
         addAlias("Alg.Alias.KeyManagerFactory.X509", "X.509");
@@ -191,18 +199,22 @@ public class BouncyCastleJsseProvider
             {
                 public Object createInstance(Object constructorParameter)
                 {
-                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1.2", "TLSv1.1", "TLSv1" });
+                    return new ProvSSLContextSpi(fipsMode, cryptoProvider,
+                        new String[]{ "TLSv1.2", "TLSv1.1", "TLSv1" });
                 }
             });
-        // TODO[tls13]
-//        addAlgorithmImplementation("SSLContext.TLSV1.3", "org.bouncycastle.jsse.provider.SSLContext.TLSv1_3",
-//            new EngineCreator()
-//            {
-//                public Object createInstance(Object constructorParameter)
-//                {
-//                    return new ProvSSLContextSpi(fipsMode, cryptoProvider, new String[]{ "TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1" });
-//                }
-//            });
+        if (PROVIDER_TLS13_ENABLED)
+        {
+            addAlgorithmImplementation("SSLContext.TLSV1.3", "org.bouncycastle.jsse.provider.SSLContext.TLSv1_3",
+                new EngineCreator()
+                {
+                    public Object createInstance(Object constructorParameter)
+                    {
+                        return new ProvSSLContextSpi(fipsMode, cryptoProvider,
+                            new String[]{ "TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1" });
+                    }
+                });
+        }
         addAlgorithmImplementation("SSLContext.DEFAULT", "org.bouncycastle.jsse.provider.SSLContext.Default",
             new EngineCreator()
             {

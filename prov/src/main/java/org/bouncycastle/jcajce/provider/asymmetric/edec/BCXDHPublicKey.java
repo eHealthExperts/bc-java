@@ -11,15 +11,15 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters;
 import org.bouncycastle.crypto.params.X448PublicKeyParameters;
-import org.bouncycastle.jcajce.interfaces.XDHKey;
+import org.bouncycastle.jcajce.interfaces.XDHPublicKey;
 import org.bouncycastle.util.Arrays;
 
 public class BCXDHPublicKey
-    implements XDHKey, PublicKey
+    implements XDHPublicKey
 {
     static final long serialVersionUID = 1L;
 
-    private transient AsymmetricKeyParameter xdhPublicKey;
+    transient AsymmetricKeyParameter xdhPublicKey;
 
     BCXDHPublicKey(AsymmetricKeyParameter pubKey)
     {
@@ -120,12 +120,12 @@ public class BCXDHPublicKey
             return true;
         }
 
-        if (!(o instanceof BCXDHPublicKey))
+        if (!(o instanceof PublicKey))
         {
             return false;
         }
 
-        BCXDHPublicKey other = (BCXDHPublicKey)o;
+        PublicKey other = (PublicKey)o;
 
         return Arrays.areEqual(other.getEncoded(), this.getEncoded());
     }

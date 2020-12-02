@@ -6,13 +6,14 @@ import java.security.Security;
 import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.SignatureAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
+import org.bouncycastle.util.Strings;
 
 class JcaUtils
 {
     static String getJcaAlgorithmName(SignatureAndHashAlgorithm algorithm)
     {
         return (HashAlgorithm.getName(algorithm.getHash()) + "WITH"
-            + SignatureAlgorithm.getName(algorithm.getSignature())).toUpperCase();
+            + Strings.toUpperCase(SignatureAlgorithm.getName(algorithm.getSignature())));
     }
 
     static boolean isSunMSCAPIProviderActive()

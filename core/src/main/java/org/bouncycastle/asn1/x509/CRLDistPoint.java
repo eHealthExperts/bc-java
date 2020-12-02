@@ -19,11 +19,6 @@ public class CRLDistPoint
         return getInstance(ASN1Sequence.getInstance(obj, explicit));
     }
 
-    public static CRLDistPoint fromExtensions(Extensions extensions)
-    {
-        return CRLDistPoint.getInstance(extensions.getExtensionParsedValue(Extension.cRLDistributionPoints));
-    }
-
     public static CRLDistPoint getInstance(
         Object  obj)
     {
@@ -37,6 +32,11 @@ public class CRLDistPoint
         }
 
         return null;
+    }
+
+    public static CRLDistPoint fromExtensions(Extensions extensions)
+    {
+        return getInstance(Extensions.getExtensionParsedValue(extensions, Extension.cRLDistributionPoints));
     }
 
     private CRLDistPoint(

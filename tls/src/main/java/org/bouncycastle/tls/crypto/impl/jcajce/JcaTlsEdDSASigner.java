@@ -1,16 +1,10 @@
 package org.bouncycastle.tls.crypto.impl.jcajce;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.security.GeneralSecurityException;
 import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.SignatureException;
 
-import org.bouncycastle.jcajce.io.OutputStreamFactory;
 import org.bouncycastle.tls.HashAlgorithm;
 import org.bouncycastle.tls.SignatureAndHashAlgorithm;
-import org.bouncycastle.tls.crypto.TlsCryptoException;
 import org.bouncycastle.tls.crypto.TlsSigner;
 import org.bouncycastle.tls.crypto.TlsStreamSigner;
 
@@ -53,37 +47,6 @@ public abstract class JcaTlsEdDSASigner
             throw new IllegalStateException();
         }
 
-        try
-        {
-            final Signature sig = crypto.getHelper().createSignature(algorithmName);
-
-            sig.initSign(privateKey);
-
-            final OutputStream stream = OutputStreamFactory.createStream(sig);
-
-            return new TlsStreamSigner()
-            {
-                public OutputStream getOutputStream() throws IOException
-                {
-                    return stream;
-                }
-
-                public byte[] getSignature() throws IOException
-                {
-                    try
-                    {
-                        return sig.sign();
-                    }
-                    catch (SignatureException e)
-                    {
-                        throw new IOException(e.getMessage());
-                    }
-                }
-            };
-        }
-        catch (GeneralSecurityException e)
-        {
-            throw new TlsCryptoException(algorithmName + " signature failed", e);
-        }
+        return crypto.createStreamSigner(algorithmName, null, privateKey, false);
     }
 }

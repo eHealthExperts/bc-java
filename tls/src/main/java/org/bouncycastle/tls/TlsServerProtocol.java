@@ -19,11 +19,11 @@ public class TlsServerProtocol
     protected TlsServer tlsServer = null;
     TlsServerContextImpl tlsServerContext = null;
 
+    protected int[] offeredCipherSuites = null;
     protected TlsKeyExchange keyExchange = null;
-    protected TlsCredentials serverCredentials = null;
     protected CertificateRequest certificateRequest = null;
-
-    protected TlsHandshakeHash prepareFinishHash = null;
+    protected byte[] serverFinishedTranscriptHash = null;
+    protected boolean offeredExtendedMasterSecret;
 
     /**
      * Constructor for non-blocking mode.<br>
@@ -102,11 +102,231 @@ public class TlsServerProtocol
     protected void cleanupHandshake()
     {
         super.cleanupHandshake();
-        
+
+        this.offeredCipherSuites = null;
         this.keyExchange = null;
-        this.serverCredentials = null;
         this.certificateRequest = null;
-        this.prepareFinishHash = null;
+        this.serverFinishedTranscriptHash = null;
+        this.offeredExtendedMasterSecret = false;
+    }
+
+    protected boolean expectCertificateVerifyMessage()
+    {
+        Certificate clientCertificate = tlsServerContext.getSecurityParametersHandshake().getPeerCertificate();
+
+        return null != clientCertificate && !clientCertificate.isEmpty() && keyExchange.requiresCertificateVerify();
+    }
+
+    protected ServerHello generate13ServerHello(boolean afterHelloRetryRequest) throws IOException
+    {
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    protected ServerHello generateServerHelloMessage()
+        throws IOException
+    {
+        SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
+
+        // TODO[tls13] Negotiate cipher suite first?
+
+        ProtocolVersion server_version;
+        if (securityParameters.isRenegotiating())
+        {
+            // Always select the negotiated version from the initial handshake
+            server_version = tlsServerContext.getServerVersion();
+        }
+        else
+        {
+            server_version = tlsServer.getServerVersion();
+            if (!ProtocolVersion.contains(tlsServerContext.getClientSupportedVersions(), server_version))
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+
+            securityParameters.negotiatedVersion = server_version;
+        }
+
+        TlsUtils.negotiatedVersionTLSServer(tlsServerContext);
+
+        final boolean negotiatedTLSv13Plus = ProtocolVersion.TLSv13.isEqualOrEarlierVersionOf(server_version);
+
+        // TODO[tls13] At some point after here we should redirect to generate13ServerHello
+//        if (negotiatedTLSv13Plus)
+//        {
+//            return generate13ServerHello(false);
+//        }
+
+        {
+            ProtocolVersion legacy_record_version = negotiatedTLSv13Plus ? ProtocolVersion.TLSv12 : server_version;
+
+            recordStream.setWriteVersion(legacy_record_version);
+        }
+
+        /*
+         * TODO[tls13] Send ServerHello message that MAY be a HelloRetryRequest.
+         * 
+         * For HelloRetryRequest, state => CS_SERVER_HELLO_RETRY_REQUEST instead (and no further
+         * messages), and reset Transcript-Hash to begin with synthetic 'message_hash' message
+         * having Hash(ClientHello) as the message body.
+         */
+
+        {
+            boolean useGMTUnixTime = !negotiatedTLSv13Plus && tlsServer.shouldUseGMTUnixTime();
+
+            securityParameters.serverRandom = createRandomBlock(useGMTUnixTime, tlsServerContext);
+
+            if (!server_version.equals(ProtocolVersion.getLatestTLS(tlsServer.getProtocolVersions())))
+            {
+                TlsUtils.writeDowngradeMarker(server_version, securityParameters.getServerRandom());
+            }
+        }
+
+        {
+            int cipherSuite = tlsServer.getSelectedCipherSuite();
+            LOG.debug("Selected CipherSuite [{}]", cipherSuite);
+            if (!TlsUtils.isValidCipherSuiteSelection(offeredCipherSuites, cipherSuite) ||
+                !TlsUtils.isValidVersionForCipherSuite(cipherSuite, securityParameters.getNegotiatedVersion()))
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+
+            TlsUtils.negotiatedCipherSuite(securityParameters, cipherSuite);
+        }
+
+        this.serverExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(tlsServer.getServerExtensions());
+
+        ProtocolVersion legacy_version = server_version;
+        if (negotiatedTLSv13Plus)
+        {
+            legacy_version = ProtocolVersion.TLSv12;
+
+            TlsExtensionsUtils.addSupportedVersionsExtensionServer(serverExtensions, server_version);
+        }
+
+        if (securityParameters.isRenegotiating())
+        {
+            /*
+             * The server MUST include a "renegotiation_info" extension containing the saved
+             * client_verify_data and server_verify_data in the ServerHello.
+             */
+            if (!securityParameters.isSecureRenegotiation())
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+
+            SecurityParameters saved = tlsServerContext.getSecurityParametersConnection();
+            byte[] reneg_conn_info = TlsUtils.concat(saved.getPeerVerifyData(), saved.getLocalVerifyData());
+
+            this.serverExtensions.put(EXT_RenegotiationInfo, createRenegotiationInfo(reneg_conn_info));
+        }
+        else
+        {
+            /*
+             * RFC 5746 3.6. Server Behavior: Initial Handshake
+             */
+            if (securityParameters.isSecureRenegotiation())
+            {
+                byte[] renegExtData = TlsUtils.getExtensionData(this.serverExtensions, EXT_RenegotiationInfo);
+                boolean noRenegExt = (null == renegExtData);
+
+                if (noRenegExt)
+                {
+                    /*
+                     * Note that sending a "renegotiation_info" extension in response to a ClientHello
+                     * containing only the SCSV is an explicit exception to the prohibition in RFC 5246,
+                     * Section 7.4.1.4, on the server sending unsolicited extensions and is only allowed
+                     * because the client is signaling its willingness to receive the extension via the
+                     * TLS_EMPTY_RENEGOTIATION_INFO_SCSV SCSV.
+                     */
+
+                    /*
+                     * If the secure_renegotiation flag is set to TRUE, the server MUST include an empty
+                     * "renegotiation_info" extension in the ServerHello message.
+                     */
+                    this.serverExtensions.put(EXT_RenegotiationInfo, createRenegotiationInfo(TlsUtils.EMPTY_BYTES));
+                }
+            }
+        }
+
+        /*
+         * RFC 7627 4. Clients and servers SHOULD NOT accept handshakes that do not use the extended
+         * master secret [..]. (and see 5.2, 5.3)
+         * 
+         * RFC 8446 Appendix D. Because TLS 1.3 always hashes in the transcript up to the server
+         * Finished, implementations which support both TLS 1.3 and earlier versions SHOULD indicate
+         * the use of the Extended Master Secret extension in their APIs whenever TLS 1.3 is used.
+         */
+        if (TlsUtils.isTLSv13(server_version))
+        {
+            securityParameters.extendedMasterSecret = true;
+        }
+        else
+        {
+            securityParameters.extendedMasterSecret = offeredExtendedMasterSecret && !server_version.isSSL()
+                && tlsServer.shouldUseExtendedMasterSecret();
+
+            if (securityParameters.isExtendedMasterSecret())
+            {
+                TlsExtensionsUtils.addExtendedMasterSecretExtension(serverExtensions);
+            }
+            else if (tlsServer.requiresExtendedMasterSecret())
+            {
+                throw new TlsFatalAlert(AlertDescription.handshake_failure);
+            }
+            else if (resumedSession && !tlsServer.allowLegacyResumption())
+            {
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+        }
+
+        /*
+         * RFC 7301 3.1. When session resumption or session tickets [...] are used, the previous
+         * contents of this extension are irrelevant, and only the values in the new handshake
+         * messages are considered.
+         */
+        securityParameters.applicationProtocol = TlsExtensionsUtils.getALPNExtensionServer(serverExtensions);
+        securityParameters.applicationProtocolSet = true;
+
+        /*
+         * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
+         * extensions appearing in the client hello, and send a server hello containing no
+         * extensions.
+         */
+
+        if (!this.serverExtensions.isEmpty())
+        {
+            securityParameters.encryptThenMAC = TlsExtensionsUtils.hasEncryptThenMACExtension(serverExtensions);
+
+            securityParameters.maxFragmentLength = processMaxFragmentLengthExtension(clientExtensions,
+                serverExtensions, AlertDescription.internal_error);
+
+            securityParameters.truncatedHMac = TlsExtensionsUtils.hasTruncatedHMacExtension(serverExtensions);
+
+            if (!resumedSession)
+            {
+                // TODO[tls13] See RFC 8446 4.4.2.1
+                if (TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsExtensionsUtils.EXT_status_request_v2,
+                    AlertDescription.internal_error))
+                {
+                    securityParameters.statusRequestVersion = 2;
+                }
+                else if (TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsExtensionsUtils.EXT_status_request,
+                    AlertDescription.internal_error))
+                {
+                    securityParameters.statusRequestVersion = 1;
+                }
+            }
+
+            this.expectSessionTicket = !resumedSession
+                && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsProtocol.EXT_SessionTicket,
+                    AlertDescription.internal_error);
+        }
+
+        applyMaxFragmentLengthExtension();
+
+        return new ServerHello(legacy_version, securityParameters.getServerRandom(), tlsSession.getSessionID(),
+            securityParameters.getCipherSuite(), serverExtensions);
     }
 
     protected TlsContext getContext()
@@ -124,24 +344,186 @@ public class TlsServerProtocol
         return tlsServer;
     }
 
-    protected void handleHandshakeMessage(short type, ByteArrayInputStream buf)
+    protected void handle13HandshakeMessage(short type, HandshakeMessageInput buf)
         throws IOException
     {
-    	LOG.debug("Handle HandshakeMessage [{}]", type);
-    	 if (this.resumedSession)
-         {
-             if (type != HandshakeType.finished || this.connection_state != CS_SERVER_FINISHED)
-             {
-                 throw new TlsFatalAlert(AlertDescription.unexpected_message);
-             }
+        if (!isTLSv13ConnectionState())
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
 
-             processFinishedMessage(buf);
-       
-             this.connection_state = CS_CLIENT_FINISHED;
+        if (this.resumedSession)
+        {
+            /*
+             * TODO[tls13] Abbreviated handshakes (PSK resumption)
+             * 
+             * NOTE: No CertificateRequest, Certificate, CertificateVerify messages, but client
+             * might now send EndOfEarlyData after receiving server Finished message.
+             */
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
 
-             completeHandshake();
-             return;
-         }
+        switch (type)
+        {
+        case HandshakeType.certificate:
+        {
+            switch (this.connection_state)
+            {
+            case CS_SERVER_FINISHED:
+            {
+                receive13ClientCertificate(buf);
+                this.connection_state = CS_CLIENT_CERTIFICATE;
+            	LOG.trace("New connection state CS_CLIENT_CERTIFICATE");
+                break;
+            }
+            default:
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
+            break;
+        }
+        case HandshakeType.certificate_verify:
+        {
+            switch (this.connection_state)
+            {
+            case CS_CLIENT_CERTIFICATE:
+            {
+                receive13ClientCertificateVerify(buf);
+                buf.updateHash(handshakeHash);
+                this.connection_state = CS_CLIENT_CERTIFICATE_VERIFY;
+            	LOG.trace("New connection state CS_CLIENT_CERTIFICATE_VERIFY");
+                break;
+            }
+            default:
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
+            break;
+        }
+        case HandshakeType.client_hello:
+        {
+            switch (this.connection_state)
+            {
+            case CS_START:
+            {
+                // NOTE: Legacy handler should be dispatching initial ClientHello.
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+            }
+            case CS_SERVER_HELLO_RETRY_REQUEST:
+            {
+                receive13ClientHelloRetry(buf);
+                this.connection_state = CS_CLIENT_HELLO_RETRY;
+            	LOG.trace("New connection state CS_CLIENT_HELLO_RETRY");
+
+                ServerHello serverHello = generate13ServerHello(true);
+                sendServerHelloMessage(serverHello);
+                this.connection_state = CS_SERVER_HELLO;
+            	LOG.trace("New connection state CS_SERVER_HELLO");
+
+                send13ServerHelloCoda(serverHello, true);
+                break;
+            }
+            default:
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
+            break;
+        }
+        case HandshakeType.finished:
+        {
+            switch (this.connection_state)
+            {
+            case CS_SERVER_FINISHED:
+            {
+                skip13ClientCertificate();
+                // Fall through
+            }
+            case CS_CLIENT_CERTIFICATE:
+            {
+                skip13ClientCertificateVerify();
+                // Fall through
+            }
+            case CS_CLIENT_CERTIFICATE_VERIFY:
+            {
+                receive13ClientFinished(buf);
+                this.connection_state = CS_CLIENT_FINISHED;
+            	LOG.trace("New connection state CS_CLIENT_FINISHED");
+
+                TlsUtils.establish13PhaseApplication(tlsServerContext, serverFinishedTranscriptHash, recordStream);
+
+                completeHandshake();
+                break;
+            }
+            default:
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
+            break;
+        }
+        case HandshakeType.key_update:
+        {
+            switch (this.connection_state)
+            {
+            case CS_END:
+            {
+                receive13ClientKeyUpdate(buf);
+                break;
+            }
+            default:
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
+            break;
+        }
+
+        case HandshakeType.certificate_request:
+        case HandshakeType.certificate_status:
+        case HandshakeType.certificate_url:
+        case HandshakeType.client_key_exchange:
+        case HandshakeType.encrypted_extensions:
+        case HandshakeType.end_of_early_data:
+        case HandshakeType.hello_request:
+        case HandshakeType.hello_verify_request:
+        case HandshakeType.message_hash:
+        case HandshakeType.new_session_ticket:
+        case HandshakeType.server_hello:
+        case HandshakeType.server_hello_done:
+        case HandshakeType.server_key_exchange:
+        case HandshakeType.supplemental_data:
+        default:
+            throw new TlsFatalAlert(AlertDescription.unexpected_message);
+        }
+    }
+
+    protected void handleHandshakeMessage(short type, HandshakeMessageInput buf)
+        throws IOException
+    {
+        LOG.debug("Handle HandshakeMessage [{}]", type);
+        SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
+
+        if (connection_state > CS_CLIENT_HELLO
+            && TlsUtils.isTLSv13(securityParameters.getNegotiatedVersion()))
+        {
+            handle13HandshakeMessage(type, buf);
+            return;
+        }
+
+        if (!isLegacyConnectionState())
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        if (this.resumedSession)
+        {
+            if (type != HandshakeType.finished || this.connection_state != CS_SERVER_FINISHED)
+            {
+                throw new TlsFatalAlert(AlertDescription.unexpected_message);
+            }
+
+            processFinishedMessage(buf);
+      
+            this.connection_state = CS_CLIENT_FINISHED;
+        	LOG.trace("New connection state CS_CLIENT_FINISHED");
+
+            completeHandshake();
+            return;
+        }
+
         switch (type)
         {
         case HandshakeType.client_hello:
@@ -160,7 +542,7 @@ public class TlsServerProtocol
             case CS_START:
             {
             	resetCurrentSession();
-                SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
+                securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
                 receiveClientHelloMessage(buf);
                 this.connection_state = CS_CLIENT_HELLO;
@@ -182,13 +564,37 @@ public class TlsServerProtocol
                     this.tlsSession = TlsUtils.importSession(securityParameters.getSessionID(), null);
                     this.sessionParameters = null;
                 }
+                
+                ServerHello serverHello = generateServerHelloMessage();
+                handshakeHash.notifyPRFDetermined();
 
-                sendServerHelloMessage();
+                if (TlsUtils.isTLSv13(securityParameters.getNegotiatedVersion()))
+                {
+                    // TODO[tls13]
+//                    throw new TlsFatalAlert(AlertDescription.internal_error);
+
+                    if (serverHello.isHelloRetryRequest())
+                    {
+                        TlsUtils.adjustTranscriptForRetry(handshakeHash);
+                        sendServerHelloMessage(serverHello);
+                        this.connection_state = CS_SERVER_HELLO_RETRY_REQUEST;
+                    	LOG.trace("New connection state CS_SERVER_HELLO_RETRY_REQUEST");
+                    }
+                    else
+                    {
+                        sendServerHelloMessage(serverHello);
+                        this.connection_state = CS_SERVER_HELLO;
+                    	LOG.trace("New connection state CS_SERVER_HELLO");
+
+                        send13ServerHelloCoda(serverHello, false);
+                    }
+                    break;
+                }
+
+                sendServerHelloMessage(serverHello);
                 this.connection_state = CS_SERVER_HELLO;
             	LOG.trace("New connection state CS_SERVER_HELLO");
 
-                recordStream.notifyHelloComplete();
-                
                 if(this.resumedSession) {
                 	recordStream.setPendingConnectionState(TlsUtils.initCipher(getContext()));
                 	
@@ -203,87 +609,102 @@ public class TlsServerProtocol
                 if (serverSupplementalData != null)
                 {
                     sendSupplementalDataMessage(serverSupplementalData);
+                    this.connection_state = CS_SERVER_SUPPLEMENTAL_DATA;
+                	LOG.trace("New connection state CS_SERVER_SUPPLEMENTAL_DATA");
                 }
-                this.connection_state = CS_SERVER_SUPPLEMENTAL_DATA;
-            	LOG.trace("New connection state CS_SERVER_SUPPLEMENTAL_DATA");
 
                 this.keyExchange = TlsUtils.initKeyExchangeServer(tlsServerContext, tlsServer);
 
-                this.serverCredentials = validateCredentials(tlsServer.getCredentials());
+                TlsCredentials serverCredentials = TlsUtils.establishServerCredentials(tlsServer);
 
                 // Server certificate
                 {
                     Certificate serverCertificate = null;
 
                     ByteArrayOutputStream endPointHash = new ByteArrayOutputStream();
-                    if (null == this.serverCredentials)
+                    if (null == serverCredentials)
                     {
                         this.keyExchange.skipServerCredentials();
                     }
                     else
                     {
-                        this.keyExchange.processServerCredentials(this.serverCredentials);
-                        serverCertificate = this.serverCredentials.getCertificate();
+                        this.keyExchange.processServerCredentials(serverCredentials);
+
+                        serverCertificate = serverCredentials.getCertificate();
                         sendCertificateMessage(serverCertificate, endPointHash);
+                        this.connection_state = CS_SERVER_CERTIFICATE;
+                        LOG.trace("New connection state CS_SERVER_CERTIFICATE");
                     }
+
                     securityParameters.tlsServerEndPoint = endPointHash.toByteArray();
-                    this.connection_state = CS_SERVER_CERTIFICATE;
-                    LOG.trace("New connection state CS_SERVER_CERTIFICATE");
 
                     // TODO[RFC 3546] Check whether empty certificates is possible, allowed, or excludes CertificateStatus
                     if (null == serverCertificate || serverCertificate.isEmpty())
                     {
-                        this.allowCertificateStatus = false;
+                        securityParameters.statusRequestVersion = 0;
                     }
                 }
 
-                if (this.allowCertificateStatus)
+                if (securityParameters.getStatusRequestVersion() > 0)
                 {
                     CertificateStatus certificateStatus = tlsServer.getCertificateStatus();
                     if (certificateStatus != null)
                     {
                         sendCertificateStatusMessage(certificateStatus);
+                        this.connection_state = CS_SERVER_CERTIFICATE_STATUS;
+                    	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
                     }
                 }
-
-                this.connection_state = CS_SERVER_CERTIFICATE;
-            	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
 
                 byte[] serverKeyExchange = this.keyExchange.generateServerKeyExchange();
                 if (serverKeyExchange != null)
                 {
                     sendServerKeyExchangeMessage(serverKeyExchange);
+                    this.connection_state = CS_SERVER_KEY_EXCHANGE;
+                	LOG.trace("New connection state CS_SERVER_KEY_EXCHANGE");
                 }
-                this.connection_state = CS_SERVER_KEY_EXCHANGE;
-            	LOG.trace("New connection state CS_SERVER_KEY_EXCHANGE");
 
-                if (this.serverCredentials != null)
+                if (null != serverCredentials)
                 {
                     this.certificateRequest = tlsServer.getCertificateRequest();
-                    if (this.certificateRequest != null)
+
+                    if (null == this.certificateRequest)
                     {
-                        if (TlsUtils.isTLSv12(getContext()) != (certificateRequest.getSupportedSignatureAlgorithms() != null))
+                        /*
+                         * For static agreement key exchanges, CertificateRequest is required since
+                         * the client Certificate message is mandatory but can only be sent if the
+                         * server requests it.
+                         */
+                        if (!keyExchange.requiresCertificateVerify())
+                        {
+                            throw new TlsFatalAlert(AlertDescription.internal_error);
+                        }
+                    }
+                    else
+                    {
+                        if (TlsUtils.isTLSv12(tlsServerContext) != (certificateRequest.getSupportedSignatureAlgorithms() != null))
                         {
                             throw new TlsFatalAlert(AlertDescription.internal_error);
                         }
 
                         this.certificateRequest = TlsUtils.validateCertificateRequest(this.certificateRequest, this.keyExchange);
 
-                        sendCertificateRequestMessage(certificateRequest);
+                        TlsUtils.establishServerSigAlgs(securityParameters, certificateRequest);
 
-                        TlsUtils.trackHashAlgorithms(this.recordStream.getHandshakeHash(),
-                            this.certificateRequest.getSupportedSignatureAlgorithms());
+                        TlsUtils.trackHashAlgorithms(handshakeHash, securityParameters.getServerSigAlgs());
+
+                        sendCertificateRequestMessage(certificateRequest);
+                        this.connection_state = CS_SERVER_CERTIFICATE_REQUEST;
+                    	LOG.trace("New connection state CS_CERTIFICATE_REQUEST");
                     }
                 }
-                this.connection_state = CS_CERTIFICATE_REQUEST;
-            	LOG.trace("New connection state CS_CERTIFICATE_REQUEST");
 
                 sendServerHelloDoneMessage();
                 this.connection_state = CS_SERVER_HELLO_DONE;
             	LOG.trace("New connection state CS_SERVER_HELLO_DONE");
 
                 boolean forceBuffering = false;
-                TlsUtils.sealHandshakeHash(getContext(), this.recordStream.getHandshakeHash(), forceBuffering);
+                TlsUtils.sealHandshakeHash(tlsServerContext, handshakeHash, forceBuffering);
 
                 break;
             }
@@ -344,26 +765,31 @@ public class TlsServerProtocol
             }
             case CS_CLIENT_SUPPLEMENTAL_DATA:
             {
-                if (this.certificateRequest == null)
+                if (null == certificateRequest)
                 {
                     this.keyExchange.skipClientCredentials();
                 }
+                else if (TlsUtils.isTLSv12(tlsServerContext))
+                {
+                    /*
+                     * RFC 5246 If no suitable certificate is available, the client MUST send a
+                     * certificate message containing no certificates.
+                     * 
+                     * NOTE: In previous RFCs, this was SHOULD instead of MUST.
+                     */
+                    throw new TlsFatalAlert(AlertDescription.unexpected_message);
+                }
+                else if (TlsUtils.isSSL(tlsServerContext))
+                {
+                    /*
+                     * SSL 3.0 If the server has sent a certificate request Message, the client must
+                     * send either the certificate message or a no_certificate alert.
+                     */
+                    throw new TlsFatalAlert(AlertDescription.unexpected_message);
+                }
                 else
                 {
-                    if (TlsUtils.isTLSv12(getContext()))
-                    {
-                        /*
-                         * RFC 5246 If no suitable certificate is available, the client MUST send a
-                         * certificate message containing no certificates.
-                         * 
-                         * NOTE: In previous RFCs, this was SHOULD instead of MUST.
-                         */
-                        throw new TlsFatalAlert(AlertDescription.unexpected_message);
-                    }
-                    else
-                    {
-                        notifyClientCertificate(Certificate.EMPTY_CHAIN);
-                    }
+                    notifyClientCertificate(Certificate.EMPTY_CHAIN);
                 }
                 // NB: Fall through to next case label
             }
@@ -396,9 +822,9 @@ public class TlsServerProtocol
                 }
 
                 receiveCertificateVerifyMessage(buf);
-                this.connection_state = CS_CERTIFICATE_VERIFY;
+                buf.updateHash(handshakeHash);
+                this.connection_state = CS_CLIENT_CERTIFICATE_VERIFY;
             	LOG.trace("New connection state CS_CERTIFICATE_VERIFY");
-
                 break;
             }
             default:
@@ -418,18 +844,19 @@ public class TlsServerProtocol
                 }
                 // NB: Fall through to next case label
             }
-            case CS_CERTIFICATE_VERIFY:
+            case CS_CLIENT_CERTIFICATE_VERIFY:
             {
                 processFinishedMessage(buf);
+                buf.updateHash(handshakeHash);
                 this.connection_state = CS_CLIENT_FINISHED;
             	LOG.trace("New connection state CS_CLIENT_FINISHED");
 
                 if (this.expectSessionTicket)
                 {
                     sendNewSessionTicketMessage(tlsServer.getNewSessionTicket());
+                    this.connection_state = CS_SERVER_SESSION_TICKET;
+                	LOG.trace("New connection state CS_SERVER_SESSION_TICKET");
                 }
-                this.connection_state = CS_SERVER_SESSION_TICKET;
-            	LOG.trace("New connection state CS_SERVER_SESSION_TICKET");
 
                 sendChangeCipherSpecMessage();
                 sendFinishedMessage();
@@ -444,13 +871,20 @@ public class TlsServerProtocol
             }
             break;
         }
+
+        case HandshakeType.certificate_request:
+        case HandshakeType.certificate_status:
+        case HandshakeType.certificate_url:
+        case HandshakeType.encrypted_extensions:
+        case HandshakeType.end_of_early_data:
         case HandshakeType.hello_request:
         case HandshakeType.hello_verify_request:
-        case HandshakeType.server_hello:
-        case HandshakeType.server_key_exchange:
-        case HandshakeType.certificate_request:
-        case HandshakeType.server_hello_done:
+        case HandshakeType.key_update:
+        case HandshakeType.message_hash:
         case HandshakeType.new_session_ticket:
+        case HandshakeType.server_hello:
+        case HandshakeType.server_hello_done:
+        case HandshakeType.server_key_exchange:
         default:
             throw new TlsFatalAlert(AlertDescription.unexpected_message);
         }
@@ -459,29 +893,84 @@ public class TlsServerProtocol
     protected void handleAlertWarningMessage(short alertDescription)
         throws IOException
     {
-        super.handleAlertWarningMessage(alertDescription);
+        /*
+         * SSL 3.0 If the server has sent a certificate request Message, the client must send
+         * either the certificate message or a no_certificate alert.
+         */
+        if (AlertDescription.no_certificate == alertDescription && null != certificateRequest
+            && TlsUtils.isSSL(tlsServerContext))
+        {
+            switch (this.connection_state)
+            {
+            case CS_SERVER_HELLO_DONE:
+            {
+                tlsServer.processClientSupplementalData(null);
+                // NB: Fall through to next case label
+            }
+            case CS_CLIENT_SUPPLEMENTAL_DATA:
+            {
+                notifyClientCertificate(Certificate.EMPTY_CHAIN);
+                this.connection_state = CS_CLIENT_CERTIFICATE;
+            	LOG.trace("New connection state CS_CLIENT_CERTIFICATE");
+                return;
+            }
+            }
+        }
 
-        switch (alertDescription)
-        {
-        case AlertDescription.no_certificate:
-        {
-            throw new TlsFatalAlert(AlertDescription.unexpected_message);
-        }
-        }
+        super.handleAlertWarningMessage(alertDescription);
     }
 
     protected void notifyClientCertificate(Certificate clientCertificate)
         throws IOException
     {
-        TlsUtils.processClientCertificate(tlsServerContext, clientCertificate, certificateRequest, keyExchange,
-            tlsServer);
+        if (null == certificateRequest)
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        TlsUtils.processClientCertificate(tlsServerContext, clientCertificate, keyExchange, tlsServer);
+    }
+
+    protected void receive13ClientCertificate(ByteArrayInputStream buf)
+        throws IOException
+    {
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    protected void receive13ClientCertificateVerify(ByteArrayInputStream buf)
+        throws IOException
+    {
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    protected void receive13ClientFinished(ByteArrayInputStream buf)
+        throws IOException
+    {
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    protected void receive13ClientHelloRetry(ByteArrayInputStream buf)
+        throws IOException
+    {
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    protected void receive13ClientKeyUpdate(ByteArrayInputStream buf)
+        throws IOException
+    {
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 
     protected void receiveCertificateMessage(ByteArrayInputStream buf)
         throws IOException
     {
     	LOG.debug("Receive CertificateMessage");
-        Certificate clientCertificate = Certificate.parse(getContext(), buf, null);
+        Certificate clientCertificate = Certificate.parse(tlsServerContext, buf, null);
 
         assertEmpty(buf);
 
@@ -492,41 +981,34 @@ public class TlsServerProtocol
         throws IOException
     {
     	LOG.debug("Receive CertificateVerifyMessage");
-        if (certificateRequest == null)
-        {
-            throw new IllegalStateException();
-        }
-
-        DigitallySigned clientCertificateVerify = DigitallySigned.parse(tlsServerContext, buf);
+        DigitallySigned certificateVerify = DigitallySigned.parse(tlsServerContext, buf);
 
         assertEmpty(buf);
 
-        TlsUtils.verifyCertificateVerify(tlsServerContext, certificateRequest, clientCertificateVerify, prepareFinishHash);
+        TlsUtils.verifyCertificateVerifyClient(tlsServerContext, certificateRequest, certificateVerify, handshakeHash);
+
+        this.handshakeHash = handshakeHash.stopTracking();
     }
 
     protected void receiveClientHelloMessage(ByteArrayInputStream buf)
         throws IOException
     {
-        LOG.debug("Receive ClientHelloMessage");
-        // TODO[tls13] For subsequent ClientHello messages (of a TLSv13 handshake) don't do this!
-        recordStream.setWriteVersion(ProtocolVersion.TLSv10);
-
+    	LOG.debug("Receive ClientHelloMessage");
         ClientHello clientHello = ClientHello.parse(buf, null);
-        ProtocolVersion client_version = clientHello.getClientVersion();
-        LOG.debug("ClientVersion [{}]", client_version);
+        ProtocolVersion legacy_version = clientHello.getVersion();
+        LOG.debug("ClientVersion [{}]", legacy_version);
         
         /*
          * TODO RFC 5077 3.4. If a ticket is presented by the client, the server MUST NOT attempt to
          * use the Session ID in the ClientHello for stateful session resumption.
          */
         byte[] sessionID = clientHello.getSessionID();
-
         
         TlsSession sessionToResume = tlsServer.getSessionToResume(sessionID);
         if (sessionToResume != null && sessionToResume.isResumable())
         {
             SessionParameters sessionParameters = sessionToResume.exportSessionParameters();
-            if(sessionParameters != null && client_version.equals(sessionParameters.getNegotiatedVersion())) 
+            if(sessionParameters != null && legacy_version.equals(sessionParameters.getNegotiatedVersion())) 
             {
                 this.tlsSession = sessionToResume;
                 this.sessionParameters = sessionParameters;
@@ -566,8 +1048,17 @@ public class TlsServerProtocol
  
         SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
 
+        if (!legacy_version.isTLS())
+        {
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+
+        tlsServerContext.setRSAPreMasterSecretVersion(legacy_version);
+
         tlsServerContext.setClientSupportedVersions(
             TlsExtensionsUtils.getSupportedVersionsExtensionClient(clientExtensions));
+
+        ProtocolVersion client_version = legacy_version;
         if (null == tlsServerContext.getClientSupportedVersions())
         {
             if (client_version.isLaterVersionOf(ProtocolVersion.TLSv12))
@@ -575,16 +1066,27 @@ public class TlsServerProtocol
                 client_version = ProtocolVersion.TLSv12;
             }
 
-            tlsServerContext.setClientSupportedVersions(client_version.downTo(ProtocolVersion.TLSv10));
+            tlsServerContext.setClientSupportedVersions(client_version.downTo(ProtocolVersion.SSLv3));
         }
         else
         {
             client_version = ProtocolVersion.getLatestTLS(tlsServerContext.getClientSupportedVersions());
         }
 
-        if (null == client_version || !ProtocolVersion.TLSv10.isEqualOrEarlierVersionOf(client_version))
+        if (!ProtocolVersion.SERVER_EARLIEST_SUPPORTED_TLS.isEqualOrEarlierVersionOf(client_version))
         {
-            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+            throw new TlsFatalAlert(AlertDescription.protocol_version);
+        }
+
+        if (ProtocolVersion.contains(tlsServerContext.getClientSupportedVersions(), ProtocolVersion.SSLv3))
+        {
+            // TODO[tls13] Prevent offering SSLv3 AND TLSv13?
+            this.recordStream.setWriteVersion(ProtocolVersion.SSLv3);
+        }
+        else
+        {
+            // TODO[tls13] For subsequent ClientHello messages (of a TLSv13 handshake) don't do this!
+            this.recordStream.setWriteVersion(ProtocolVersion.TLSv10);
         }
 
         if (securityParameters.isRenegotiating())
@@ -613,18 +1115,6 @@ public class TlsServerProtocol
         else {
             tlsServer.notifyFallback(Arrays.contains(offeredCipherSuites, CipherSuite.TLS_FALLBACK_SCSV));
         	tlsServer.notifyOfferedCipherSuites(offeredCipherSuites);
-        }
-
-        /*
-         * RFC 7627 4. Clients and servers SHOULD NOT accept handshakes that do not use the extended
-         * master secret [..]. (and see 5.2, 5.3)
-         */
-        securityParameters.extendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(clientExtensions);
-
-        if (!securityParameters.isExtendedMasterSecret()
-            && (resumedSession || tlsServer.requiresExtendedMasterSecret()))
-        {
-            throw new TlsFatalAlert(AlertDescription.handshake_failure);
         }
 
         byte[] renegExtData = TlsUtils.getExtensionData(clientExtensions, EXT_RenegotiationInfo);
@@ -717,6 +1207,8 @@ public class TlsServerProtocol
 
         tlsServer.notifySecureRenegotiation(securityParameters.isSecureRenegotiation());
 
+        this.offeredExtendedMasterSecret = TlsExtensionsUtils.hasExtendedMasterSecretExtension(clientExtensions);
+
         if (clientExtensions != null)
         {
             // NOTE: Validates the padding extension data, if present
@@ -745,8 +1237,7 @@ public class TlsServerProtocol
              */
             if (TlsUtils.isSignatureAlgorithmsExtensionAllowed(client_version))
             {
-                securityParameters.clientSigAlgs = TlsExtensionsUtils.getSignatureAlgorithmsExtension(clientExtensions);
-                securityParameters.clientSigAlgsCert = TlsExtensionsUtils.getSignatureAlgorithmsCertExtension(clientExtensions);
+                TlsUtils.establishClientSigAlgs(securityParameters, clientExtensions);
             }
 
             securityParameters.clientSupportedGroups = TlsExtensionsUtils.getSupportedGroupsExtension(clientExtensions);
@@ -763,268 +1254,182 @@ public class TlsServerProtocol
 
         assertEmpty(buf);
 
-        this.prepareFinishHash = recordStream.prepareToFinish();
-        tlsServerContext.getSecurityParametersHandshake().sessionHash = TlsUtils.getCurrentPRFHash(prepareFinishHash);
+        final boolean isSSL = TlsUtils.isSSL(tlsServerContext);
+        if (isSSL)
+        {
+            // NOTE: For SSLv3 (only), master_secret needed to calculate session hash
+            establishMasterSecret(tlsServerContext, keyExchange);
+        }
 
-        establishMasterSecret(getContext(), keyExchange);
-        recordStream.setPendingConnectionState(TlsUtils.initCipher(getContext()));
+        tlsServerContext.getSecurityParametersHandshake().sessionHash = TlsUtils.getCurrentPRFHash(handshakeHash);
+
+        if (!isSSL)
+        {
+            // NOTE: For (D)TLS, session hash potentially needed for extended_master_secret
+            establishMasterSecret(tlsServerContext, keyExchange);
+        }
+
+        recordStream.setPendingConnectionState(TlsUtils.initCipher(tlsServerContext));
+
+        if (!expectCertificateVerifyMessage())
+        {
+            this.handshakeHash = handshakeHash.stopTracking();
+        }
+    }
+
+    protected void send13ServerHelloCoda(ServerHello serverHello, boolean afterHelloRetryRequest) throws IOException
+    {
+        final SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
+
+        byte[] serverHelloTranscriptHash = TlsUtils.getCurrentPRFHash(handshakeHash);
+
+        TlsUtils.establish13PhaseHandshake(tlsServerContext, serverHelloTranscriptHash, recordStream);
+
+        /*
+         * TODO[tls13] EncryptedExtensions
+         */
+        this.connection_state = CS_SERVER_ENCRYPTED_EXTENSIONS;
+    	LOG.trace("New connection state CS_SERVER_ENCRYPTED_EXTENSIONS");
+
+        // CertificateRequest
+        {
+            this.certificateRequest = tlsServer.getCertificateRequest();
+            if (null != certificateRequest)
+            {
+                if (!certificateRequest.hasCertificateRequestContext(TlsUtils.EMPTY_BYTES))
+                {
+                    throw new TlsFatalAlert(AlertDescription.internal_error);
+                }
+
+                TlsUtils.establishServerSigAlgs(securityParameters, certificateRequest);
+
+                sendCertificateRequestMessage(certificateRequest);
+                this.connection_state = CS_SERVER_CERTIFICATE_REQUEST;
+            	LOG.trace("New connection state CS_SERVER_CERTIFICATE_REQUEST");
+            }
+        }
+
+        /*
+         * TODO[tls13] For PSK-only key exchange, there's no Certificate message.
+         */
+
+        TlsCredentialedSigner serverCredentials = TlsUtils.establish13ServerCredentials(tlsServer);
+        if (null == serverCredentials)
+        {
+            throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+
+        // Certificate
+        {
+            /*
+             * TODO[tls13] Note that we are expecting the TlsServer implementation to take care of
+             * e.g. adding optional "status_request" extension to each CertificateEntry.
+             */
+            /*
+             * No CertificateStatus message is sent; TLS 1.3 uses per-CertificateEntry
+             * "status_request" extension instead.
+             */
+
+            ByteArrayOutputStream endPointHash = new ByteArrayOutputStream();
+            Certificate serverCertificate = serverCredentials.getCertificate();
+            send13CertificateMessage(serverCertificate, endPointHash);
+            securityParameters.tlsServerEndPoint = endPointHash.toByteArray();
+            securityParameters.statusRequestVersion = 1;
+            this.connection_state = CS_SERVER_CERTIFICATE;
+        	LOG.trace("New connection state CS_SERVER_CERTIFICATE");
+        }
+
+        // CertificateVerify
+        {
+            DigitallySigned certificateVerify = TlsUtils.generate13CertificateVerify(tlsServerContext, serverCredentials,
+                handshakeHash);
+            send13CertificateVerifyMessage(certificateVerify);
+            this.connection_state = CS_CLIENT_CERTIFICATE_VERIFY;
+        	LOG.trace("New connection state CS_CLIENT_CERTIFICATE_VERIFY");
+        }
+
+        // Finished
+        {
+            send13FinishedMessage();
+            this.connection_state = CS_SERVER_FINISHED;
+        	LOG.trace("New connection state CS_SERVER_FINISHED");
+        }
+
+        this.serverFinishedTranscriptHash = TlsUtils.getCurrentPRFHash(handshakeHash);
     }
 
     protected void sendCertificateRequestMessage(CertificateRequest certificateRequest)
         throws IOException
     {
     	LOG.debug("Send CertificateRequestMessage");
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.certificate_request);
-
-        certificateRequest.encode(message);
-
-        message.writeToRecordStream();
+        HandshakeMessageOutput message = new HandshakeMessageOutput(HandshakeType.certificate_request);
+        certificateRequest.encode(tlsServerContext, message);
+        message.send(this);
     }
 
     protected void sendCertificateStatusMessage(CertificateStatus certificateStatus)
         throws IOException
     {
     	LOG.debug("Send CertificateStatusMessage");
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.certificate_status);
-
+        HandshakeMessageOutput message = new HandshakeMessageOutput(HandshakeType.certificate_status);
+        // TODO[tls13] Ensure this cannot happen for (D)TLS1.3+
         certificateStatus.encode(message);
-
-        message.writeToRecordStream();
+        message.send(this);
     }
 
     protected void sendHelloRequestMessage()
         throws IOException
     {
-        byte[] message = new byte[4];
-        TlsUtils.writeUint8(HandshakeType.hello_request, message, 0);
-        TlsUtils.writeUint24(0, message, 1);
-
-        writeHandshakeMessage(message, 0, message.length);
+        HandshakeMessageOutput.send(this, HandshakeType.hello_request, TlsUtils.EMPTY_BYTES);
     }
 
     protected void sendNewSessionTicketMessage(NewSessionTicket newSessionTicket)
         throws IOException
     {
-    	LOG.debug("Send NewSessionTicketMessage");
         if (newSessionTicket == null)
         {
             throw new TlsFatalAlert(AlertDescription.internal_error);
         }
 
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.new_session_ticket);
-
+        HandshakeMessageOutput message = new HandshakeMessageOutput(HandshakeType.new_session_ticket);
         newSessionTicket.encode(message);
-
-        message.writeToRecordStream();
-    }
-
-    protected void sendServerHelloMessage()
-        throws IOException
-    {
-        LOG.debug("Send ServerHelloMessage");
-        SecurityParameters securityParameters = tlsServerContext.getSecurityParametersHandshake();
-
-        ProtocolVersion server_version;
-        if (securityParameters.isRenegotiating())
-        {
-            // Always select the negotiated version from the initial handshake
-            server_version = tlsServerContext.getServerVersion();
-            LOG.debug("ServerVersion [{}]", server_version);
-        }
-        else
-        {
-            server_version = tlsServer.getServerVersion();
-            LOG.debug("ServerVersion [{}]", server_version);
-
-            if (null == server_version
-                || server_version.isEarlierVersionOf(ProtocolVersion.TLSv10)
-                || server_version.isLaterVersionOf(ProtocolVersion.TLSv12)
-                || !ProtocolVersion.contains(tlsServerContext.getClientSupportedVersions(), server_version))
-            {
-                throw new TlsFatalAlert(AlertDescription.internal_error);
-            }
-
-            ProtocolVersion legacy_record_version = server_version.isLaterVersionOf(ProtocolVersion.TLSv12)
-                ? ProtocolVersion.TLSv12
-                : server_version;
-
-            recordStream.setWriteVersion(legacy_record_version);
-            securityParameters.negotiatedVersion = server_version;
-        }
-
-        securityParameters.serverRandom = createRandomBlock(tlsServer.shouldUseGMTUnixTime(), tlsServerContext);
-        if (!server_version.equals(ProtocolVersion.getLatestTLS(tlsServer.getProtocolVersions())))
-        {
-            TlsUtils.writeDowngradeMarker(server_version, securityParameters.getServerRandom());
-        }
-
-        {
-            int selectedCipherSuite = tlsServer.getSelectedCipherSuite();
-            if (!Arrays.contains(offeredCipherSuites, selectedCipherSuite)
-                || selectedCipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL
-                || CipherSuite.isSCSV(selectedCipherSuite)
-                || !TlsUtils.isValidCipherSuiteForVersion(selectedCipherSuite, tlsServerContext.getServerVersion()))
-            {
-                throw new TlsFatalAlert(AlertDescription.internal_error);
-            }
-            securityParameters.cipherSuite = selectedCipherSuite;
-            LOG.debug("Selected CipherSuite [{}]", selectedCipherSuite);
-        }
-
-        this.serverExtensions = TlsExtensionsUtils.ensureExtensionsInitialised(tlsServer.getServerExtensions());
-
-        ProtocolVersion legacy_version = server_version;
-        if (server_version.isLaterVersionOf(ProtocolVersion.TLSv12))
-        {
-            legacy_version = ProtocolVersion.TLSv12;
-
-            TlsExtensionsUtils.addSupportedVersionsExtensionServer(serverExtensions, server_version);
-        }
-
-        if (securityParameters.isRenegotiating())
-        {
-            /*
-             * The server MUST include a "renegotiation_info" extension containing the saved
-             * client_verify_data and server_verify_data in the ServerHello.
-             */
-            if (!securityParameters.isSecureRenegotiation())
-            {
-                throw new TlsFatalAlert(AlertDescription.internal_error);
-            }
-
-            SecurityParameters saved = tlsServerContext.getSecurityParametersConnection();
-            byte[] reneg_conn_info = TlsUtils.concat(saved.getPeerVerifyData(), saved.getLocalVerifyData());
-
-            this.serverExtensions.put(EXT_RenegotiationInfo, createRenegotiationInfo(reneg_conn_info));
-        }
-        else
-        {
-            /*
-             * RFC 5746 3.6. Server Behavior: Initial Handshake
-             */
-            if (securityParameters.isSecureRenegotiation())
-            {
-                byte[] renegExtData = TlsUtils.getExtensionData(this.serverExtensions, EXT_RenegotiationInfo);
-                boolean noRenegExt = (null == renegExtData);
-
-                if (noRenegExt)
-                {
-                    /*
-                     * Note that sending a "renegotiation_info" extension in response to a ClientHello
-                     * containing only the SCSV is an explicit exception to the prohibition in RFC 5246,
-                     * Section 7.4.1.4, on the server sending unsolicited extensions and is only allowed
-                     * because the client is signaling its willingness to receive the extension via the
-                     * TLS_EMPTY_RENEGOTIATION_INFO_SCSV SCSV.
-                     */
-
-                    /*
-                     * If the secure_renegotiation flag is set to TRUE, the server MUST include an empty
-                     * "renegotiation_info" extension in the ServerHello message.
-                     */
-                    this.serverExtensions.put(EXT_RenegotiationInfo, createRenegotiationInfo(TlsUtils.EMPTY_BYTES));
-                }
-            }
-        }
-
-        if (securityParameters.isExtendedMasterSecret())
-        {
-            TlsExtensionsUtils.addExtendedMasterSecretExtension(serverExtensions);
-        }
-
-        /*
-         * contents of this extension are irrelevant, and only the values in the new handshake
-         * messages are considered.
-         */
-        securityParameters.applicationProtocol = TlsExtensionsUtils.getALPNExtensionServer(serverExtensions);
-        securityParameters.applicationProtocolSet = true;
-
-        /*
-         * TODO RFC 3546 2.3 If [...] the older session is resumed, then the server MUST ignore
-         * extensions appearing in the client hello, and send a server hello containing no
-         * extensions.
-         */
-
-        if (!this.serverExtensions.isEmpty())
-        {
-            securityParameters.encryptThenMAC = TlsExtensionsUtils.hasEncryptThenMACExtension(serverExtensions);
-
-            securityParameters.maxFragmentLength = processMaxFragmentLengthExtension(clientExtensions,
-                serverExtensions, AlertDescription.internal_error);
-
-            securityParameters.truncatedHMac = TlsExtensionsUtils.hasTruncatedHMacExtension(serverExtensions);
-
-            /*
-             * TODO It's surprising that there's no provision to allow a 'fresh' CertificateStatus to be sent in
-             * a session resumption handshake.
-             */
-            this.allowCertificateStatus = !this.resumedSession
-                && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsExtensionsUtils.EXT_status_request,
-                    AlertDescription.internal_error);
-
-            this.expectSessionTicket = !this.resumedSession
-                && TlsUtils.hasExpectedEmptyExtensionData(serverExtensions, TlsProtocol.EXT_SessionTicket,
-                    AlertDescription.internal_error);
-        }
-
-        securityParameters.prfAlgorithm = getPRFAlgorithm(tlsServerContext, securityParameters.getCipherSuite());
-
-        /*
-         * RFC 5246 7.4.9. Any cipher suite which does not explicitly specify verify_data_length has
-         * a verify_data_length equal to 12. This includes all existing cipher suites.
-         */
-        securityParameters.verifyDataLength = 12;
-
-        applyMaxFragmentLengthExtension();
-
-
-
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.server_hello);
-
-        TlsUtils.writeVersion(legacy_version, message);
-
-        message.write(securityParameters.getServerRandom());
-
-        /*
-         * The server may return an empty session_id to indicate that the session will not be cached
-         * and therefore cannot be resumed.
-         */
-        TlsUtils.writeOpaque8(tlsSession.getSessionID(), message);
-
-        TlsUtils.writeUint16(securityParameters.getCipherSuite(), message);
-
-        TlsUtils.writeUint8(CompressionMethod._null, message);
-
-        writeExtensions(message, serverExtensions);
-
-        message.writeToRecordStream();
+        message.send(this);
     }
 
     protected void sendServerHelloDoneMessage()
         throws IOException
     {
         LOG.debug("Send ServerHelloDoneMessage");
-        byte[] message = new byte[4];
-        TlsUtils.writeUint8(HandshakeType.server_hello_done, message, 0);
-        TlsUtils.writeUint24(0, message, 1);
+        HandshakeMessageOutput.send(this, HandshakeType.server_hello_done, TlsUtils.EMPTY_BYTES);
+    }
 
-        writeHandshakeMessage(message, 0, message.length);
+    protected void sendServerHelloMessage(ServerHello serverHello)
+        throws IOException
+    {
+	    LOG.debug("Send ServerHelloMessage");
+        HandshakeMessageOutput message = new HandshakeMessageOutput(HandshakeType.server_hello);
+        serverHello.encode(tlsServerContext, message);
+        message.send(this);
     }
 
     protected void sendServerKeyExchangeMessage(byte[] serverKeyExchange)
         throws IOException
     {
         LOG.debug("Send ServerKeyExchangeMessage");
-        HandshakeMessage message = new HandshakeMessage(HandshakeType.server_key_exchange, serverKeyExchange.length);
-
-        message.write(serverKeyExchange);
-
-        message.writeToRecordStream();
+        HandshakeMessageOutput.send(this, HandshakeType.server_key_exchange, serverKeyExchange);
     }
 
-    protected boolean expectCertificateVerifyMessage()
+    protected void skip13ClientCertificate()
+        throws IOException
     {
-        Certificate clientCertificate = tlsServerContext.getSecurityParametersHandshake().getPeerCertificate();
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
 
-        return null != clientCertificate && !clientCertificate.isEmpty() && keyExchange.requiresCertificateVerify();
+    protected void skip13ClientCertificateVerify()
+        throws IOException
+    {
+        // TODO[tls13]
+        throw new TlsFatalAlert(AlertDescription.internal_error);
     }
 }

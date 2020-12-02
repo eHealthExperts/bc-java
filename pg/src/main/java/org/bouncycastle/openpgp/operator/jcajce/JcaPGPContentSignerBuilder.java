@@ -8,6 +8,7 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 
+import org.bouncycastle.bcpg.PublicKeyAlgorithmTags;
 import org.bouncycastle.jcajce.io.OutputStreamFactory;
 import org.bouncycastle.jcajce.util.DefaultJcaJceHelper;
 import org.bouncycastle.jcajce.util.NamedJcaJceHelper;
@@ -92,6 +93,7 @@ public class JcaPGPContentSignerBuilder
         throws PGPException
     {
         final PGPDigestCalculator digestCalculator = digestCalculatorProviderBuilder.build().get(hashAlgorithm);
+        final PGPDigestCalculator edDigestCalculator = digestCalculatorProviderBuilder.build().get(hashAlgorithm);
         final Signature           signature = helper.createSignature(keyAlgorithm, hashAlgorithm);
 
         try
@@ -134,6 +136,10 @@ public class JcaPGPContentSignerBuilder
 
             public OutputStream getOutputStream()
             {
+                if (keyAlgorithm == PublicKeyAlgorithmTags.EDDSA)
+                {
+                    return new TeeOutputStream(edDigestCalculator.getOutputStream(), digestCalculator.getOutputStream());
+                }
                 return new TeeOutputStream(OutputStreamFactory.createStream(signature), digestCalculator.getOutputStream());
             }
 
@@ -141,6 +147,10 @@ public class JcaPGPContentSignerBuilder
             {
                 try
                 {
+                    if (keyAlgorithm == PublicKeyAlgorithmTags.EDDSA)
+                    {
+                         signature.update(edDigestCalculator.getDigest());
+                    }
                     return signature.sign();
                 }
                 catch (SignatureException e)

@@ -6,12 +6,12 @@ import java.security.GeneralSecurityException;
 import java.security.PublicKey;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathBuilderException;
+import java.security.cert.CertPathBuilderSpi;
 import java.security.cert.CertPathValidatorException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.PKIXCertPathChecker;
 import java.security.cert.X509CRL;
-import java.security.cert.X509CRLSelector;
 import java.security.cert.X509CertSelector;
 import java.security.cert.X509Certificate;
 import java.security.cert.X509Extension;
@@ -53,10 +53,12 @@ import org.bouncycastle.asn1.x509.IssuingDistributionPoint;
 import org.bouncycastle.asn1.x509.NameConstraints;
 import org.bouncycastle.asn1.x509.PolicyInformation;
 import org.bouncycastle.jcajce.PKIXCRLStore;
-import org.bouncycastle.jcajce.PKIXCRLStoreSelector;
+import org.bouncycastle.jcajce.PKIXCertRevocationChecker;
+import org.bouncycastle.jcajce.PKIXCertRevocationCheckerParameters;
 import org.bouncycastle.jcajce.PKIXCertStoreSelector;
 import org.bouncycastle.jcajce.PKIXExtendedBuilderParameters;
 import org.bouncycastle.jcajce.PKIXExtendedParameters;
+import org.bouncycastle.jcajce.provider.symmetric.util.ClassUtil;
 import org.bouncycastle.jcajce.util.JcaJceHelper;
 import org.bouncycastle.jce.exception.ExtCertPathValidatorException;
 import org.bouncycastle.util.Arrays;
@@ -64,6 +66,8 @@ import org.bouncycastle.util.Arrays;
 class RFC3280CertPathUtilities
 {
     private static final PKIXCRLUtil CRL_UTIL = new PKIXCRLUtil();
+
+    private static final Class revChkClass = ClassUtil.loadClass(RFC3280CertPathUtilities.class, "java.security.cert.PKIXRevocationChecker");
 
     /**
      * If the complete CRL includes an issuing distribution point (IDP) CRL
@@ -170,8 +174,7 @@ class RFC3280CertPathUtilities
                             genNames = new GeneralName[1];
                             try
                             {
-                                genNames[0] = new GeneralName(X500Name.getInstance(PrincipalUtils
-                                    .getEncodedIssuerPrincipal(cert).getEncoded()));
+                                genNames[0] = new GeneralName(PrincipalUtils.getEncodedIssuerPrincipal(cert));
                             }
                             catch (Exception e)
                             {
@@ -503,7 +506,8 @@ class RFC3280CertPathUtilities
             }
             try
             {
-                PKIXCertPathBuilderSpi builder = new PKIXCertPathBuilderSpi(true);
+                CertPathBuilderSpi builder = (revChkClass != null)
+                                ? new PKIXCertPathBuilderSpi_8(true) : new PKIXCertPathBuilderSpi(true);
                 X509CertSelector tmpCertSelector = new X509CertSelector();
                 tmpCertSelector.setCertificate(signingCert);
 
@@ -554,9 +558,9 @@ class RFC3280CertPathUtilities
         for (int i = 0; i < validCerts.size(); i++)
         {
             X509Certificate signCert = (X509Certificate)validCerts.get(i);
-            boolean[] keyusage = signCert.getKeyUsage();
+            boolean[] keyUsage = signCert.getKeyUsage();
 
-            if (keyusage != null && (keyusage.length < 7 || !keyusage[CRL_SIGN]))
+            if (keyUsage != null && (keyUsage.length <= CRL_SIGN || !keyUsage[CRL_SIGN]))
             {
                 lastException = new AnnotatedException(
                     "Issuer certificate key usage extension does not permit CRL signing.");
@@ -628,119 +632,6 @@ class RFC3280CertPathUtilities
         }
         return null;
     }
-
-    protected static Set processCRLA1i(
-        Date currentDate,
-        PKIXExtendedParameters paramsPKIX,
-        X509Certificate cert,
-        X509CRL crl)
-        throws AnnotatedException
-    {
-        Set set = new HashSet();
-        if (paramsPKIX.isUseDeltasEnabled())
-        {
-            CRLDistPoint freshestCRL = null;
-            try
-            {
-                freshestCRL = CRLDistPoint
-                    .getInstance(CertPathValidatorUtilities.getExtensionValue(cert, FRESHEST_CRL));
-            }
-            catch (AnnotatedException e)
-            {
-                throw new AnnotatedException("Freshest CRL extension could not be decoded from certificate.", e);
-            }
-            if (freshestCRL == null)
-            {
-                try
-                {
-                    freshestCRL = CRLDistPoint.getInstance(CertPathValidatorUtilities.getExtensionValue(crl,
-                        FRESHEST_CRL));
-                }
-                catch (AnnotatedException e)
-                {
-                    throw new AnnotatedException("Freshest CRL extension could not be decoded from CRL.", e);
-                }
-            }
-            if (freshestCRL != null)
-            {
-                List crlStores = new ArrayList();
-
-                crlStores.addAll(paramsPKIX.getCRLStores());
-
-                try
-                {
-                    crlStores.addAll(CertPathValidatorUtilities.getAdditionalStoresFromCRLDistributionPoint(freshestCRL, paramsPKIX.getNamedCRLStoreMap()));
-                }
-                catch (AnnotatedException e)
-                {
-                    throw new AnnotatedException(
-                        "No new delta CRL locations could be added from Freshest CRL extension.", e);
-                }
-
-                // get delta CRL(s)
-                try
-                {
-                    set.addAll(CertPathValidatorUtilities.getDeltaCRLs(currentDate, crl, paramsPKIX.getCertStores(), crlStores));
-                }
-                catch (AnnotatedException e)
-                {
-                    throw new AnnotatedException("Exception obtaining delta CRLs.", e);
-                }
-            }
-        }
-        return set;
-    }
-
-    protected static Set[] processCRLA1ii(
-        Date currentDate,
-        PKIXExtendedParameters paramsPKIX,
-        X509Certificate cert,
-        X509CRL crl)
-        throws AnnotatedException
-    {
-        Set deltaSet = new HashSet();
-        X509CRLSelector crlselect = new X509CRLSelector();
-        crlselect.setCertificateChecking(cert);
-
-        try
-        {
-            crlselect.addIssuerName(PrincipalUtils.getIssuerPrincipal(crl).getEncoded());
-        }
-        catch (Exception e)
-        {
-            throw new AnnotatedException("Cannot extract issuer from CRL." + e, e);
-        }
-
-        PKIXCRLStoreSelector extSelect = new PKIXCRLStoreSelector.Builder(crlselect).setCompleteCRLEnabled(true).build();
-
-        Date validityDate = currentDate;
-
-        if (paramsPKIX.getDate() != null)
-        {
-            validityDate = paramsPKIX.getDate();
-        }
-
-        Set completeSet = CRL_UTIL.findCRLs(extSelect, validityDate, paramsPKIX.getCertStores(), paramsPKIX.getCRLStores());
-
-        if (paramsPKIX.isUseDeltasEnabled())
-        {
-            // get delta CRL(s)
-            try
-            {
-                deltaSet.addAll(CertPathValidatorUtilities.getDeltaCRLs(validityDate, crl, paramsPKIX.getCertStores(), paramsPKIX.getCRLStores()));
-            }
-            catch (AnnotatedException e)
-            {
-                throw new AnnotatedException("Exception obtaining delta CRLs.", e);
-            }
-        }
-        return new Set[]
-            {
-                completeSet,
-                deltaSet};
-    }
-
-
 
     /**
      * If use-deltas is set, verify the issuer and scope of the delta CRL.
@@ -907,7 +798,7 @@ class RFC3280CertPathUtilities
         ASN1Sequence pm = null;
         try
         {
-            pm = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            pm = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.POLICY_MAPPINGS));
         }
         catch (AnnotatedException ex)
@@ -1090,7 +981,7 @@ class RFC3280CertPathUtilities
         ASN1Sequence pm = null;
         try
         {
-            pm = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            pm = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.POLICY_MAPPINGS));
         }
         catch (AnnotatedException ex)
@@ -1108,7 +999,7 @@ class RFC3280CertPathUtilities
                 ASN1ObjectIdentifier subjectDomainPolicy = null;
                 try
                 {
-                    ASN1Sequence mapping = DERSequence.getInstance(mappings.getObjectAt(j));
+                    ASN1Sequence mapping = ASN1Sequence.getInstance(mappings.getObjectAt(j));
 
                     issuerDomainPolicy = ASN1ObjectIdentifier.getInstance(mapping.getObjectAt(0));
                     subjectDomainPolicy = ASN1ObjectIdentifier.getInstance(mapping.getObjectAt(1));
@@ -1165,7 +1056,7 @@ class RFC3280CertPathUtilities
         ASN1Sequence certPolicies = null;
         try
         {
-            certPolicies = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            certPolicies = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.CERTIFICATE_POLICIES));
         }
         catch (AnnotatedException e)
@@ -1207,7 +1098,7 @@ class RFC3280CertPathUtilities
 
             try
             {
-                dns = DERSequence.getInstance(principal.getEncoded());
+                dns = ASN1Sequence.getInstance(principal);
             }
             catch (Exception e)
             {
@@ -1306,7 +1197,7 @@ class RFC3280CertPathUtilities
         ASN1Sequence certPolicies = null;
         try
         {
-            certPolicies = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            certPolicies = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.CERTIFICATE_POLICIES));
         }
         catch (AnnotatedException e)
@@ -1490,13 +1381,13 @@ class RFC3280CertPathUtilities
     protected static void processCertA(
         CertPath certPath,
         PKIXExtendedParameters paramsPKIX,
+        PKIXCertRevocationChecker revocationChecker,
         int index,
         PublicKey workingPublicKey,
         boolean verificationAlreadyPerformed,
         X500Name workingIssuerName,
-        X509Certificate sign,
-        JcaJceHelper helper)
-        throws ExtCertPathValidatorException
+        X509Certificate sign)
+        throws CertPathValidatorException
     {
         List certs = certPath.getCertificates();
         X509Certificate cert = (X509Certificate)certs.get(index);
@@ -1541,12 +1432,17 @@ class RFC3280CertPathUtilities
         //
         // (a) (3)
         //
-        if (paramsPKIX.isRevocationEnabled())
+        if (revocationChecker != null)
         {
+
             try
             {
-                checkCRLs(paramsPKIX, cert, CertPathValidatorUtilities.getValidCertDateFromValidityModel(paramsPKIX,
-                    certPath, index), sign, workingPublicKey, certs, helper);
+                Date validDate = CertPathValidatorUtilities.getValidCertDateFromValidityModel(paramsPKIX, certPath, index);
+
+                revocationChecker.initialize(
+                        new PKIXCertRevocationCheckerParameters(paramsPKIX, validDate, certPath, index, sign, workingPublicKey));
+
+                revocationChecker.check(cert);
             }
             catch (AnnotatedException e)
             {
@@ -1562,11 +1458,11 @@ class RFC3280CertPathUtilities
         //
         // (a) (4) name chaining
         //
-        if (!PrincipalUtils.getEncodedIssuerPrincipal(cert).equals(workingIssuerName))
+        X500Name issuer = PrincipalUtils.getIssuerPrincipal(cert);
+        if (!issuer.equals(workingIssuerName))
         {
-            throw new ExtCertPathValidatorException("IssuerName(" + PrincipalUtils.getEncodedIssuerPrincipal(cert)
-                + ") does not match SubjectName(" + workingIssuerName + ") of signing certificate.", null,
-                certPath, index);
+            throw new ExtCertPathValidatorException("IssuerName(" + issuer + ") does not match SubjectName("
+                + workingIssuerName + ") of signing certificate.", null, certPath, index);
         }
     }
 
@@ -1584,7 +1480,7 @@ class RFC3280CertPathUtilities
         ASN1Sequence pc = null;
         try
         {
-            pc = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            pc = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.POLICY_CONSTRAINTS));
         }
         catch (Exception e)
@@ -1638,7 +1534,7 @@ class RFC3280CertPathUtilities
         ASN1Sequence pc = null;
         try
         {
-            pc = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            pc = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.POLICY_CONSTRAINTS));
         }
         catch (Exception e)
@@ -1692,7 +1588,7 @@ class RFC3280CertPathUtilities
         NameConstraints nc = null;
         try
         {
-            ASN1Sequence ncSeq = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            ASN1Sequence ncSeq = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.NAME_CONSTRAINTS));
             if (ncSeq != null)
             {
@@ -1763,6 +1659,7 @@ class RFC3280CertPathUtilities
      *                            or some error occurs.
      */
     private static void checkCRL(
+        PKIXCertRevocationCheckerParameters params,
         DistributionPoint dp,
         PKIXExtendedParameters paramsPKIX,
         X509Certificate cert,
@@ -1773,7 +1670,7 @@ class RFC3280CertPathUtilities
         ReasonsMask reasonMask,
         List certPathCerts,
         JcaJceHelper helper)
-        throws AnnotatedException
+        throws AnnotatedException, RecoverableCertPathValidatorException
     {
         Date currentDate = new Date(System.currentTimeMillis());
         if (validDate.getTime() > currentDate.getTime())
@@ -1789,7 +1686,7 @@ class RFC3280CertPathUtilities
          * getAdditionalStore()
          */
 
-        Set crls = CertPathValidatorUtilities.getCompleteCRLs(dp, cert, currentDate, paramsPKIX);
+        Set crls = CertPathValidatorUtilities.getCompleteCRLs(params, dp, cert, currentDate, paramsPKIX);
         boolean validCrlFound = false;
         AnnotatedException lastException = null;
         Iterator crl_iter = crls.iterator();
@@ -1832,7 +1729,7 @@ class RFC3280CertPathUtilities
                 if (paramsPKIX.isUseDeltasEnabled())
                 {
                     // get delta CRLs
-                    Set deltaCRLs = CertPathValidatorUtilities.getDeltaCRLs(validityDate, crl, paramsPKIX.getCertStores(), paramsPKIX.getCRLStores());
+                    Set deltaCRLs = CertPathValidatorUtilities.getDeltaCRLs(validityDate, crl, paramsPKIX.getCertStores(), paramsPKIX.getCRLStores(), helper);
                     // we only want one valid delta CRL
                     // (h)
                     deltaCRL = RFC3280CertPathUtilities.processCRLH(deltaCRLs, key);
@@ -1942,6 +1839,7 @@ class RFC3280CertPathUtilities
      *                            or some error occurs.
      */
     protected static void checkCRLs(
+        PKIXCertRevocationCheckerParameters params,
         PKIXExtendedParameters paramsPKIX,
         X509Certificate cert,
         Date validDate,
@@ -1949,7 +1847,7 @@ class RFC3280CertPathUtilities
         PublicKey workingPublicKey,
         List certPathCerts,
         JcaJceHelper helper)
-        throws AnnotatedException
+        throws AnnotatedException, RecoverableCertPathValidatorException
     {
         AnnotatedException lastException = null;
         CRLDistPoint crldp = null;
@@ -1966,7 +1864,7 @@ class RFC3280CertPathUtilities
         PKIXExtendedParameters.Builder paramsBldr = new PKIXExtendedParameters.Builder(paramsPKIX);
         try
         {
-            List extras = CertPathValidatorUtilities.getAdditionalStoresFromCRLDistributionPoint(crldp, paramsPKIX.getNamedCRLStoreMap());
+            List extras = CertPathValidatorUtilities.getAdditionalStoresFromCRLDistributionPoint(crldp, paramsPKIX.getNamedCRLStoreMap(), validDate, helper);
             for (Iterator it = extras.iterator(); it.hasNext();)
             {
                 paramsBldr.addCRLStore((PKIXCRLStore)it.next());
@@ -2000,7 +1898,7 @@ class RFC3280CertPathUtilities
                 {
                     try
                     {
-                        checkCRL(dps[i], finalParams, cert, validDate, sign, workingPublicKey, certStatus, reasonsMask, certPathCerts, helper);
+                        checkCRL(params, dps[i], finalParams, cert, validDate, sign, workingPublicKey, certStatus, reasonsMask, certPathCerts, helper);
                         validCrlFound = true;
                     }
                     catch (AnnotatedException e)
@@ -2029,7 +1927,7 @@ class RFC3280CertPathUtilities
                 X500Name issuer;
                 try
                 {
-                    issuer = PrincipalUtils.getEncodedIssuerPrincipal(cert);
+                    issuer = PrincipalUtils.getIssuerPrincipal(cert);
                 }
                 catch (RuntimeException e)
                 {
@@ -2038,7 +1936,7 @@ class RFC3280CertPathUtilities
                 DistributionPoint dp = new DistributionPoint(new DistributionPointName(0, new GeneralNames(
                     new GeneralName(GeneralName.directoryName, issuer))), null, null);
                 PKIXExtendedParameters paramsPKIXClone = (PKIXExtendedParameters)paramsPKIX.clone();
-                checkCRL(dp, paramsPKIXClone, cert, validDate, sign, workingPublicKey, certStatus, reasonsMask,
+                checkCRL(params, dp, paramsPKIXClone, cert, validDate, sign, workingPublicKey, certStatus, reasonsMask,
                     certPathCerts, helper);
                 validCrlFound = true;
             }
@@ -2218,9 +2116,9 @@ class RFC3280CertPathUtilities
         //
         // (n)
         //
-        boolean[] _usage = cert.getKeyUsage();
+        boolean[] keyUsage = cert.getKeyUsage();
 
-        if ((_usage != null) && !_usage[RFC3280CertPathUtilities.KEY_CERT_SIGN])
+        if (keyUsage != null && (keyUsage.length <= KEY_CERT_SIGN || !keyUsage[KEY_CERT_SIGN]))
         {
             throw new ExtCertPathValidatorException(
                 "Issuer certificate keyusage extension is critical and does not permit key signing.", null,
@@ -2373,7 +2271,7 @@ class RFC3280CertPathUtilities
         ASN1Sequence pc = null;
         try
         {
-            pc = DERSequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
+            pc = ASN1Sequence.getInstance(CertPathValidatorUtilities.getExtensionValue(cert,
                 RFC3280CertPathUtilities.POLICY_CONSTRAINTS));
         }
         catch (AnnotatedException e)

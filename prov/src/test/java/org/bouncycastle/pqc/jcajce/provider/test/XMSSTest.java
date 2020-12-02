@@ -267,7 +267,7 @@ public class XMSSTest
         assertTrue(xmssSig.verify(s));
     }
 
-    public void testXMSSSha256SignatureMultiple()
+    public void testXMSSSha256SignatureMultiplePreHash()
         throws Exception
     {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("XMSS", "BCPQC");
@@ -320,7 +320,7 @@ public class XMSSTest
     {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("XMSS", "BCPQC");
 
-        kpg.initialize(new XMSSParameterSpec(10, XMSSParameterSpec.SHA256), new SecureRandom());
+        kpg.initialize(XMSSParameterSpec.SHA2_10_256, new SecureRandom());
 
         KeyPair kp = kpg.generateKeyPair();
 
@@ -337,7 +337,7 @@ public class XMSSTest
         assertEquals(10, privKey.getHeight());
         assertEquals(XMSSParameterSpec.SHA256, privKey.getTreeDigest());
 
-        testSig("SHA256withXMSS", pubKey, (PrivateKey)privKey);
+        testSig("XMSS", pubKey, (PrivateKey)privKey);
     }
 
     public void testXMSSSha512KeyFactory()
@@ -756,6 +756,16 @@ public class XMSSTest
             }
             sigs.add(sw);
         }
+        
+        try
+        {
+            privKey.getIndex();
+            fail("no exception");
+        }
+        catch (IllegalStateException e)
+        {
+            assertEquals("key exhausted", e.getMessage());
+        }
     }
 
     private void testPrehashAndWithoutPrehash(String baseAlgorithm, String digestName, Digest digest)
@@ -828,14 +838,14 @@ public class XMSSTest
 
         for (int i = 0; i != 10; i++)
         {
-            StateAwareSignature signer = (StateAwareSignature)Signature.getInstance(sigAlg, "BCPQC");
+            Signature signer = Signature.getInstance(sigAlg, "BCPQC");
             signer.initSign(privateKey);
             signer.update(payload);
 
             byte[] signature = signer.sign();
 
             // serialise private key
-            byte[] enc = signer.getUpdatedPrivateKey().getEncoded();
+            byte[] enc = privateKey.getEncoded();
             privateKey = KeyFactory.getInstance("XMSS").generatePrivate(new PKCS8EncodedKeySpec(enc));
             Signature verifier = Signature.getInstance(sigAlg, "BCPQC");
             verifier.initVerify(publicKey);

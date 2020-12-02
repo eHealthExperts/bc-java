@@ -1,6 +1,8 @@
 package org.bouncycastle.openpgp;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -28,14 +30,48 @@ import org.bouncycastle.util.Iterable;
  * </p>
  */
 public class PGPEncryptedDataList
-    implements Iterable
+    implements Iterable<PGPEncryptedData>
 {
-    List                 list = new ArrayList();
-    InputStreamPacket    data;
+    List<PGPEncryptedData> methods = new ArrayList<PGPEncryptedData>();
+    InputStreamPacket      data;
 
     /**
      * Construct an encrypted data packet holder, reading PGP encrypted method packets and an
-     * encrytped data packet from the stream.
+     * encrypted data packet from a stream.
+     * <p>
+     * The first packet in the stream should be one of {@link PacketTags#SYMMETRIC_KEY_ENC_SESSION}
+     * or {@link PacketTags#PUBLIC_KEY_ENC_SESSION}.
+     * </p>
+     * @param encData a byte array containing an encrypted stream.
+     * @throws IOException if an error occurs reading from the PGP input.
+     */
+    public PGPEncryptedDataList(
+        byte[] encData)
+        throws IOException
+    {
+        this(Util.createBCPGInputStream(new ByteArrayInputStream(encData), PacketTags.PUBLIC_KEY_ENC_SESSION, PacketTags.SYMMETRIC_KEY_ENC_SESSION));
+    }
+
+    /**
+     * Construct an encrypted data packet holder, reading PGP encrypted method packets and an
+     * encrypted data packet from a stream.
+     * <p>
+     * The first packet in the stream should be one of {@link PacketTags#SYMMETRIC_KEY_ENC_SESSION}
+     * or {@link PacketTags#PUBLIC_KEY_ENC_SESSION}.
+     * </p>
+     * @param inStream the input stream being read.
+     * @throws IOException if an error occurs reading from the PGP input.
+     */
+    public PGPEncryptedDataList(
+        InputStream inStream)
+        throws IOException
+    {
+        this(Util.createBCPGInputStream(inStream, PacketTags.PUBLIC_KEY_ENC_SESSION, PacketTags.SYMMETRIC_KEY_ENC_SESSION));
+    }
+
+    /**
+     * Construct an encrypted data packet holder, reading PGP encrypted method packets and an
+     * encrypted data packet from the stream.
      * <p>
      * The next packet in the stream should be one of {@link PacketTags#SYMMETRIC_KEY_ENC_SESSION}
      * or {@link PacketTags#PUBLIC_KEY_ENC_SESSION}.
@@ -47,6 +83,8 @@ public class PGPEncryptedDataList
         BCPGInputStream    pIn)
         throws IOException
     {
+        List list = new ArrayList();
+
         while (pIn.nextPacketTag() == PacketTags.PUBLIC_KEY_ENC_SESSION
             || pIn.nextPacketTag() == PacketTags.SYMMETRIC_KEY_ENC_SESSION)
         {
@@ -65,11 +103,11 @@ public class PGPEncryptedDataList
         {
             if (list.get(i) instanceof SymmetricKeyEncSessionPacket)
             {
-                list.set(i, new PGPPBEEncryptedData((SymmetricKeyEncSessionPacket)list.get(i), data));
+                methods.add(new PGPPBEEncryptedData((SymmetricKeyEncSessionPacket)list.get(i), data));
             }
             else
             {
-                list.set(i, new PGPPublicKeyEncryptedData((PublicKeyEncSessionPacket)list.get(i), data));
+                methods.add(new PGPPublicKeyEncryptedData((PublicKeyEncSessionPacket)list.get(i), data));
             }
         }
     }
@@ -79,10 +117,10 @@ public class PGPEncryptedDataList
      *
      * @param index the encryption method to obtain (0 based).
      */
-    public Object get(
+    public PGPEncryptedData get(
         int    index)
     {
-        return list.get(index);
+        return (PGPEncryptedData)methods.get(index);
     }
 
     /**
@@ -90,7 +128,7 @@ public class PGPEncryptedDataList
      */
     public int size()
     {
-        return list.size();
+        return methods.size();
     }
 
     /**
@@ -98,22 +136,22 @@ public class PGPEncryptedDataList
      */
     public boolean isEmpty()
     {
-        return list.isEmpty();
+        return methods.isEmpty();
     }
 
     /**
      * Returns an iterator over the encryption method objects held in this list, in the order they
      * appeared in the stream they are read from.
      */
-    public Iterator getEncryptedDataObjects()
+    public Iterator<PGPEncryptedData> getEncryptedDataObjects()
     {
-        return list.iterator();
+        return methods.iterator();
     }
 
     /**
      * Support method for Iterable where available.
      */
-    public Iterator iterator()
+    public Iterator<PGPEncryptedData> iterator()
     {
         return getEncryptedDataObjects();
     }

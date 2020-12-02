@@ -19,7 +19,7 @@ abstract class AbstractAlgorithmConstraints implements BCAlgorithmConstraints
 
     protected void checkAlgorithmName(String algorithm)
     {
-        if (!isAlgorithmSpecified(algorithm))
+        if (!JsseUtils.isNameSpecified(algorithm))
         {
             throw new IllegalArgumentException("No algorithm name specified");
         }
@@ -79,11 +79,6 @@ abstract class AbstractAlgorithmConstraints implements BCAlgorithmConstraints
         return false;
     }
 
-    protected boolean isAlgorithmSpecified(String algorithm)
-    {
-        return null != algorithm && algorithm.length() > 0;
-    }
-
     protected boolean isPrimitivesSpecified(Set<BCCryptoPrimitive> primitives)
     {
         return null != primitives && !primitives.isEmpty();
@@ -91,9 +86,15 @@ abstract class AbstractAlgorithmConstraints implements BCAlgorithmConstraints
 
     protected static Set<String> asUnmodifiableSet(String[] algorithms)
     {
-        return null == algorithms || algorithms.length < 1
-            ? Collections.<String> emptySet()
-            : Collections.unmodifiableSet(asSet(algorithms));
+        if (null != algorithms && algorithms.length > 0)
+        {
+            Set<String> result = asSet(algorithms);
+            if (!result.isEmpty())
+            {
+                return Collections.unmodifiableSet(result);
+            }
+        }
+        return Collections.<String> emptySet();
     }
 
     protected static Set<String> asSet(String[] algorithms)
@@ -103,8 +104,11 @@ abstract class AbstractAlgorithmConstraints implements BCAlgorithmConstraints
         {
             for (String algorithm : algorithms)
             {
-                // TODO[jsse] toLowerCase?
-                result.add(algorithm);
+                if (null != algorithm)
+                {
+                    // TODO[jsse] toLowerCase?
+                    result.add(algorithm);
+                }
             }
         }
         return result;

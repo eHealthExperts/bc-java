@@ -6,6 +6,16 @@ Thanks, may your castles never deflate!
 <p>
 Donors
 <p>
+The following people donated financially to help with the release of 1.66:
+<br />
+Denis Beurive, Ravi_02, and Manuel Corona.
+</p>
+<p>
+The following people donated financially to help with the release of 1.65:
+<br />
+Christian Kahlo, Alexi Livshitz, and Denis Beurive.
+</p>
+<p>
 The following people donated financially to help with the release of 1.63:
 <br />
 Joshua Hight
@@ -285,7 +295,7 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>Georg Lippold &lt;georg.lippold&#064gmx.de&gt; - initial implementation of NaccacheStern cipher.</li>
 <li>Chris Viles &lt;chris_viles&#064yahoo.com&gt; - fix to SignatureSubpacket critical bit setting.</li>
 <li>Pasi Eronen &lt;Pasi.Eronen&#064nokia.com&gt; - extra toString() support for ASN.1 library. Initial patch for large OID components.</li>
-<li>Lijun Liao &lt;https://github.com/xipki&gt; performance enhancements for SHA family of digests. Bug report and patch for blank line handling in ArmoredInputStream. Addition of getSignatureAlgorithmID to BasicOCSPResp. Reset fix for SM2 signatures, performance improvements for SHA-3. Clean up of CMP EncryptedValueBuilder, additional functionality on PollReqContent. Bug fix for endianness issue in cSHAKE left encode method.</li>
+<li>Lijun Liao &lt;https://github.com/xipki&gt; performance enhancements for SHA family of digests. Bug report and patch for blank line handling in ArmoredInputStream. Addition of getSignatureAlgorithmID to BasicOCSPResp. Reset fix for SM2 signatures, performance improvements for SHA-3. Clean up of CMP EncryptedValueBuilder, additional functionality on PollReqContent. Bug fix for endianness issue in cSHAKE left encode method. Initial implementation of SipHash128.</li>
 <li>Maria Ivanova &lt;maria.ivanova&#064gmail.com&gt; - support for tags > 30 in ASN.1 parsing.</li>
 <li>Armin H&auml;berling &lt;arminha&#064student.ethz.ch&gt; - first cut of internationalisation, initial PKIX validation classes.</li>
 <li>Marius Schilder &lt;mschilder&#064google.com&gt; - main set of test vectors for Bleichenbacher's forgery attack.</li>
@@ -334,7 +344,7 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>Cagdas Cirit &lt;cagdascirit&#064gmail.com&gt; subjectAlternativeName fix for x509CertStoreSelector.</li>
 <li>Harakiri &lt;harakiri_23&#064yahoo.com&gt; datahandler patch for attached parts in SMIME signatures.</li>
 <li>Pedro Henriques &lt;pmahenriques&#064gmail.com&gt; explicit bounds checking for DESKeyGenerator, code simplification for OAEPEncoding.</li>
-<li>Lothar Kimmeringer &lt;job&#064kimmeringer.de&gt; verbose mode for ASN1Dump, support for DERExternal, DNS performance fix for S/MIME API.</li>
+<li>Lothar Kimmeringer &lt;job&#064kimmeringer.de&gt; verbose mode for ASN1Dump, support for DERExternal, DNS performance fix for S/MIME API, corrections for DLExternal and testing. Identified an issue with Properties utils ignoring system properties in some cases.</li>
 <li>Richard Farr &lt;rfarr.se&#064gmail.com&gt; initial SRP-6a implementation.</li>
 <li>Thomas Castiglione &lt;castiglione&#064au.ibm.com&gt; patch to encoding for CRMF OptionalValidity.</li>
 <li>Elisabetta Romani &lt;eromani&#064sogei.it&gt; patch for recognising multiple counter signatures.</li>
@@ -493,7 +503,7 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>fgrieu &lt;fgrieu&#064gmail.com&gt; identification and suggested fixes for possible timing vulnerability in OAEPEncoding and RSACoreEngine.</li>
 <li>MTG &lt;https://github.com/mtgag&gt; patch for decoding issues in PKIPublicationInfo and CertifiedKeyPair.</li>
 <li>Andreas Gadermaier &lt;up.gadermaier&#064gmail.com&gt; initial version of Argon2 PBKDF algorithm.</li>
-<li>Tony Washer &lt;tony.washer@yahoo.co.uk&gt; review of qTesla, Java 1.9 module code, additional test code and debugging for GOST, DSTU, and ECNR algorithms. Initial lightweight implementation of the ZUC ciphers and macs.</li>
+<li>Tony Washer &lt;tony.washer@yahoo.co.uk&gt; review of qTesla, Java 1.9 module code, additional test code and debugging for GOST, DSTU, and ECNR algorithms. Initial lightweight implementation of the ZUC ciphers and macs. Additions to LMS/HSS API implementations, fix for truncation issue with big HSS keys, contributions to optimization of LMS/HSS.</li>
 <li>Vincent Bouckaert &lt;https://github.com/veebee&gt; initial version of RFC 4998 ASN.1 classes.</li>
 <li>Tony Washer &lt;https://github.com/tonywasher&gt; ECIESKeyEncapsulation fix for use of OldCofactor mode. Submitted ChaCha20Poly1305 prototype.</li>
 <li>Aurimas Liutikas &lt;https://github.com/liutikas&gt; JavaDoc patches to ReasonsMask.</li>
@@ -514,11 +524,23 @@ CertPath support for implicit DSA parameters and a range of NameConstraints. Add
 <li>dbusche&lt;https://github.com/dbusche&gt; Argon2 optimisations.</li>
 <li>Daniel Heldt&lt;https://github.com/dheldt&gt; Fixing encodings in unicode tests to allow a wider range of Java compilers to work. Tweak to inheritance in JceKeyAgreeRecipient.</li>
 <li>Ugochukwu Mmaduekwe&lt;https://github.com/Xor-el&gt; Fix for initially bugged legacy Integers.numberOfLeadingZeros method.</li>
-<li>Gsealy &lt;https://github.com/Gsealy&gt; addition of PBKDF2withHmacSM3 to the provider.</li>
+<li>Gsealy &lt;https://github.com/Gsealy&gt; addition of PBKDF2withHmacSM3 and HmacSM3 to the provider.</li>
 <li>aphuang2013 &lt;https://github.com/aphuang2013&gt; update to path validation in EST service for ClearPath EST.</li>
 <li>Kevin Herron &lt;https://github.com/kevinherron&gt; Initial ChaCha20Poly1305 prototype.</li>
 <li>vkreml &lt;https://github.com/svkreml&gt; GOST compliance change for DefaultCMSSignatureEncryptionAlgorithmFinder.</li>
-<li>Tobias Ospelt &gt;tobias&#064pentagrid.ch&lt; Identification of 1.63 regression in ASN.1 parsing.</li>
+<li>Tobias Ospelt &lt;tobias&#064pentagrid.ch&gt; Identification of 1.63 regression in ASN.1 parsing.</li>
+<li>Phil Glass &lt;https://github.com/PhilGlass&gt; Patch for to allow BC to function on Android 10.</li>
+<li>Steven &lt;https://github.com/acid1103&gt; Identified issue with ChaCha20Poly1305 and large files. Identified an overly-eager null check in ChaCha20Poly1305.</li>
+<li>Anatoly Zaretsky &lt;https://github.com/azaretsky&gt; Daemon mode patch for entropy gatherer thread.</li>
+<li>Brandon Weeks &lt;https://github.com/brandonweeks&gt; Fix for engineInitSign() with null random values in PSSSignatureSpi.</li>
+<li>Stojan Dimitrovski &lt;https://github.com/hf&gt; SecureRandom configuration code for NTRU key generation.</li>
+<li>vvvlado &lt;https://github.com/vvvlado&gt; Fix to support repeated headers in PGP armored data.</li>
+<li>a--v--k &lt;https://github.com/a--v--k&gt; Clean up for some invalid mappings in the Java provider.</li>
+<li>lipnitsk &lt;https://github.com/lipnitsk&gt; Fix for non-CRT RSA Private serialisation.</li>
+<li>Niccolò Fontana &lt;https://github.com/NicFontana&gt; Initial fix for high-latency DTLS HelloVerifyRequest handshakes.</li>
+<li>sudheernv &lt;https://github.com/sudheernv&gt; Patch for KMAC rightEncode() encoding.</li>
+<li>Mathias Neuhaus &lt;https://github.com/mneuhaus-cv&gt; Patch for cSHAKE extra padding on block aligned N and S bug.</li>
+<li>Yuri Schimke &lt;https://github.com/yschimke&gt; Patch for nested exception handling in BcKeyStoreSpi.</li>
 </ul>
 </body>
 </html>

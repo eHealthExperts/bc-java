@@ -20,33 +20,31 @@ public class EraseUtil {
 
     public static void clearByteArray(final byte[] array) 
     {
-        if (array != null) {
-            Arrays.fill(array, (byte) 0);
+        if (array != null && System.getProperty("bc.erase.skip") == null && System.getProperty("bc.erase.byte.skip") == null) {
+    		Arrays.fill(array, (byte) 0);
         }
     }
 
     public static void clearIntArray(final int[] array) 
     {
-        if (array != null) 
+        if (array != null && System.getProperty("bc.erase.skip") == null && System.getProperty("bc.erase.int.skip") == null) 
         {
-            Arrays.fill(array, 0);
+    		Arrays.fill(array, 0);
         }
     }
 
     public static void clearLongArray(final long[] array) 
     {
-        if (array != null) 
+        if (array != null && System.getProperty("bc.erase.skip") == null && System.getProperty("bc.erase.long.skip") == null) 
         {
-            Arrays.fill(array, 0);
+    		Arrays.fill(array, 0);
         }
     }
 
     public static void clearBigInteger(final BigInteger bigInteger) 
     {
     	
-
-    	
-        if (bigInteger != null) 
+        if (bigInteger != null && System.getProperty("bc.erase.skip") == null && System.getProperty("bc.erase.bigint.skip") == null) 
         {
         	final long value = bigInteger.longValue();
         	
@@ -77,7 +75,7 @@ public class EraseUtil {
     }
 
     public static void clearECFieldElement(final ECFieldElement ecField) {
-        if (ecField != null) 
+        if (ecField != null && System.getProperty("bc.erase.skip") == null && System.getProperty("bc.erase.ecfield.skip") == null) 
         {
 
             Field declaredField = null;
@@ -123,8 +121,7 @@ public class EraseUtil {
 
     private static void clearBCLongArray(final Object longArray) 
     {
-
-        if (longArray != null) 
+        if (longArray != null && System.getProperty("bc.erase.skip") == null && System.getProperty("bc.erase.bclong.skip") == null) 
         {
             try 
             {

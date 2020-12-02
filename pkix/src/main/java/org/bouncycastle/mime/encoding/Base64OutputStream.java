@@ -4,32 +4,68 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.bouncycastle.util.encoders.Base64;
+import org.bouncycastle.util.encoders.Base64Encoder;
 
 public class Base64OutputStream
     extends FilterOutputStream
 {
-    byte[] buffer = new byte[54];
-    int    bufOff;
+    private static final Base64Encoder ENCODER = new Base64Encoder();
+    private static final int INBUF_SIZE = 54;
+    private static final int OUTBUF_SIZE = (((INBUF_SIZE + 2) / 3) * 4) + 2;
+
+    private final byte[] inBuf = new byte[INBUF_SIZE];
+    private final byte[] outBuf = new byte[OUTBUF_SIZE];
+
+    private int inPos = 0;
 
     public Base64OutputStream(OutputStream stream)
     {
         super(stream);
+
+        outBuf[OUTBUF_SIZE - 2] = (byte)'\r';
+        outBuf[OUTBUF_SIZE - 1] = (byte)'\n';
     }
 
     public void write(int b)
         throws IOException
     {
-        doWrite((byte)b);
+        inBuf[inPos++] = (byte)b;
+        if (inPos == INBUF_SIZE)
+        {
+            encodeBlock(inBuf, 0);
+            inPos = 0;
+        }
     }
 
-    public void write(byte[] buf, int bufOff, int len)
+    public void write(byte[] buf, int off, int len)
         throws IOException
     {
-        for (int i = 0; i != len; i++)
+        int available = INBUF_SIZE - inPos;
+        if (len < available)
         {
-            doWrite(buf[bufOff + i]);
+            System.arraycopy(buf, off, inBuf, inPos, len);
+            inPos += len;
+            return;
         }
+
+        int count = 0;
+        if (inPos > 0)
+        {
+            System.arraycopy(buf, off, inBuf, inPos, available);
+            count += available;
+            encodeBlock(inBuf, 0);
+//            inPos = 0;
+        }
+
+        int remaining;
+        while ((remaining = (len - count)) >= INBUF_SIZE)
+        {
+            encodeBlock(buf, off + count);
+            count += INBUF_SIZE;
+        }
+
+        System.arraycopy(buf, off + count, inBuf, 0, remaining);
+        inPos = remaining;
     }
 
     public void write(byte[] buf)
@@ -41,23 +77,24 @@ public class Base64OutputStream
     public void close()
         throws IOException
     {
-        if (bufOff > 0)
+        if (inPos > 0)
         {
-            Base64.encode(buffer, 0, bufOff, out);
+            int outPos = ENCODER.encode(inBuf, 0, inPos, outBuf, 0);
+            inPos = 0;
+
+            outBuf[outPos++] = (byte)'\r';
+            outBuf[outPos++] = (byte)'\n';
+
+            out.write(outBuf, 0, outPos);
         }
+
         out.close();
     }
-    
-    private void doWrite(byte b)
+
+    private void encodeBlock(byte[] buf, int off)
         throws IOException
     {
-        buffer[bufOff++] = b;
-        if (bufOff == buffer.length)
-        {
-            Base64.encode(buffer, 0, buffer.length, out);
-            out.write('\r');
-            out.write('\n');
-            bufOff = 0;
-        }
+        ENCODER.encode(buf, off, INBUF_SIZE, outBuf, 0);
+        out.write(outBuf, 0, OUTBUF_SIZE);
     }
 }

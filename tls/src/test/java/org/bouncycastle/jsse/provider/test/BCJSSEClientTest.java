@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.security.SecureRandom;
-import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
@@ -15,9 +14,6 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 
 /**
  * A simple test designed to conduct a TLS handshake with an external TLS server,
@@ -28,11 +24,7 @@ public class BCJSSEClientTest
     public static void main(String[] args)
         throws Exception
     {
-        Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME);
-        Security.insertProviderAt(new BouncyCastleProvider(), 1);
-
-        Security.removeProvider(BouncyCastleJsseProvider.PROVIDER_NAME);
-        Security.insertProviderAt(new BouncyCastleJsseProvider(), 2);
+        ProviderUtils.setupHighPriority(false);
 
         /*
          * TEST CODE ONLY. If writing your own code based on this test case, you should configure
@@ -62,7 +54,7 @@ public class BCJSSEClientTest
             }
         };
 
-        SSLContext sslContext = SSLContext.getInstance("TLSv1.2", BouncyCastleJsseProvider.PROVIDER_NAME);
+        SSLContext sslContext = SSLContext.getInstance("TLSv1.2", ProviderUtils.PROVIDER_NAME_BCJSSE);
         sslContext.init(null, new TrustManager[]{ tm }, new SecureRandom());
 
         String host = "localhost";

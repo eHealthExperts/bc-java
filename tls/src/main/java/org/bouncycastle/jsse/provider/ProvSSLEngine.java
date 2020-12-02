@@ -16,6 +16,7 @@ import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
+import javax.net.ssl.X509ExtendedKeyManager;
 
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -45,12 +46,12 @@ class ProvSSLEngine
 {
     private static final Logger LOG = Logger.getLogger(ProvSSLEngine.class.getName());
 
-    protected final ProvSSLContextSpi context;
     protected final ContextData contextData;
     protected final ProvSSLParameters sslParameters;
 
     protected boolean enableSessionCreation = true;
-    protected boolean useClientMode = false;
+    protected boolean useClientMode = true;
+    protected boolean useClientModeSet = false;
 
     protected boolean closedEarly = false;
     protected boolean initialHandshakeBegun = false;
@@ -62,27 +63,17 @@ class ProvSSLEngine
 
     protected SSLException deferredException = null;
 
-    protected ProvSSLEngine(ProvSSLContextSpi context, ContextData contextData)
+    protected ProvSSLEngine(ContextData contextData)
     {
-        super();
-
-        this.context = context;
-        this.contextData = contextData;
-        this.sslParameters = context.getDefaultParameters(!useClientMode);
+        this(contextData, null, -1);
     }
 
-    protected ProvSSLEngine(ProvSSLContextSpi context, ContextData contextData, String host, int port)
+    protected ProvSSLEngine(ContextData contextData, String host, int port)
     {
         super(host, port);
 
-        this.context = context;
         this.contextData = contextData;
-        this.sslParameters = context.getDefaultParameters(!useClientMode);
-    }
-
-    public ProvSSLContextSpi getContext()
-    {
-        return context;
+        this.sslParameters = contextData.getContext().getDefaultSSLParameters(useClientMode);
     }
 
     public ContextData getContextData()
@@ -94,6 +85,10 @@ class ProvSSLEngine
     public synchronized void beginHandshake()
         throws SSLException
     {
+        if (!useClientModeSet)
+        {
+            throw new IllegalStateException("Client/Server mode must be set before the handshake can begin");
+        }
         if (closedEarly)
         {
             throw new SSLException("Connection is already closed");
@@ -164,14 +159,18 @@ class ProvSSLEngine
         }
     }
 
-    public String chooseClientAlias(String[] keyType, Principal[] issuers)
+    public ProvX509Key chooseClientKey(String[] keyTypes, Principal[] issuers)
     {
-        return contextData.getX509KeyManager().chooseEngineClientAlias(keyType, issuers, this);
+        X509ExtendedKeyManager x509KeyManager = getContextData().getX509KeyManager();
+        String alias = x509KeyManager.chooseEngineClientAlias(keyTypes, JsseUtils.clone(issuers), this);
+        return ProvX509Key.from(x509KeyManager, alias);
     }
 
-    public String chooseServerAlias(String keyType, Principal[] issuers)
+    public ProvX509Key chooseServerKey(String keyType, Principal[] issuers)
     {
-        return contextData.getX509KeyManager().chooseEngineServerAlias(keyType, issuers, this);
+        X509ExtendedKeyManager x509KeyManager = getContextData().getX509KeyManager();
+        String alias = x509KeyManager.chooseEngineServerAlias(keyType, JsseUtils.clone(issuers), this);
+        return ProvX509Key.from(x509KeyManager, alias);
     }
 
     @Override
@@ -239,6 +238,11 @@ class ProvSSLEngine
         return handshakeSession;
     }
 
+    public BCExtendedSSLSession getBCSession()
+    {
+        return getSessionImpl();
+    }
+
     public synchronized BCSSLConnection getConnection()
     {
         return connection;
@@ -274,7 +278,7 @@ class ProvSSLEngine
         return null == handshakeSession ? null : handshakeSession.getApplicationProtocol();
     }
 
-    @Override
+    // An SSLEngine method from JDK 7
     public synchronized SSLSession getHandshakeSession()
     {
         return null == handshakeSession ? null : handshakeSession.getExportSSLSession();
@@ -298,14 +302,12 @@ class ProvSSLEngine
     }
 
     @Override
-    public synchronized SSLSession getSession()
+    public SSLSession getSession()
     {
-        ProvSSLSession sslSession = (null == connection) ? ProvSSLSession.NULL_SESSION : connection.getSession();
-
-        return sslSession.getExportSSLSession();
+        return getSessionImpl().getExportSSLSession();
     }
 
-    @Override
+    // An SSLEngine method from JDK 6
     public synchronized SSLParameters getSSLParameters()
     {
         return SSLParametersUtil.getSSLParameters(sslParameters);
@@ -314,13 +316,13 @@ class ProvSSLEngine
     @Override
     public synchronized String[] getSupportedCipherSuites()
     {
-        return context.getSupportedCipherSuites();
+        return contextData.getContext().getSupportedCipherSuites();
     }
 
     @Override
     public synchronized String[] getSupportedProtocols()
     {
-        return context.getSupportedProtocols();
+        return contextData.getContext().getSupportedProtocols();
     }
 
     @Override
@@ -352,6 +354,24 @@ class ProvSSLEngine
         sslParameters.setEngineAPSelector(selector);
     }
 
+    public synchronized void setBCSessionToResume(BCExtendedSSLSession session)
+    {
+        if (null == session)
+        {
+            throw new NullPointerException("'session' cannot be null");
+        }
+        if (!(session instanceof ProvSSLSession))
+        {
+            throw new IllegalArgumentException("Session-to-resume must be a session returned from 'getBCSession'");
+        }
+        if (initialHandshakeBegun)
+        {
+            throw new IllegalArgumentException("Session-to-resume cannot be set after the handshake has begun");
+        }
+
+        sslParameters.setSessionToResume((ProvSSLSession)session);
+    }
+
     @Override
     public synchronized void setEnabledCipherSuites(String[] suites)
     {
@@ -381,7 +401,7 @@ class ProvSSLEngine
         SSLParametersUtil.setParameters(this.sslParameters, parameters);
     }
 
-    @Override
+    // An SSLEngine method from JDK 6
     public synchronized void setSSLParameters(SSLParameters sslParameters)
     {
         SSLParametersUtil.setSSLParameters(this.sslParameters, sslParameters);
@@ -392,15 +412,17 @@ class ProvSSLEngine
     {
         if (initialHandshakeBegun)
         {
-            throw new IllegalArgumentException("Mode cannot be changed after the initial handshake has begun");
+            throw new IllegalArgumentException("Client/Server mode cannot be changed after the handshake has begun");
         }
 
         if (this.useClientMode != useClientMode)
         {
-            context.updateDefaultProtocols(sslParameters, !useClientMode);
+            contextData.getContext().updateDefaultSSLParameters(sslParameters, useClientMode);
 
             this.useClientMode = useClientMode;
         }
+
+        this.useClientModeSet = true;
     }
 
     @Override
@@ -688,9 +710,14 @@ class ProvSSLEngine
 
     public synchronized void notifyHandshakeComplete(ProvSSLConnection connection)
     {
-        if (null != handshakeSession && !handshakeSession.isValid())
+        if (null != handshakeSession)
         {
-            connection.getSession().invalidate();
+            if (!handshakeSession.isValid())
+            {
+                connection.getSession().invalidate();
+            }
+
+            handshakeSession.getJsseSecurityParameters().clear();
         }
 
         this.handshakeSession = null;
@@ -705,6 +732,11 @@ class ProvSSLEngine
     public synchronized String selectApplicationProtocol(List<String> protocols)
     {
         return sslParameters.getEngineAPSelector().select(this, protocols);
+    }
+
+    ProvSSLSession getSessionImpl()
+    {
+        return null == connection ? ProvSSLSession.NULL_SESSION : connection.getSession();
     }
 
     private RecordPreview getRecordPreview(ByteBuffer src)

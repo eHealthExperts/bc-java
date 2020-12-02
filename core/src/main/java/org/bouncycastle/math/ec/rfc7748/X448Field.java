@@ -42,6 +42,11 @@ public abstract class X448Field
         int z0 = z[0], z1 = z[1], z2 = z[2], z3 = z[3], z4 = z[4], z5 = z[5], z6 = z[6], z7 = z[7];
         int z8 = z[8], z9 = z[9], z10 = z[10], z11 = z[11], z12 = z[12], z13 = z[13], z14 = z[14], z15 = z[15];
 
+        z1   += (z0 >>> 28); z0 &= M28;
+        z5   += (z4 >>> 28); z4 &= M28;
+        z9   += (z8 >>> 28); z8 &= M28;
+        z13  += (z12 >>> 28); z12 &= M28;
+
         z2   += (z1 >>> 28); z1 &= M28;
         z6   += (z5 >>> 28); z5 &= M28;
         z10  += (z9 >>> 28); z9 &= M28;
@@ -646,16 +651,22 @@ public abstract class X448Field
         mul(t, x222, z);
     }
 
-    private static void reduce(int[] z, int c)
+    private static void reduce(int[] z, int x)
     {
         int t = z[15], z15 = t & M28;
-        t = (t >> 28) + c;
-        z[8] += t;
-        for (int i = 0; i < 15; ++i)
+        t = (t >>> 28) + x;
+
+        long cc = t;
+        for (int i = 0; i < 8; ++i)
         {
-            t += z[i]; z[i] = t & M28; t >>= 28;
+            cc += z[i] & U32; z[i] = (int)cc & M28; cc >>= 28;
         }
-        z[15] = z15 + t;
+        cc += t;
+        for (int i = 8; i < 15; ++i)
+        {
+            cc += z[i] & U32; z[i] = (int)cc & M28; cc >>= 28;
+        }
+        z[15] = z15 + (int)cc;
     }
 
     public static void sqr(int[] x, int[] z)

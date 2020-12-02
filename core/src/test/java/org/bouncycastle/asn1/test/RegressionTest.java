@@ -79,7 +79,9 @@ public class RegressionTest
         new CertifiedKeyPairTest(),
         new PrivateKeyInfoTest(),
         new LocaleTest(),
-        new LinkedCertificateTest()
+        new LinkedCertificateTest(),
+        new DLExternalTest(),
+        new KMACParamsTest()
     };
 
     public static void main(String[] args)

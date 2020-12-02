@@ -15,8 +15,15 @@ import org.bouncycastle.jsse.java.security.BCCryptoPrimitive;
 abstract class JsseUtils_7
     extends JsseUtils
 {
-    static final Set<CryptoPrimitive> TLS_CRYPTO_PRIMITIVES =
+    static final Set<CryptoPrimitive> KEY_AGREEMENT_CRYPTO_PRIMITIVES =
         Collections.unmodifiableSet(EnumSet.of(CryptoPrimitive.KEY_AGREEMENT));
+    static final Set<CryptoPrimitive> KEY_ENCAPSULATION_CRYPTO_PRIMITIVES =
+        Collections.unmodifiableSet(EnumSet.of(CryptoPrimitive.KEY_ENCAPSULATION));
+    static final Set<CryptoPrimitive> SIGNATURE_CRYPTO_PRIMITIVES =
+        Collections.unmodifiableSet(EnumSet.of(CryptoPrimitive.SIGNATURE));
+
+    static final AlgorithmConstraints DEFAULT_ALGORITHM_CONSTRAINTS = new ExportAlgorithmConstraints(
+        ProvAlgorithmConstraints.DEFAULT);
 
     static class ExportAlgorithmConstraints implements AlgorithmConstraints
     {
@@ -80,11 +87,13 @@ abstract class JsseUtils_7
         }
     }
 
-    /*
-     * NOTE: Currently return type is Object to isolate callers from JDK7 type
-     */
-    static Object exportAlgorithmConstraints(BCAlgorithmConstraints constraints)
+    static AlgorithmConstraints exportAlgorithmConstraints(BCAlgorithmConstraints constraints)
     {
+        if (ProvAlgorithmConstraints.DEFAULT == constraints)
+        {
+            return DEFAULT_ALGORITHM_CONSTRAINTS;
+        }
+
         if (constraints == null)
         {
             return null;
@@ -96,6 +105,14 @@ abstract class JsseUtils_7
         }
 
         return new ExportAlgorithmConstraints(constraints);
+    }
+
+    /*
+     * NOTE: Return type is Object to isolate callers from JDK 7 type
+     */
+    static Object exportAlgorithmConstraintsDynamic(BCAlgorithmConstraints constraints)
+    {
+        return exportAlgorithmConstraints(constraints);
     }
 
     static CryptoPrimitive exportCryptoPrimitive(BCCryptoPrimitive primitive)
@@ -129,9 +146,17 @@ abstract class JsseUtils_7
 
     static Set<CryptoPrimitive> exportCryptoPrimitives(Set<BCCryptoPrimitive> primitives)
     {
-        if (TLS_CRYPTO_PRIMITIVES_BC == primitives)
+        if (SIGNATURE_CRYPTO_PRIMITIVES_BC == primitives)
         {
-            return TLS_CRYPTO_PRIMITIVES;
+            return SIGNATURE_CRYPTO_PRIMITIVES;
+        }
+        if (KEY_AGREEMENT_CRYPTO_PRIMITIVES_BC == primitives)
+        {
+            return KEY_AGREEMENT_CRYPTO_PRIMITIVES;
+        }
+        if (KEY_ENCAPSULATION_CRYPTO_PRIMITIVES_BC == primitives)
+        {
+            return KEY_ENCAPSULATION_CRYPTO_PRIMITIVES;
         }
 
         HashSet<CryptoPrimitive> result = new HashSet<CryptoPrimitive>();
@@ -142,17 +167,12 @@ abstract class JsseUtils_7
         return result;
     }
 
-    /*
-     * NOTE: Currently argument is Object type to isolate callers from JDK7 type
-     */
-    static BCAlgorithmConstraints importAlgorithmConstraints(Object getAlgorithmConstraintsResult)
+    static BCAlgorithmConstraints importAlgorithmConstraints(AlgorithmConstraints constraints)
     {
-        if (getAlgorithmConstraintsResult == null)
+        if (null == constraints)
         {
             return null;
         }
-
-        AlgorithmConstraints constraints = (AlgorithmConstraints)getAlgorithmConstraintsResult;
 
         if (constraints instanceof ExportAlgorithmConstraints)
         {
@@ -160,6 +180,14 @@ abstract class JsseUtils_7
         }
 
         return new ImportAlgorithmConstraints(constraints);
+    }
+
+    /*
+     * NOTE: Argument type is Object to isolate callers from JDK 7 type
+     */
+    static BCAlgorithmConstraints importAlgorithmConstraintsDynamic(Object constraints)
+    {
+        return importAlgorithmConstraints((AlgorithmConstraints)constraints);
     }
 
     static BCCryptoPrimitive importCryptoPrimitive(CryptoPrimitive primitive)
@@ -193,9 +221,17 @@ abstract class JsseUtils_7
 
     static Set<BCCryptoPrimitive> importCryptoPrimitives(Set<CryptoPrimitive> primitives)
     {
-        if (TLS_CRYPTO_PRIMITIVES == primitives)
+        if (SIGNATURE_CRYPTO_PRIMITIVES == primitives)
         {
-            return TLS_CRYPTO_PRIMITIVES_BC;
+            return SIGNATURE_CRYPTO_PRIMITIVES_BC;
+        }
+        if (KEY_AGREEMENT_CRYPTO_PRIMITIVES == primitives)
+        {
+            return KEY_AGREEMENT_CRYPTO_PRIMITIVES_BC;
+        }
+        if (KEY_ENCAPSULATION_CRYPTO_PRIMITIVES == primitives)
+        {
+            return KEY_ENCAPSULATION_CRYPTO_PRIMITIVES_BC;
         }
 
         HashSet<BCCryptoPrimitive> result = new HashSet<BCCryptoPrimitive>();

@@ -10,12 +10,16 @@ import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.spec.PSSParameterSpec;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1Null;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DERNull;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.RSASSAPSSparams;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -25,6 +29,16 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 class X509SignatureUtil
 {
+    private static final Map<ASN1ObjectIdentifier, String> algNames = new HashMap<ASN1ObjectIdentifier, String>();
+
+    static
+    {
+        algNames.put(EdECObjectIdentifiers.id_Ed25519, "Ed25519");
+        algNames.put(EdECObjectIdentifiers.id_Ed448, "Ed448");
+        algNames.put(OIWObjectIdentifiers.dsaWithSHA1, "SHA1withDSA");
+        algNames.put(X9ObjectIdentifiers.id_dsa_with_sha1, "SHA1withDSA");
+    }
+
     private static final ASN1Null       derNull = DERNull.INSTANCE;
 
     static void setSignatureParameters(
@@ -80,33 +94,14 @@ class X509SignatureUtil
             }
         }
 
-        Provider prov = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME);
-
-        if (prov != null)
+        // deal with the "weird" ones.
+        String algName = (String)algNames.get(sigAlgId.getAlgorithm());
+        if (algName != null)
         {
-            String      algName = prov.getProperty("Alg.Alias.Signature." + sigAlgId.getAlgorithm().getId());
-
-            if (algName != null)
-            {
-                return algName;
-            }
+            return algName;
         }
 
-        Provider[] provs = Security.getProviders();
-
-        //
-        // search every provider looking for a real algorithm
-        //
-        for (int i = 0; i != provs.length; i++)
-        {
-            String algName = provs[i].getProperty("Alg.Alias.Signature." + sigAlgId.getAlgorithm().getId());
-            if (algName != null)
-            {
-                return algName;
-            }
-        }
-
-        return sigAlgId.getAlgorithm().getId();
+        return findAlgName(sigAlgId.getAlgorithm());
     }
     
     /**
@@ -124,6 +119,55 @@ class X509SignatureUtil
             return name.substring(0, dIndex) + name.substring(dIndex + 1);
         }
 
-        return MessageDigestUtils.getDigestName(digestAlgOID);
+        return name;
+    }
+
+    private static String findAlgName(ASN1ObjectIdentifier algOid)
+    {
+        Provider prov = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME);
+
+        if (prov != null)
+        {
+            String algName = lookupAlg(prov, algOid);
+            if (algName != null)
+            {
+                return algName;
+            }
+        }
+
+        Provider[] provs = Security.getProviders();
+
+        for (int i = 0; i != provs.length; i++)
+        {
+            if (prov != provs[i])
+            {
+                String algName = lookupAlg(provs[i], algOid);
+                if (algName != null)
+                {
+                    return algName;
+                }
+            }
+        }
+
+        return algOid.getId();
+    }
+
+    private static String lookupAlg(Provider prov, ASN1ObjectIdentifier algOid)
+    {
+        String      algName = prov.getProperty("Alg.Alias.Signature." + algOid);
+
+        if (algName != null)
+        {
+            return algName;
+        }
+
+        algName = prov.getProperty("Alg.Alias.Signature.OID." + algOid);
+
+        if (algName != null)
+        {
+            return algName;
+        }
+
+        return null;
     }
 }
