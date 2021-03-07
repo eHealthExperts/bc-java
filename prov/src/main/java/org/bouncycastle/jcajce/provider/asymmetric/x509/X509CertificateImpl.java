@@ -194,7 +194,7 @@ abstract class X509CertificateImpl
 
     public byte[] getSignature()
     {
-        return c.getSignature().getOctets();
+        return Arrays.clone(c.getSignature().getOctets());
     }
 
     /**

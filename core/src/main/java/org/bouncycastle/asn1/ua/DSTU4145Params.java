@@ -92,7 +92,7 @@ public class DSTU4145Params
 
             if (seq.size() == 2)
             {
-                params.dke = ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets();
+                params.dke = Arrays.clone(ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets());
                 if (params.dke.length != DSTU4145Params.DEFAULT_DKE.length)
                 {
                     throw new IllegalArgumentException("object parse error");

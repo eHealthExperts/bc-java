@@ -79,7 +79,7 @@ public class DERVisibleString
     DERVisibleString(
         byte[]   string)
     {
-        this.string = string;
+        this.string = Arrays.clone(string);
     }
 
     /**

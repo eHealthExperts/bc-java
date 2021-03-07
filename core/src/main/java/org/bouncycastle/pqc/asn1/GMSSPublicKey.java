@@ -34,7 +34,7 @@ public class GMSSPublicKey
         }
 
         this.version = ASN1Integer.getInstance(seq.getObjectAt(0));
-        this.publicKey = ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets();
+        this.publicKey = Arrays.clone(ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets());
     }
 
     public GMSSPublicKey(byte[] publicKeyBytes)

@@ -14,6 +14,7 @@ import org.bouncycastle.pqc.math.linearalgebra.GF2Matrix;
 import org.bouncycastle.pqc.math.linearalgebra.GF2mField;
 import org.bouncycastle.pqc.math.linearalgebra.Permutation;
 import org.bouncycastle.pqc.math.linearalgebra.PolynomialGF2mSmallM;
+import org.bouncycastle.util.Arrays;
 
 public class McEliecePrivateKey
     extends ASN1Object
@@ -57,15 +58,15 @@ public class McEliecePrivateKey
 
         k = ((ASN1Integer)seq.getObjectAt(1)).intValueExact();
 
-        encField = ((ASN1OctetString)seq.getObjectAt(2)).getOctets();
+        encField = Arrays.clone(((ASN1OctetString)seq.getObjectAt(2)).getOctets());
 
-        encGp = ((ASN1OctetString)seq.getObjectAt(3)).getOctets();
+        encGp = Arrays.clone(((ASN1OctetString)seq.getObjectAt(3)).getOctets());
 
-        encP1 = ((ASN1OctetString)seq.getObjectAt(4)).getOctets();
+        encP1 = Arrays.clone(((ASN1OctetString)seq.getObjectAt(4)).getOctets());
 
-        encP2 = ((ASN1OctetString)seq.getObjectAt(5)).getOctets();
+        encP2 = Arrays.clone(((ASN1OctetString)seq.getObjectAt(5)).getOctets());
 
-        encSInv = ((ASN1OctetString)seq.getObjectAt(6)).getOctets();
+        encSInv = Arrays.clone(((ASN1OctetString)seq.getObjectAt(6)).getOctets());
     }
 
     public int getN()

@@ -93,7 +93,7 @@ public class CMSAuthenticatedData
         this.macAlg = authData.getMacAlgorithm();
 
         this.authAttrs = authData.getAuthAttrs();
-        this.mac = authData.getMac().getOctets();
+        this.mac = Arrays.clone(authData.getMac().getOctets());
         this.unauthAttrs = authData.getUnauthAttrs();
 
         //
@@ -101,7 +101,7 @@ public class CMSAuthenticatedData
         //
         ContentInfo encInfo = authData.getEncapsulatedContentInfo();
         CMSReadable readable = new CMSProcessableByteArray(
-            ASN1OctetString.getInstance(encInfo.getContent()).getOctets());
+            Arrays.clone(ASN1OctetString.getInstance(encInfo.getContent()).getOctets()));
 
         //
         // build the RecipientInformationStore
@@ -298,7 +298,7 @@ public class CMSAuthenticatedData
     {
         if (authAttrs != null)
         {
-            return ASN1OctetString.getInstance(getAuthAttrs().get(CMSAttributes.messageDigest).getAttrValues().getObjectAt(0)).getOctets();
+            return Arrays.clone(ASN1OctetString.getInstance(getAuthAttrs().get(CMSAttributes.messageDigest).getAttrValues().getObjectAt(0)).getOctets());
         }
 
         return null;

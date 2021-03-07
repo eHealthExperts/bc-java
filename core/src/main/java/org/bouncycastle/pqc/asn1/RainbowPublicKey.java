@@ -10,6 +10,7 @@ import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.pqc.crypto.rainbow.util.RainbowUtil;
+import org.bouncycastle.util.Arrays;
 
 /**
  * This class implements an ASN.1 encoded Rainbow public key. The ASN.1 definition
@@ -56,18 +57,18 @@ public class RainbowPublicKey
         coeffQuadratic = new byte[asnCoeffQuad.size()][];
         for (int quadSize = 0; quadSize < asnCoeffQuad.size(); quadSize++)
         {
-            coeffQuadratic[quadSize] = ASN1OctetString.getInstance(asnCoeffQuad.getObjectAt(quadSize)).getOctets();
+            coeffQuadratic[quadSize] = Arrays.clone(ASN1OctetString.getInstance(asnCoeffQuad.getObjectAt(quadSize)).getOctets());
         }
 
         ASN1Sequence asnCoeffSing = (ASN1Sequence)seq.getObjectAt(3);
         coeffSingular = new byte[asnCoeffSing.size()][];
         for (int singSize = 0; singSize < asnCoeffSing.size(); singSize++)
         {
-            coeffSingular[singSize] = ASN1OctetString.getInstance(asnCoeffSing.getObjectAt(singSize)).getOctets();
+            coeffSingular[singSize] = Arrays.clone(ASN1OctetString.getInstance(asnCoeffSing.getObjectAt(singSize)).getOctets());
         }
 
         ASN1Sequence asnCoeffScalar = (ASN1Sequence)seq.getObjectAt(4);
-        coeffScalar = ASN1OctetString.getInstance(asnCoeffScalar.getObjectAt(0)).getOctets();
+        coeffScalar = Arrays.clone(ASN1OctetString.getInstance(asnCoeffScalar.getObjectAt(0)).getOctets());
     }
 
     public RainbowPublicKey(int docLength, short[][] coeffQuadratic, short[][] coeffSingular, short[] coeffScalar)

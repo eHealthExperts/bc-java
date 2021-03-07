@@ -9,6 +9,7 @@ import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.selector.X509CertificateHolderSelector;
+import org.bouncycastle.util.Arrays;
 
 public class JcaX509CertificateHolderSelector
     extends X509CertificateHolderSelector
@@ -62,7 +63,7 @@ public class JcaX509CertificateHolderSelector
 
         if (ext != null)
         {
-            return ASN1OctetString.getInstance(ASN1OctetString.getInstance(ext).getOctets()).getOctets();
+            return Arrays.clone(ASN1OctetString.getInstance(ASN1OctetString.getInstance(ext).getOctets()).getOctets());
         }
         else
         {

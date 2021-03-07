@@ -12,6 +12,7 @@ import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.operator.DigestCalculator;
+import org.bouncycastle.util.Arrays;
 
 /**
  * General utility class for creating calculated extensions using the standard methods.
@@ -123,7 +124,7 @@ public class X509ExtensionUtils
 
             if (ext != null)
             {
-                return ASN1OctetString.getInstance(ext.getParsedValue()).getOctets();
+                return Arrays.clone(ASN1OctetString.getInstance(ext.getParsedValue()).getOctets());
             }
             else
             {

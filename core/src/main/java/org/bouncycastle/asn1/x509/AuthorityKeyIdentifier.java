@@ -15,6 +15,7 @@ import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.crypto.Digest;
 import org.bouncycastle.crypto.digests.SHA1Digest;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Hex;
 
 /**
@@ -176,7 +177,7 @@ public class AuthorityKeyIdentifier
     {
         if (keyidentifier != null)
         {
-            return keyidentifier.getOctets();
+            return Arrays.clone(keyidentifier.getOctets());
         }
 
         return null;

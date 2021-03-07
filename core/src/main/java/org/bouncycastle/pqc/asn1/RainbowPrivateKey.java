@@ -11,6 +11,7 @@ import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.pqc.crypto.rainbow.Layer;
 import org.bouncycastle.pqc.crypto.rainbow.util.RainbowUtil;
+import org.bouncycastle.util.Arrays;
 
 /**
  * Return the key data to encode in the PrivateKeyInfo structure.
@@ -71,28 +72,28 @@ public class RainbowPrivateKey
         invA1 = new byte[asnA1.size()][];
         for (int i = 0; i < asnA1.size(); i++)
         {
-            invA1[i] = ((ASN1OctetString)asnA1.getObjectAt(i)).getOctets();
+            invA1[i] = Arrays.clone(((ASN1OctetString)asnA1.getObjectAt(i)).getOctets());
         }
 
         // <b1>
         ASN1Sequence asnb1 = (ASN1Sequence)seq.getObjectAt(2);
-        b1 = ((ASN1OctetString)asnb1.getObjectAt(0)).getOctets();
+        b1 = Arrays.clone(((ASN1OctetString)asnb1.getObjectAt(0)).getOctets());
 
         // <A2inv>
         ASN1Sequence asnA2 = (ASN1Sequence)seq.getObjectAt(3);
         invA2 = new byte[asnA2.size()][];
         for (int j = 0; j < asnA2.size(); j++)
         {
-            invA2[j] = ((ASN1OctetString)asnA2.getObjectAt(j)).getOctets();
+            invA2[j] = Arrays.clone(((ASN1OctetString)asnA2.getObjectAt(j)).getOctets());
         }
 
         // <b2>
         ASN1Sequence asnb2 = (ASN1Sequence)seq.getObjectAt(4);
-        b2 = ((ASN1OctetString)asnb2.getObjectAt(0)).getOctets();
+        b2 = Arrays.clone(((ASN1OctetString)asnb2.getObjectAt(0)).getOctets());
 
         // <vi>
         ASN1Sequence asnvi = (ASN1Sequence)seq.getObjectAt(5);
-        vi = ((ASN1OctetString)asnvi.getObjectAt(0)).getOctets();
+        vi = Arrays.clone(((ASN1OctetString)asnvi.getObjectAt(0)).getOctets());
 
         // <layers>
         ASN1Sequence asnLayers = (ASN1Sequence)seq.getObjectAt(6);
@@ -115,7 +116,7 @@ public class RainbowPrivateKey
                 alphas[l][m] = new byte[alphas2d.size()][];
                 for (int n = 0; n < alphas2d.size(); n++)
                 {
-                    alphas[l][m][n] = ((ASN1OctetString)alphas2d.getObjectAt(n)).getOctets();
+                    alphas[l][m][n] = Arrays.clone(((ASN1OctetString)alphas2d.getObjectAt(n)).getOctets());
                 }
             }
 
@@ -128,7 +129,7 @@ public class RainbowPrivateKey
                 betas[l][mb] = new byte[betas2d.size()][];
                 for (int nb = 0; nb < betas2d.size(); nb++)
                 {
-                    betas[l][mb][nb] = ((ASN1OctetString)betas2d.getObjectAt(nb)).getOctets();
+                    betas[l][mb][nb] = Arrays.clone(((ASN1OctetString)betas2d.getObjectAt(nb)).getOctets());
                 }
             }
 
@@ -137,11 +138,11 @@ public class RainbowPrivateKey
             gammas[l] = new byte[gammas2d.size()][];
             for (int mg = 0; mg < gammas2d.size(); mg++)
             {
-                gammas[l][mg] = ((ASN1OctetString)gammas2d.getObjectAt(mg)).getOctets();
+                gammas[l][mg] = Arrays.clone(((ASN1OctetString)gammas2d.getObjectAt(mg)).getOctets());
             }
 
             // eta ...
-            etas[l] = ((ASN1OctetString)asnLayer.getObjectAt(3)).getOctets();
+            etas[l] = Arrays.clone(((ASN1OctetString)asnLayer.getObjectAt(3)).getOctets());
         }
 
         int numOfLayers = vi.length - 1;

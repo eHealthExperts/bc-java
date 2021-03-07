@@ -10,6 +10,7 @@ import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.util.Arrays;
 
 public class PBEParameter
     extends ASN1Object
@@ -58,7 +59,7 @@ public class PBEParameter
 
     public byte[] getSalt()
     {
-        return salt.getOctets();
+        return Arrays.clone(salt.getOctets());
     }
 
     public ASN1Primitive toASN1Primitive()

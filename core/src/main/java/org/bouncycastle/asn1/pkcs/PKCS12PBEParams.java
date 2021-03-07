@@ -10,6 +10,7 @@ import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.util.Arrays;
 
 public class PKCS12PBEParams
     extends ASN1Object
@@ -54,7 +55,7 @@ public class PKCS12PBEParams
 
     public byte[] getIV()
     {
-        return iv.getOctets();
+        return Arrays.clone(iv.getOctets());
     }
 
     public ASN1Primitive toASN1Primitive()

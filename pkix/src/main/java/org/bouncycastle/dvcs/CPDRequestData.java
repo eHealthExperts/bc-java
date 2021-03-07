@@ -1,6 +1,7 @@
 package org.bouncycastle.dvcs;
 
 import org.bouncycastle.asn1.dvcs.Data;
+import org.bouncycastle.util.Arrays;
 
 /**
  * Data piece of DVCRequest for CPD service (Certify Possession of Data).
@@ -36,6 +37,6 @@ public class CPDRequestData
      */
     public byte[] getMessage()
     {
-        return data.getMessage().getOctets();
+        return Arrays.clone(data.getMessage().getOctets());
     }
 }

@@ -56,7 +56,7 @@ public class CCMParameters
     private CCMParameters(
         ASN1Sequence seq)
     {
-        this.nonce = ASN1OctetString.getInstance(seq.getObjectAt(0)).getOctets();
+        this.nonce = Arrays.clone(ASN1OctetString.getInstance(seq.getObjectAt(0)).getOctets());
 
         if (seq.size() == 2)
         {
@@ -90,7 +90,7 @@ public class CCMParameters
     {
         ASN1EncodableVector v = new ASN1EncodableVector(2);
 
-        v.add(new DEROctetString(nonce));
+        v.add(new DEROctetString(getNonce()));
 
         if (icvLen != 12)
         {

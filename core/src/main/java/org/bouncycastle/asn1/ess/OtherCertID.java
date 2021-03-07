@@ -11,6 +11,7 @@ import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.DigestInfo;
 import org.bouncycastle.asn1.x509.IssuerSerial;
+import org.bouncycastle.util.Arrays;
 
 public class OtherCertID
     extends ASN1Object
@@ -93,7 +94,7 @@ public class OtherCertID
         if (otherCertHash.toASN1Primitive() instanceof ASN1OctetString)
         {
             // SHA-1
-            return ((ASN1OctetString)otherCertHash.toASN1Primitive()).getOctets();
+            return Arrays.clone(((ASN1OctetString)otherCertHash.toASN1Primitive()).getOctets());
         }
         else
         {

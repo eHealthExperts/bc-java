@@ -83,7 +83,7 @@ public class DERNumericString
     DERNumericString(
         byte[]   string)
     {
-        this.string = string;
+        this.string = Arrays.clone(string);
     }
 
     /**

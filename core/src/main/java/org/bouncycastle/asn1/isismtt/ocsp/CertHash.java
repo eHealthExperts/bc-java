@@ -71,7 +71,7 @@ public class CertHash
                 + seq.size());
         }
         hashAlgorithm = AlgorithmIdentifier.getInstance(seq.getObjectAt(0));
-        certificateHash = DEROctetString.getInstance(seq.getObjectAt(1)).getOctets();
+        certificateHash = Arrays.clone(DEROctetString.getInstance(seq.getObjectAt(1)).getOctets());
     }
 
     /**
@@ -115,7 +115,7 @@ public class CertHash
     {
         ASN1EncodableVector vec = new ASN1EncodableVector(2);
         vec.add(hashAlgorithm);
-        vec.add(new DEROctetString(certificateHash));
+        vec.add(new DEROctetString(getCertificateHash()));
         return new DERSequence(vec);
     }
 }

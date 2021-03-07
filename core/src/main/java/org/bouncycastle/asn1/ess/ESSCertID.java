@@ -8,6 +8,7 @@ import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.x509.IssuerSerial;
+import org.bouncycastle.util.Arrays;
 
 public class ESSCertID
     extends ASN1Object
@@ -64,7 +65,7 @@ public class ESSCertID
 
     public byte[] getCertHash()
     {
-        return certHash.getOctets();
+        return Arrays.clone(certHash.getOctets());
     }
 
     public IssuerSerial getIssuerSerial()

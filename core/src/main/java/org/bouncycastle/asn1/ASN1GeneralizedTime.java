@@ -165,7 +165,7 @@ public class ASN1GeneralizedTime
         {
             throw new IllegalArgumentException("GeneralizedTime string too short");
         }
-        this.time = bytes;
+        this.time = Arrays.clone(bytes);
 
         if (!(isDigit(0) && isDigit(1) && isDigit(2) && isDigit(3)))
         {
