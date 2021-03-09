@@ -41,7 +41,7 @@ public class GostR3410TransportParameters
         if (seq.size() == 2)
         {
             this.encryptionParamSet = ASN1ObjectIdentifier.getInstance(seq.getObjectAt(0));
-            this.ukm = ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets();
+            this.ukm = Arrays.clone(ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets());
             this.ephemeralPublicKey = null;
         }
         else if (seq.size() == 3)
@@ -49,7 +49,7 @@ public class GostR3410TransportParameters
             this.encryptionParamSet = ASN1ObjectIdentifier.getInstance(seq.getObjectAt(0));
             this.ephemeralPublicKey = SubjectPublicKeyInfo.getInstance(
                 ASN1TaggedObject.getInstance(seq.getObjectAt(1)), false);
-            this.ukm = ASN1OctetString.getInstance(seq.getObjectAt(2)).getOctets();
+            this.ukm = Arrays.clone(ASN1OctetString.getInstance(seq.getObjectAt(2)).getOctets());
         }
         else
         {

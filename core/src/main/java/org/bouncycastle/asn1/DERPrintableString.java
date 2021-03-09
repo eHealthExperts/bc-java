@@ -99,7 +99,7 @@ public class DERPrintableString
     DERPrintableString(
         byte[]   string)
     {
-        this.string = string;
+        this.string = Arrays.clone(string);
     }
 
     /**

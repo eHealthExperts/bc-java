@@ -91,11 +91,11 @@ public class RequestedCertificate
     {
         if (tagged.getTagNo() == publicKeyCertificate)
         {
-            publicKeyCert = ASN1OctetString.getInstance(tagged, true).getOctets();
+            publicKeyCert = Arrays.clone(ASN1OctetString.getInstance(tagged, true).getOctets());
         }
         else if (tagged.getTagNo() == attributeCertificate)
         {
-            attributeCert = ASN1OctetString.getInstance(tagged, true).getOctets();
+            attributeCert = Arrays.clone(ASN1OctetString.getInstance(tagged, true).getOctets());
         }
         else
         {

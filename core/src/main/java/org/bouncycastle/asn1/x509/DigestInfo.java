@@ -62,7 +62,7 @@ public class DigestInfo
         Enumeration             e = obj.getObjects();
 
         algId = AlgorithmIdentifier.getInstance(e.nextElement());
-        digest = ASN1OctetString.getInstance(e.nextElement()).getOctets();
+        digest = Arrays.clone(ASN1OctetString.getInstance(e.nextElement()).getOctets());
     }
 
     public AlgorithmIdentifier getAlgorithmId()
@@ -80,7 +80,7 @@ public class DigestInfo
         ASN1EncodableVector v = new ASN1EncodableVector(2);
 
         v.add(algId);
-        v.add(new DEROctetString(digest));
+        v.add(new DEROctetString(getDigest()));
 
         return new DERSequence(v);
     }

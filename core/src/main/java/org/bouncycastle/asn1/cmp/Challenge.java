@@ -9,6 +9,7 @@ import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.util.Arrays;
 
 public class Challenge
     extends ASN1Object
@@ -64,12 +65,12 @@ public class Challenge
 
     public byte[] getWitness()
     {
-        return witness.getOctets();
+        return Arrays.clone(witness.getOctets());
     }
 
     public byte[] getChallenge()
     {
-        return challenge.getOctets();
+        return Arrays.clone(challenge.getOctets());
     }
 
     /**

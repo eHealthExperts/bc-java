@@ -78,7 +78,7 @@ public class DERUTF8String
      */
     DERUTF8String(byte[] string)
     {
-        this.string = string;
+        this.string = Arrays.clone(string);
     }
 
     /**

@@ -379,7 +379,7 @@ abstract class X509CRLImpl
 
     public byte[] getSignature()
     {
-        return c.getSignature().getOctets();
+        return Arrays.clone(c.getSignature().getOctets());
     }
 
     public String getSigAlgName()

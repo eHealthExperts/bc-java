@@ -5,6 +5,7 @@ import org.bouncycastle.asn1.cms.IssuerAndSerialNumber;
 import org.bouncycastle.asn1.cms.KeyTransRecipientInfo;
 import org.bouncycastle.asn1.cms.RecipientIdentifier;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.util.Arrays;
 
 /**
  * the KeyTransRecipientInformation class for a recipient who has been sent a secret
@@ -45,6 +46,6 @@ public class KeyTransRecipientInformation
     protected RecipientOperator getRecipientOperator(Recipient recipient)
         throws CMSException
     {
-        return ((KeyTransRecipient)recipient).getRecipientOperator(keyEncAlg, messageAlgorithm, info.getEncryptedKey().getOctets());
+        return ((KeyTransRecipient)recipient).getRecipientOperator(keyEncAlg, messageAlgorithm, Arrays.clone(info.getEncryptedKey().getOctets()));
     }
 }

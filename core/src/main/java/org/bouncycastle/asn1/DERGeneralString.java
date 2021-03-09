@@ -77,7 +77,7 @@ public class DERGeneralString
 
     DERGeneralString(byte[] string)
     {
-        this.string = string;
+        this.string = Arrays.clone(string);
     }
 
     /**

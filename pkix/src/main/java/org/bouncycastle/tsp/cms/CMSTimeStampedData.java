@@ -20,6 +20,7 @@ import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.tsp.TimeStampToken;
+import org.bouncycastle.util.Arrays;
 
 public class CMSTimeStampedData
 {
@@ -99,7 +100,7 @@ public class CMSTimeStampedData
     {
         if (timeStampedData.getContent() != null)
         {
-            return timeStampedData.getContent().getOctets();
+            return Arrays.clone(timeStampedData.getContent().getOctets());
         }
 
         return null;

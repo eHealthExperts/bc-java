@@ -23,6 +23,7 @@ import org.bouncycastle.asn1.x9.X9ObjectIdentifiers;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.jcajce.util.AlgorithmParametersUtils;
 import org.bouncycastle.jcajce.util.AnnotatedPrivateKey;
+import org.bouncycastle.util.Arrays;
 
 class CMSUtils
 {
@@ -103,7 +104,7 @@ class CMSUtils
 
         if (ext != null)
         {
-            return ASN1OctetString.getInstance(ASN1OctetString.getInstance(ext).getOctets()).getOctets();
+            return Arrays.clone(ASN1OctetString.getInstance(ASN1OctetString.getInstance(ext).getOctets()).getOctets());
         }
         else
         {

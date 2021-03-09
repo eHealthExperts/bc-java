@@ -17,6 +17,7 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.util.Arrays;
 
 public class CertificateID
 {
@@ -58,12 +59,12 @@ public class CertificateID
 
     public byte[] getIssuerNameHash()
     {
-        return id.getIssuerNameHash().getOctets();
+        return Arrays.clone(id.getIssuerNameHash().getOctets());
     }
 
     public byte[] getIssuerKeyHash()
     {
-        return id.getIssuerKeyHash().getOctets();
+        return Arrays.clone(id.getIssuerKeyHash().getOctets());
     }
 
     /**

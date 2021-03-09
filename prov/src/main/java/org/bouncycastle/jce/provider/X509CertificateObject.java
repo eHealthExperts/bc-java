@@ -217,7 +217,7 @@ public class X509CertificateObject
 
     public byte[] getSignature()
     {
-        return c.getSignature().getOctets();
+        return Arrays.clone(c.getSignature().getOctets());
     }
 
     /**

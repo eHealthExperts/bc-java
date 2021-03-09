@@ -5,6 +5,7 @@ import java.security.SignatureException;
 
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.util.Arrays;
 
 public class SignatureSpiLe
     extends SignatureSpi
@@ -24,7 +25,7 @@ public class SignatureSpiLe
     protected byte[] engineSign()
         throws SignatureException
     {
-        byte[] signature = ASN1OctetString.getInstance(super.engineSign()).getOctets();
+        byte[] signature = Arrays.clone(ASN1OctetString.getInstance(super.engineSign()).getOctets());
         reverseBytes(signature);
         try
         {
@@ -44,7 +45,7 @@ public class SignatureSpiLe
 
         try
         {
-            bytes = ((ASN1OctetString)ASN1OctetString.fromByteArray(sigBytes)).getOctets();
+            bytes = Arrays.clone(((ASN1OctetString)ASN1OctetString.fromByteArray(sigBytes)).getOctets());
         }
         catch (IOException e)
         {

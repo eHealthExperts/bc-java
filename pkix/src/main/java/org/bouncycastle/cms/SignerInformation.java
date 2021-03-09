@@ -72,7 +72,7 @@ public class SignerInformation
         {
             ASN1OctetString octs = ASN1OctetString.getInstance(s.getId());
 
-            sid = new SignerId(octs.getOctets());
+            sid = new SignerId(Arrays.clone(octs.getOctets()));
         }
         else
         {
@@ -85,7 +85,7 @@ public class SignerInformation
         this.signedAttributeSet = info.getAuthenticatedAttributes();
         this.unsignedAttributeSet = info.getUnauthenticatedAttributes();
         this.encryptionAlgorithm = info.getDigestEncryptionAlgorithm();
-        this.signature = info.getEncryptedDigest().getOctets();
+        this.signature = Arrays.clone(info.getEncryptedDigest().getOctets());
 
         this.content = content;
         this.resultDigest = resultDigest;
@@ -108,7 +108,7 @@ public class SignerInformation
         this.signedAttributeSet = info.getAuthenticatedAttributes();
         this.unsignedAttributeSet = info.getUnauthenticatedAttributes();
         this.encryptionAlgorithm = info.getDigestEncryptionAlgorithm();
-        this.signature = info.getEncryptedDigest().getOctets();
+        this.signature = Arrays.clone(info.getEncryptedDigest().getOctets());
         this.content = baseInfo.content;
         this.resultDigest = baseInfo.resultDigest;
         this.signedAttributeValues = baseInfo.signedAttributeValues;

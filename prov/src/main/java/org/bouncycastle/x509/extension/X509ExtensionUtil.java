@@ -18,6 +18,7 @@ import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Integers;
 
 
@@ -95,7 +96,7 @@ public class X509ExtensionUtil
                     list.add(ASN1ObjectIdentifier.getInstance(genName.getName()).getId());
                     break;
                 case GeneralName.iPAddress:
-                    list.add(DEROctetString.getInstance(genName.getName()).getOctets());
+                    list.add(Arrays.clone(DEROctetString.getInstance(genName.getName()).getOctets()));
                     break;
                 default:
                     throw new IOException("Bad tag number: " + genName.getTagNo());

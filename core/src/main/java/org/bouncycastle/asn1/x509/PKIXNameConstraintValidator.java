@@ -254,8 +254,8 @@ public class PKIXNameConstraintValidator
                 extractNameAsString(base));
             break;
         case GeneralName.iPAddress:
-            excludedSubtreesIP = unionIP(excludedSubtreesIP, ASN1OctetString
-                .getInstance(base.getName()).getOctets());
+            excludedSubtreesIP = unionIP(excludedSubtreesIP, Arrays.clone(ASN1OctetString
+                .getInstance(base.getName()).getOctets()));
             break;
         default:
             throw new IllegalStateException("Unknown tag encountered: " + base.getTagNo());
@@ -624,8 +624,8 @@ public class PKIXNameConstraintValidator
         Set intersect = new HashSet();
         for (Iterator it = ips.iterator(); it.hasNext();)
         {
-            byte[] ip = ASN1OctetString.getInstance(
-                ((GeneralSubtree)it.next()).getBase().getName()).getOctets();
+            byte[] ip = Arrays.clone(ASN1OctetString.getInstance(
+                ((GeneralSubtree)it.next()).getBase().getName()).getOctets());
             if (permitted == null)
             {
                 if (ip != null)

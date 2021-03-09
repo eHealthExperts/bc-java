@@ -64,12 +64,12 @@ public class CMSAuthEnvelopedData
             public InputStream getInputStream()
                 throws IOException, CMSException
             {
-                return new ByteArrayInputStream(authEncInfo.getEncryptedContent().getOctets());
+                return new ByteArrayInputStream(Arrays.clone(authEncInfo.getEncryptedContent().getOctets()));
             }
         };
 
         this.authAttrs = authEnvData.getAuthAttrs();
-        this.mac = authEnvData.getMac().getOctets();
+        this.mac = Arrays.clone(authEnvData.getMac().getOctets());
         this.unauthAttrs = authEnvData.getUnauthAttrs();
 
         //

@@ -21,7 +21,7 @@ public class Gost2814789KeyWrapParameters
         if (seq.size() == 2)
         {
             this.encryptionParamSet = ASN1ObjectIdentifier.getInstance(seq.getObjectAt(0));
-            this.ukm = ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets();
+            this.ukm = Arrays.clone(ASN1OctetString.getInstance(seq.getObjectAt(1)).getOctets());
         }
         else if (seq.size() == 1)
         {

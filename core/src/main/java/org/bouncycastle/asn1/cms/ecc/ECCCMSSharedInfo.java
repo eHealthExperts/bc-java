@@ -55,12 +55,12 @@ public class ECCCMSSharedInfo
         if (seq.size() == 2)
         {
             this.entityUInfo = null;
-            this.suppPubInfo = ASN1OctetString.getInstance((ASN1TaggedObject)seq.getObjectAt(1), true).getOctets();
+            this.suppPubInfo = Arrays.clone(ASN1OctetString.getInstance((ASN1TaggedObject)seq.getObjectAt(1), true).getOctets());
         }
         else
         {
-            this.entityUInfo = ASN1OctetString.getInstance((ASN1TaggedObject)seq.getObjectAt(1), true).getOctets();
-            this.suppPubInfo = ASN1OctetString.getInstance((ASN1TaggedObject)seq.getObjectAt(2), true).getOctets();
+            this.entityUInfo = Arrays.clone(ASN1OctetString.getInstance((ASN1TaggedObject)seq.getObjectAt(1), true).getOctets());
+            this.suppPubInfo = Arrays.clone(ASN1OctetString.getInstance((ASN1TaggedObject)seq.getObjectAt(2), true).getOctets());
         }
     }
 

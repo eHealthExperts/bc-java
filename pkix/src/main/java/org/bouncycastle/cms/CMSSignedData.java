@@ -30,6 +30,7 @@ import org.bouncycastle.cert.X509AttributeCertificateHolder;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.Encodable;
 import org.bouncycastle.util.Store;
 
@@ -197,7 +198,7 @@ public class CMSSignedData
             if (content instanceof ASN1OctetString)
             {
                 this.signedContent = new CMSProcessableByteArray(signedData.getEncapContentInfo().getContentType(),
-                    ((ASN1OctetString)content).getOctets());
+                    Arrays.clone(((ASN1OctetString)content).getOctets()));
             }
             else
             {

@@ -80,7 +80,7 @@ public class DERIA5String
     DERIA5String(
         byte[]   string)
     {
-        this.string = string;
+        this.string = Arrays.clone(string);
     }
 
     /**

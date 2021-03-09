@@ -144,7 +144,7 @@ public class ECDSAPublicKey
         if ((options & G) == 0)
         {
             options |= G;
-            this.basePointG = basePointG.getOctets();
+            this.basePointG = Arrays.clone(basePointG.getOctets());
         }
         else
         {
@@ -273,7 +273,7 @@ public class ECDSAPublicKey
         if ((options & Y) == 0)
         {
             options |= Y;
-            this.publicPointY = publicPointY.getOctets();
+            this.publicPointY = Arrays.clone(publicPointY.getOctets());
         }
         else
         {

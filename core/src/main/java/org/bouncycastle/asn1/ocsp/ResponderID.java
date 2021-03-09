@@ -9,6 +9,7 @@ import org.bouncycastle.asn1.ASN1TaggedObject;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.util.Arrays;
 
 public class ResponderID
     extends ASN1Object
@@ -68,7 +69,7 @@ public class ResponderID
         if (this.value instanceof ASN1OctetString)
         {
             ASN1OctetString octetString = (ASN1OctetString)this.value;
-            return octetString.getOctets();
+            return Arrays.clone(octetString.getOctets());
         }
 
         return null;

@@ -26,6 +26,7 @@ import org.bouncycastle.asn1.x509.TBSCertificate;
 import org.bouncycastle.asn1.x509.Time;
 import org.bouncycastle.asn1.x509.V3TBSCertificateGenerator;
 import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.util.Arrays;
 
 
 /**
@@ -344,7 +345,7 @@ public class X509v3CertificateBuilder
             throw new NullPointerException("extension " + oid + " not present");
         }
 
-        extGenerator.addExtension(oid, isCritical, extension.getExtnValue().getOctets());
+        extGenerator.addExtension(oid, isCritical, Arrays.clone(extension.getExtnValue().getOctets()));
 
         return this;
     }

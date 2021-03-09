@@ -83,7 +83,7 @@ public class DERT61UTF8String
     public DERT61UTF8String(
         byte[] string)
     {
-        this.string = string;
+        this.string = Arrays.clone(string);
     }
 
     /**
